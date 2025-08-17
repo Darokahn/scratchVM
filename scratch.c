@@ -14,14 +14,20 @@ SCRATCH_implementFunction(push) {
 }
 
 SCRATCH_implementFunction(motionGoto) {
+    (*stackIndex)--;
     struct SCRATCH_data op2 = stack[*stackIndex];
     (*stackIndex)--;
     struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex)--;
     int x;
     int y;
-    if (op1.type != SCRATCH_NUMBER) {
+    if (op1.type == SCRATCH_NUMBER) {
+        x = op1.data.number;
     }
+    if (op2.type == SCRATCH_NUMBER) {
+        y = op2.data.number;
+    }
+    sprite->x = x;
+    sprite->y = y;
     return SCRATCH_yieldGeneric;
 }
 

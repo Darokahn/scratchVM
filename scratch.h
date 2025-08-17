@@ -30,7 +30,7 @@ struct SCRATCH_thread;
 
 union SCRATCH_field {
     bool boolean;
-    float number;
+    int number;
     halfStringPointer string; // can either be datasegment-allocated, variable-allocated (heap), or string buffer-allocated (stack)
     uint8_t spriteID;
     uint8_t color;
