@@ -9,7 +9,7 @@
 #define MAXOPCODE 256
 #define LOOPNESTMAX 16 // deepest nesting for `repeat x` loops before failure
 #define SPRITEMAX 256 // maximum spritecount
-#define VARIABLEMAX 2040 // maximum variable count for whole project
+#define VARIABLEMAX 2048 // maximum variable count for whole project
 #define THREADRATIO 4 // ratio of threads to sprites; Either each sprite has this many or amount is dispersed unevenly.
 
 extern int THREADMAX;
@@ -30,7 +30,7 @@ struct SCRATCH_thread;
 
 union SCRATCH_field {
     bool boolean;
-    int number;
+    uint16_t number;
     halfStringPointer string; // can either be datasegment-allocated, variable-allocated (heap), or string buffer-allocated (stack)
     uint8_t spriteID;
     uint8_t color;
@@ -53,33 +53,55 @@ enum SCRATCH_opcode : uint8_t {
 
     // Loop opcodes. 
 
-    SCRATCH_loopJump,        // Interpreter needs to know when a loop iteration finishes for sequencing
     SCRATCH_loopInit,        // Push loop counter to loop stack
     SCRATCH_loopIncrement,   // Increment the top of stack loop counter
-    SCRATCH_loopDestroy,     // Destroy the top of stack loop counter
-    SCRATCH_jumpIfRepeat,     // Jump if the top of the loop stack has reached a value   @field which value to compare against
+    SCRATCH_jumpIfRepeatDone,// Jump if the top of the loop stack has reached a value   @field loop value @field jump location
 
     SCRATCH_BEGINEXPRESSIONS, // Semantic partition.
 
     // Expression opcodes. May pop from the stack; always push to the stack.
 
     SCRATCH_fetch,           // Fetch some special value such as `x position`            @field which property to get
+    SCRATCH_fetchFrom,       // Like above, but fetches from an aritrary sprite.         @input which sprite @field which property
     SCRATCH_loadVar,         // Load a variable                                          @field variable index
+    SCRATCH_loadVarFrom,     // Like above, but from an arbitrary sprite.                @input which sprite @field variable index
     SCRATCH_loadArrayAt,     // Load from an array                                       @field array name @input array position
     SCRATCH_push,            // Push argument                                            @field value
+
+    SCRATCH_add,             // Add two top-of-stack values                              @input op1 @input op2
 
     SCRATCH_BEGINSTATEMENTS, // Semantic partition.
 
     // Statement opcodes. Statements always leave the stack empty, unless there has been an error in compilation or implementation.
 
+    SCRATCH_loopJump,        // Signal a loop iteration to interpreter                   @field jump destination
     SCRATCH_joinString,      // For string join operations                               @input string1 @input string2
     SCRATCH_clone,           // Treat cloning as a privileged primitive operation        @input sprite index
     SCRATCH_jumpIf,          // Jump if top of stack is truthy                           @input condition
     SCRATCH_jump,            // Unconditional jump
 
     SCRATCH_motionGoto,
+    SCRATCH_DEBUG,
 };
 
+// values indicating which dynamic value to fetch
+enum SCRATCH_fetchValue : uint8_t {
+    SCRATCH_xPosition,
+    SCRATCH_yPosition,
+    SCRATCH_direction,
+    SCRATCH_costumeNumber,
+    SCRATCH_backdropNumber,
+    SCRATCH_size,
+    SCRATCH_volume, // ignored
+    SCRATCH_answer, // ignored
+    SCRATCH_mouseX, // ignored
+    SCRATCH_mouseY, // ignored
+    SCRATCH_loudness, // ignored
+    SCRATCH_timer,
+    SCRATCH_year,
+    SCRATCH_daysSince2000,
+    SCRATCH_username, // ignored
+};
 // Signals a block gives the interpreter about how to continue the sequence
 enum SCRATCH_continueStatus {
     SCRATCH_continue,
@@ -144,16 +166,16 @@ struct SCRATCH_thread {
 struct SCRATCH_sprite {
     struct SCRATCH_thread* threads; // storage of all threads
     uint8_t threadCount;
-    struct SCRATCH_data* variables; // for data storage
-    struct SCRATCH_list* lists; // for list-data storage
+    uint16_t* variables; // for data storage
+    uint16_t* lists; // for list-data storage
 
     // looks-related data
     bool visible;
     int8_t layer;
     int x;
     int y;
-    float size;
-    float rotation;
+    int size;
+    int rotation;
     uint8_t costumeIndex;
     uint8_t costumeMax;
 };
