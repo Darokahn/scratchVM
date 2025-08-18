@@ -1,5 +1,10 @@
 #include "scratch.h"
 
+struct SCRATCH_sprite masterSprites[16];
+struct SCRATCH_sprite sprites[SPRITEMAX];
+struct SCRATCH_data variableMemory[VARIABLEMAX];
+struct SCRATCH_thread threadMemory[THREADMAX];
+
 enum SCRATCH_opcode code[] = {
     SCRATCH_loopInit,
     SCRATCH_jumpIfRepeatDone, 3, 0, 11, 0,

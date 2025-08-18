@@ -12,10 +12,10 @@ bool SCRATCH_requireNumber();
 
 bool SCRATCH_requireString();
 
-struct SCRATCH_sprite masterSprites[16] = {(struct SCRATCH_sprite) {}};
-struct SCRATCH_sprite sprites[SPRITEMAX];
-struct SCRATCH_data variableMemory[VARIABLEMAX];
-struct SCRATCH_thread threadMemory[THREADMAX];
+extern struct SCRATCH_sprite masterSprites[16];
+extern struct SCRATCH_sprite sprites[SPRITEMAX];
+extern struct SCRATCH_data variableMemory[VARIABLEMAX];
+extern struct SCRATCH_thread threadMemory[THREADMAX];
 
 SCRATCH_implementFunction(DEBUG) {
     machineLog("DEBUG\n");
