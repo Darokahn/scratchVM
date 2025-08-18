@@ -1,26 +1,22 @@
 #include "scratch.h"
 
-int THREADMAX = SPRITEMAX * THREADRATIO;
-
-enum SCRATCH_opcode code[64] = {
+enum SCRATCH_opcode code[] = {
     SCRATCH_loopInit,
-    SCRATCH_jumpIfRepeatDone, 3, 0, 10, 0,
-    SCRATCH_DEBUG,
+    SCRATCH_jumpIfRepeatDone, 3, 0, 11, 0,
     SCRATCH_loopIncrement,
+    SCRATCH_DEBUGEXPRESSION,
     SCRATCH_loopJump, 1, 0,
     SCRATCH_fetch, SCRATCH_xPosition,
     SCRATCH_push, SCRATCH_NUMBER, 1, 0,
     SCRATCH_add,
     SCRATCH_push, SCRATCH_NUMBER, 1, 0,
     SCRATCH_motionGoto,
-    SCRATCH_DEBUG,
+    SCRATCH_DEBUGSTATEMENT,
 };
 
 struct SCRATCH_thread spriteThread = {
     .active = true,
-    .code = code,
     .programCounter = 0,
-    .instructionLength = 2,
     .loopCounterStackIndex = 0,
 };
 
@@ -33,8 +29,6 @@ struct SCRATCH_sprite sprite = {
 struct SCRATCH_sprite stage;
 
 int main() {
-    SCRATCH_processBlock(&stage, &sprite, &spriteThread);
-    SCRATCH_processBlock(&stage, &sprite, &spriteThread);
     SCRATCH_processBlock(&stage, &sprite, &spriteThread);
     SCRATCH_processBlock(&stage, &sprite, &spriteThread);
     SCRATCH_processBlock(&stage, &sprite, &spriteThread);

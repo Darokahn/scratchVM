@@ -5,9 +5,17 @@
 
 #define INTERPRET_AS(type, value) *(type*)&(value)
 
+extern int machineLog(const char* fmt, ...);
+extern enum SCRATCH_opcode code[];
+
 bool SCRATCH_requireNumber();
 
 bool SCRATCH_requireString();
+
+struct SCRATCH_sprite masterSprites[16] = {(struct SCRATCH_sprite) {}};
+struct SCRATCH_sprite sprites[SPRITEMAX];
+struct SCRATCH_data variableMemory[VARIABLEMAX];
+struct SCRATCH_thread threadMemory[THREADMAX];
 
 SCRATCH_implementFunction(DEBUG) {
     machineLog("DEBUG\n");
@@ -24,9 +32,9 @@ SCRATCH_implementFunction(loopIncrement) {
 }
 
 SCRATCH_implementFunction(jumpIfRepeatDone) {
-    uint16_t toMatch = INTERPRET_AS(uint16_t, thread->code[thread->programCounter]);
+    uint16_t toMatch = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof(toMatch);
-    uint16_t jumpTo = INTERPRET_AS(uint16_t, thread->code[thread->programCounter]);
+    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof(jumpTo);
     if (thread->loopCounterStack[thread->loopCounterStackIndex-1] >= toMatch) {
         thread->programCounter = jumpTo;
@@ -35,13 +43,13 @@ SCRATCH_implementFunction(jumpIfRepeatDone) {
 }
 
 SCRATCH_implementFunction(loopJump) {
-    uint16_t to = INTERPRET_AS(uint16_t, thread->code[thread->programCounter]);
+    uint16_t to = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter = to;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(fetch) {
-    enum SCRATCH_fetchValue toFetch = INTERPRET_AS(enum SCRATCH_fetchValue, thread->code[thread->programCounter]);
+    enum SCRATCH_fetchValue toFetch = INTERPRET_AS(enum SCRATCH_fetchValue, code[thread->programCounter]);
     thread->programCounter += sizeof(toFetch);
     uint16_t fetchedValue;
     switch (toFetch) {
@@ -54,9 +62,9 @@ SCRATCH_implementFunction(fetch) {
 }
 
 SCRATCH_implementFunction(push) {
-    enum SCRATCH_fieldType type = thread->code[thread->programCounter];
+    enum SCRATCH_fieldType type = code[thread->programCounter];
     thread->programCounter += sizeof(type);
-    uint16_t field = INTERPRET_AS(uint16_t, thread->code[thread->programCounter]);
+    uint16_t field = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof(field);
     stack[*stackIndex] = (struct SCRATCH_data) {type, {.number = field}};
     (*stackIndex) += 1;
@@ -68,9 +76,7 @@ SCRATCH_implementFunction(add) {
     (*stackIndex)--;
     struct SCRATCH_data op1 = stack[*stackIndex-1];
     (*stackIndex)--;
-    machineLog("%d, %d\n", op1.data.number, op2.data.number);
     uint16_t result = op1.data.number + op2.data.number;
-    machineLog("%d\n", result);
     stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
     (*stackIndex) += 1;
 }
@@ -102,7 +108,8 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_add] = add,
     [SCRATCH_motionGoto] = motionGoto,
     [SCRATCH_loopJump] = loopJump,
-    [SCRATCH_DEBUG] = DEBUG,
+    [SCRATCH_DEBUGEXPRESSION] = DEBUG,
+    [SCRATCH_DEBUGSTATEMENT] = DEBUG,
 };
 
 void SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
@@ -114,9 +121,9 @@ void SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* s
     int stringIndicesB[2] = {STRINGREGISTERMAX / 2, STRINGREGISTERMAX / 2}; // for quick joining
     enum SCRATCH_opcode operation;
     while (true) {
-        operation = thread->code[thread->programCounter++];
+        operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status = operations[operation](stage, sprite, (struct SCRATCH_data*) stack, &stackIndex, thread);
         thread->currentOperation = status;
-        if (operation > SCRATCH_BEGINSTATEMENTS) return; // A block has completed
+        if (operation > SCRATCH_PARTITION_BEGINSTATEMENTS) return; // A block has completed
     }
 }

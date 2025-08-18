@@ -4,16 +4,15 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define STACKMAX 128
-#define STRINGREGISTERMAX 4096
-#define MAXOPCODE 256
-#define LOOPNESTMAX 16 // deepest nesting for `repeat x` loops before failure
-#define SPRITEMAX 256 // maximum spritecount
-#define VARIABLEMAX 2048 // maximum variable count for whole project
-#define THREADRATIO 4 // ratio of threads to sprites; Either each sprite has this many or amount is dispersed unevenly.
+#define STACKMAX (128)
+#define STRINGREGISTERMAX (4096)
+#define MAXOPCODE (255)
+#define LOOPNESTMAX (8) // deepest nesting for `repeat x` loops before failure
+#define SPRITEMAX (256) // maximum spritecount
+#define VARIABLEMAX (2048) // maximum variable count for whole project
+#define THREADRATIO (4) // ratio of threads to sprites; Either each sprite has this many or amount is dispersed unevenly.
+#define THREADMAX (32)
 
-extern int THREADMAX;
-extern void machineLog(const char* fmt, ...);
 typedef uint16_t halfStringPointer; // used to represent the bottom half of a pointer; safe to use with some static buffers.
 
 // using GNU typed enum extension
@@ -49,7 +48,7 @@ struct SCRATCH_list {
 
 // fields are read from the bytecode stream; inputs are popped from the stack (presumably previously pushed)
 enum SCRATCH_opcode : uint8_t {
-    SCRATCH_BEGINLOOPCONTROL, // Semantic partition.
+    SCRATCH_PARTITION_BEGINLOOPCONTROL, // Semantic partition.
 
     // Loop opcodes. 
 
@@ -57,7 +56,7 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_loopIncrement,   // Increment the top of stack loop counter
     SCRATCH_jumpIfRepeatDone,// Jump if the top of the loop stack has reached a value   @field loop value @field jump location
 
-    SCRATCH_BEGINEXPRESSIONS, // Semantic partition.
+    SCRATCH_PARTITION_BEGINEXPRESSIONS, // Semantic partition.
 
     // Expression opcodes. May pop from the stack; always push to the stack.
 
@@ -70,7 +69,11 @@ enum SCRATCH_opcode : uint8_t {
 
     SCRATCH_add,             // Add two top-of-stack values                              @input op1 @input op2
 
-    SCRATCH_BEGINSTATEMENTS, // Semantic partition.
+    SCRATCH_DEBUGEXPRESSION,
+
+    SCRATCH_PARTITION_BEGINSTATEMENTS, // Semantic partition.
+    // Only Statement opcodes need to mind their return value. Still, for predictability, expression opcodes should return
+    // SCRATCH_continue.
 
     // Statement opcodes. Statements always leave the stack empty, unless there has been an error in compilation or implementation.
 
@@ -81,7 +84,7 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_jump,            // Unconditional jump
 
     SCRATCH_motionGoto,
-    SCRATCH_DEBUG,
+    SCRATCH_DEBUGSTATEMENT,
 };
 
 // values indicating which dynamic value to fetch
@@ -133,32 +136,36 @@ enum SCRATCH_EVENTTYPE : uint8_t {
 };
 
 union SCRATCH_eventInput { // redundant union; meant for semantic labeling
-    int key;
-    int backdrop;
-    int loudness;
-    int message;
+    uint16_t key;
+    uint16_t backdrop;
+    uint16_t loudness;
+    uint16_t message;
+};
+
+struct SCRATCH_threadMaster {
+    enum SCRATCH_EVENTTYPE startEvent;
+    union SCRATCH_eventInput eventCondition;
+    uint16_t codeIndex;
+    uint16_t instructionLength;
 };
 
 struct SCRATCH_thread {
+    uint8_t masterIndex; // The thread master object to refer to for init data.
     bool active;
-    enum SCRATCH_EVENTTYPE startEvent;
-    union SCRATCH_eventInput eventCondition;
-    enum SCRATCH_opcode* code; // bytecode entry point for this thread
-    int programCounter; // pc
-    int instructionLength;
-    int loopCounterStack[LOOPNESTMAX];
+    uint16_t programCounter; // pc
+    uint16_t loopCounterStack[LOOPNESTMAX];
     uint8_t loopCounterStackIndex;
     enum SCRATCH_continueStatus currentOperation;
     union {
         struct {
             int8_t stepsizeX; // how far to change position each iteration
             int8_t stepsizeY;
-            int remainingIterations; // how many times to iterate
-            int targetX; // what to set position to when done (assume slight error due to rounding)
-            int targetY;
+            uint16_t remainingIterations; // how many times to iterate
+            uint16_t targetX; // what to set position to when done (assume slight error due to rounding)
+            uint16_t targetY;
         } glideData;
         struct {
-            int remainingIterations;
+            uint16_t remainingIterations;
         } waitData;
     } operationData;
 };
@@ -172,9 +179,9 @@ struct SCRATCH_sprite {
     // looks-related data
     bool visible;
     int8_t layer;
-    int x;
-    int y;
-    int size;
+    uint16_t x;
+    uint16_t y;
+    uint8_t size;
     int rotation;
     uint8_t costumeIndex;
     uint8_t costumeMax;
