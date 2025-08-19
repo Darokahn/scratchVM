@@ -1,22 +1,21 @@
 #include <stdbool.h>
+#include <math.h>
 #include "scratch.h"
 
 #define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
 
 #define INTERPRET_AS(type, value) *(type*)&(value)
+#define PI 3.14159265358979323846264338279f
 
-extern int machineLog(const char* fmt, ...);
+float degreeToRadian = PI / 32768.0f;
+float radianToDegree = 32768.0f / PI;
+
 extern enum SCRATCH_opcode code[];
 
 extern struct SCRATCH_sprite masterSprites[16];
 extern struct SCRATCH_sprite sprites[SPRITEMAX];
 extern struct SCRATCH_data variableMemory[VARIABLEMAX];
 extern struct SCRATCH_thread threadMemory[THREADMAX];
-
-// TODO:
-// - create monosize-block heap allocator for sprite memory, variable memory, thread memory
-// - 
-// 
 
 SCRATCH_implementFunction(DEBUG) {
     machineLog("DEBUG\n");
@@ -26,10 +25,12 @@ SCRATCH_implementFunction(DEBUG) {
 SCRATCH_implementFunction(loopInit) {
     thread->loopCounterStack[thread->loopCounterStackIndex] = 0;
     thread->loopCounterStackIndex++;
+    return SCRATCH_continue;
 }
 
 SCRATCH_implementFunction(loopIncrement) {
     thread->loopCounterStack[thread->loopCounterStackIndex-1] += 1;
+    return SCRATCH_continue;
 }
 
 SCRATCH_implementFunction(jumpIfRepeatDone) {
@@ -80,6 +81,7 @@ SCRATCH_implementFunction(add) {
     uint16_t result = op1.data.number + op2.data.number;
     stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
     (*stackIndex) += 1;
+    return SCRATCH_continue;
 }
 
 SCRATCH_implementFunction(motionGoto) {
@@ -100,6 +102,32 @@ SCRATCH_implementFunction(motionGoto) {
     return SCRATCH_yieldGeneric;
 }
 
+SCRATCH_implementFunction(motionMovesteps) {
+    (*stackIndex)--;
+    struct SCRATCH_data steps = stack[*stackIndex];
+    float rotation = sprite->rotation * degreeToRadian;
+
+    int x = sin(rotation) * steps.data.number;
+    int y = cos(rotation) * steps.data.number;
+    sprite->x += x;
+    sprite->y += y;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(motionTurnright) {
+    (*stackIndex)--;
+    struct SCRATCH_data degrees = stack[*stackIndex];
+    sprite->rotation += degrees.data.number;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(motionTurnleft) {
+    (*stackIndex)--;
+    struct SCRATCH_data degrees = stack[*stackIndex];
+    sprite->rotation -= degrees.data.number;
+    return SCRATCH_yieldGeneric;
+}
+
 SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_loopInit] = loopInit,
     [SCRATCH_loopIncrement] = loopIncrement,
@@ -108,6 +136,9 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_push] = push,
     [SCRATCH_add] = add,
     [SCRATCH_motionGoto] = motionGoto,
+    [SCRATCH_motionTurnright] = motionTurnright,
+    [SCRATCH_motionTurnleft] = motionTurnleft,
+    [SCRATCH_motionMovesteps] = motionMovesteps,
     [SCRATCH_loopJump] = loopJump,
     [SCRATCH_DEBUGEXPRESSION] = DEBUG,
     [SCRATCH_DEBUGSTATEMENT] = DEBUG,
