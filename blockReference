@@ -1,0 +1,36 @@
+moveSteps:
+    input distance
+turnright:
+    input amount
+
+(
+goto:
+    input x - fetch; either x from sprite, random number, or x from mouse pointer
+    input y - like above
+gotoxy:
+    input x
+    input y
+)
+(
+glideto:
+    input secs
+    input x - like goto
+    input y - ""
+glidetoxy:
+    input secs
+    input x
+    input y
+)
+pointindirection:
+    input dir
+pointtowards:
+    input x - like goto
+    input y - ""
+changexby:
+    input x
+setx:
+    input x
+changeyby:
+    input y
+sety:
+    input y
