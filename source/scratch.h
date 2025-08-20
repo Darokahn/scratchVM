@@ -113,6 +113,12 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_motionTurnright,
     SCRATCH_motionTurnleft,
     SCRATCH_motionMovesteps,
+    SCRATCH_motionPointindirection,
+    SCRATCH_motionPointtowards,
+    SCRATCH_motionSetx,
+    SCRATCH_motionChangexby,
+    SCRATCH_motionSety,
+    SCRATCH_motionChangeyby,
     SCRATCH_DEBUGSTATEMENT,
 };
 
@@ -217,6 +223,7 @@ struct SCRATCH_sprite {
     scaledInt32 y;
     uint8_t size;
     uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    bool rotationStyle;
     uint8_t costumeIndex;
     uint8_t costumeMax;
 };

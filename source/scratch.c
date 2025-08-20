@@ -169,6 +169,62 @@ SCRATCH_implementFunction(_glideIteration) {
     return SCRATCH_yieldGeneric;
 }
 
+SCRATCH_implementFunction(motionPointindirection) {
+    (*stackIndex)--;
+    struct SCRATCH_data degrees = stack[*stackIndex];
+    sprite->rotation = degrees.data.number;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(motionPointtowards) {
+    (*stackIndex)--;
+    struct SCRATCH_data x = stack[*stackIndex];
+    (*stackIndex)--;
+    struct SCRATCH_data y = stack[*stackIndex];
+    float direction = atan2(y.data.number, x.data.number);
+    direction *= radianToDegree;
+    sprite->rotation = (uint16_t) direction;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(motionSetx) {
+    (*stackIndex)--;
+    struct SCRATCH_data x = stack[*stackIndex];
+    sprite->x.halves.high = x.data.number;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(motionChangexby) {
+    (*stackIndex)--;
+    struct SCRATCH_data x = stack[*stackIndex];
+    sprite->x.halves.high += x.data.number;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(motionSety) {
+    (*stackIndex)--;
+    struct SCRATCH_data y = stack[*stackIndex];
+    sprite->x.halves.high = y.data.number;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(motionChangeyby) {
+    (*stackIndex)--;
+    struct SCRATCH_data y = stack[*stackIndex];
+    sprite->x.halves.high += y.data.number;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(motionSetrotationstyle) {
+    (*stackIndex)--;
+    struct SCRATCH_data style = stack[*stackIndex];
+    sprite->rotationStype = style.data.boolean;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(looksSay) {
+}
+
 SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_loopInit] = loopInit,
     [SCRATCH_loopIncrement] = loopIncrement,
@@ -182,6 +238,12 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_motionMovesteps] = motionMovesteps,
     [SCRATCH_motionGlideto] = motionGlideto,
     [SCRATCH_motion_glideIteration] = _glideIteration,
+    [SCRATCH_motionPointindirection] = motionPointindirection,
+    [SCRATCH_motionPointtowards] = motionPointtowards,
+    [SCRATCH_motionChangexby] = motionChangexby,
+    [SCRATCH_motionSetx] = motionChangexby,
+    [SCRATCH_motionChangeyby] = motionChangexby,
+    [SCRATCH_motionSety] = motionChangexby,
     [SCRATCH_loopJump] = loopJump,
     [SCRATCH_DEBUGEXPRESSION] = DEBUG,
     [SCRATCH_DEBUGSTATEMENT] = DEBUG,
