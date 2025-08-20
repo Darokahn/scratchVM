@@ -13,6 +13,28 @@
 #define THREADRATIO (4) // ratio of threads to sprites; Either each sprite has this many or amount is dispersed unevenly.
 #define THREADMAX (32)
 
+#define FRAMESPERSEC 30
+
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    typedef union {
+        int32_t i; 
+        __attribute__((packed)) struct {
+            int16_t low; 
+            int16_t high;
+        } halves;
+    } scaledInt32;
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    typedef union {
+        int32_t i; 
+        __attribute__((packed)) struct {
+            int16_t high; 
+            int16_t low;
+        } halves;
+    } scaledInt32;
+#else
+    #error "Unknown endianness"
+#endif
+
 typedef uint16_t halfStringPointer; // used to represent the bottom half of a pointer; safe to use with some static buffers.
 extern int machineLog(const char* fmt, ...);
 
@@ -86,6 +108,8 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_jump,            // Unconditional jump
 
     SCRATCH_motionGoto,
+    SCRATCH_motionGlideto,
+    SCRATCH_motion_glideIteration,
     SCRATCH_motionTurnright,
     SCRATCH_motionTurnleft,
     SCRATCH_motionMovesteps,
@@ -114,8 +138,6 @@ enum SCRATCH_fetchValue : uint8_t {
 enum SCRATCH_continueStatus {
     SCRATCH_continue,
     SCRATCH_yieldGeneric,
-    SCRATCH_yieldGlide, // specific case for animated gliding
-    SCRATCH_yieldWait, // specific case for waiting
 };
 
 typedef bool (*SCRATCH_functionIterator)(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, int iteration);
@@ -133,11 +155,10 @@ struct SCRATCH_stringRegister {
 enum SCRATCH_EVENTTYPE : uint8_t {
     ONFLAG,
     ONKEY,
-    ONCLICK,
+    ONCLICK, // ignored
     ONBACKDROP,
-    ONLOUDNESS,
+    ONLOUDNESS, // ignored
     ONMESSAGE,
-    ONCLONE
 };
 
 union SCRATCH_eventInput { // redundant union; meant for semantic labeling
@@ -154,24 +175,32 @@ struct SCRATCH_threadMaster {
     uint16_t instructionLength;
 };
 
+union SCRATCH_stepSize {
+    uint16_t value;
+    uint8_t bytes[2];
+};
+
+struct SCRATCH_glideData {
+    int32_t stepX;
+    int32_t stepY;
+    uint16_t remainingIterations; // how many times to iterate
+    uint16_t targetX; // what to set position to when done (assume slight error due to rounding)
+    uint16_t targetY;
+};
+
+struct SCRATCH_waitData {
+    uint16_t remainingIterations;
+};
+
 struct SCRATCH_thread {
     uint8_t masterIndex; // The thread master object to refer to for init data.
     bool active;
     uint16_t programCounter; // pc
     uint16_t loopCounterStack[LOOPNESTMAX];
     uint8_t loopCounterStackIndex;
-    enum SCRATCH_continueStatus currentOperation;
     union {
-        struct {
-            int8_t stepsizeX; // how far to change position each iteration
-            int8_t stepsizeY;
-            uint16_t remainingIterations; // how many times to iterate
-            uint16_t targetX; // what to set position to when done (assume slight error due to rounding)
-            uint16_t targetY;
-        } glideData;
-        struct {
-            uint16_t remainingIterations;
-        } waitData;
+        struct SCRATCH_glideData glideData;
+        struct SCRATCH_waitData waitData;
     } operationData;
 };
 
@@ -184,13 +213,14 @@ struct SCRATCH_sprite {
     // looks-related data
     bool visible;
     int8_t layer;
-    int16_t x;
-    int16_t y;
+    scaledInt32 x;
+    scaledInt32 y;
     uint8_t size;
     uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
     uint8_t costumeIndex;
     uint8_t costumeMax;
 };
 
-void SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
+enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
+void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 #endif

@@ -56,7 +56,7 @@ SCRATCH_implementFunction(fetch) {
     uint16_t fetchedValue;
     switch (toFetch) {
         case SCRATCH_xPosition:
-            fetchedValue = sprite->x; break;
+            fetchedValue = sprite->x.halves.high; break;
     }
     stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = fetchedValue}};
     (*stackIndex) += 1;
@@ -97,8 +97,8 @@ SCRATCH_implementFunction(motionGoto) {
     if (op2.type == SCRATCH_NUMBER) {
         y = op2.data.number;
     } else return SCRATCH_yieldGeneric;
-    sprite->x = x;
-    sprite->y = y;
+    sprite->x.halves.high = x;
+    sprite->y.halves.high = y;
     return SCRATCH_yieldGeneric;
 }
 
@@ -109,8 +109,8 @@ SCRATCH_implementFunction(motionMovesteps) {
 
     int x = sin(rotation) * steps.data.number;
     int y = cos(rotation) * steps.data.number;
-    sprite->x += x;
-    sprite->y += y;
+    sprite->x.halves.high += x;
+    sprite->y.halves.high += y;
     return SCRATCH_yieldGeneric;
 }
 
@@ -128,6 +128,47 @@ SCRATCH_implementFunction(motionTurnleft) {
     return SCRATCH_yieldGeneric;
 }
 
+SCRATCH_implementFunction(motionGlideto) {
+    (*stackIndex)--;
+    struct SCRATCH_data scaledSecs = stack[*stackIndex]; // seconds scaled so that the larger 11 bits is seconds and the smaller 5 are seconds / 32
+    (*stackIndex)--;
+    struct SCRATCH_data x = stack[*stackIndex];
+    (*stackIndex)--;
+    struct SCRATCH_data y = stack[*stackIndex];
+    int32_t xDiff = (x.data.number - sprite->x.halves.high) << 16;
+    int32_t yDiff = (y.data.number - sprite->y.halves.high) << 16;
+    uint16_t iterations = (scaledSecs.data.number * FRAMESPERSEC) >> 5;
+    if (iterations == 0) {
+        sprite->x.halves.high = x.data.number;
+        sprite->y.halves.high = y.data.number;
+        thread->operationData.glideData.remainingIterations = 0;
+        return SCRATCH_continue;
+    }
+    thread->operationData.glideData = (struct SCRATCH_glideData) {
+        .stepX = xDiff / iterations,
+        .stepY = yDiff / iterations,
+        .remainingIterations = iterations,
+        .targetX = x.data.number,
+        .targetY = y.data.number,
+    };
+    return SCRATCH_continue;
+}
+
+SCRATCH_implementFunction(_glideIteration) {
+    sprite->x.i += thread->operationData.glideData.stepX;
+    sprite->y.i += thread->operationData.glideData.stepY;
+    thread->operationData.glideData.remainingIterations--;
+    if (thread->operationData.glideData.remainingIterations <= 0) {
+        sprite->x.halves.high = thread->operationData.glideData.targetX;
+        sprite->y.halves.high = thread->operationData.glideData.targetY;
+        sprite->x.halves.low = 0;
+        sprite->y.halves.low = 0;
+        return SCRATCH_yieldGeneric;
+    }
+    thread->programCounter--; // re-align program counter with this instruction so it runs again
+    return SCRATCH_yieldGeneric;
+}
+
 SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_loopInit] = loopInit,
     [SCRATCH_loopIncrement] = loopIncrement,
@@ -139,12 +180,14 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_motionTurnright] = motionTurnright,
     [SCRATCH_motionTurnleft] = motionTurnleft,
     [SCRATCH_motionMovesteps] = motionMovesteps,
+    [SCRATCH_motionGlideto] = motionGlideto,
+    [SCRATCH_motion_glideIteration] = _glideIteration,
     [SCRATCH_loopJump] = loopJump,
     [SCRATCH_DEBUGEXPRESSION] = DEBUG,
     [SCRATCH_DEBUGSTATEMENT] = DEBUG,
 };
 
-void SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
+enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
     struct SCRATCH_data stack[STACKMAX];
     int stackIndex = 0;
     char stringRegisterA[STRINGREGISTERMAX];
@@ -155,7 +198,13 @@ void SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* s
     while (true) {
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status = operations[operation](stage, sprite, (struct SCRATCH_data*) stack, &stackIndex, thread);
-        thread->currentOperation = status;
-        if (operation > SCRATCH_PARTITION_BEGINSTATEMENTS) return; // A block has completed
+        if (operation > SCRATCH_PARTITION_BEGINSTATEMENTS) return status; // A block has completed
+    }
+}
+
+void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
+    enum SCRATCH_continueStatus status = SCRATCH_continue;
+    while (status == SCRATCH_continue) {
+        status = SCRATCH_processBlock(stage, sprite, thread);
     }
 }
