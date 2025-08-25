@@ -1,3 +1,5 @@
+# An opcode describes its name and inputs. If opcodes are separate in the official scratch implementation but grouped in this VM implementation, they are wrapped in parentheses. Usually, this means the opcode gets arguments from the stack, and the specialized behavior that warrants a separate block in the official implementation can be simplified into a single opcode with specialized fetches.
+
 moveSteps:
     input distance
 turnright:

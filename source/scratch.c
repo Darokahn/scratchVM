@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <math.h>
+#include <stdlib.h>
 #include "scratch.h"
 
 #define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
@@ -9,8 +10,6 @@
 
 float degreeToRadian = PI / 32768.0f;
 float radianToDegree = 32768.0f / PI;
-
-extern enum SCRATCH_opcode code[];
 
 extern struct SCRATCH_sprite masterSprites[16];
 extern struct SCRATCH_sprite sprites[SPRITEMAX];
@@ -218,7 +217,12 @@ SCRATCH_implementFunction(motionChangeyby) {
 SCRATCH_implementFunction(motionSetrotationstyle) {
     (*stackIndex)--;
     struct SCRATCH_data style = stack[*stackIndex];
-    sprite->rotationStype = style.data.boolean;
+    sprite->rotationStyle = style.data.boolean;
+    return SCRATCH_yieldGeneric;
+}
+
+SCRATCH_implementFunction(stop) {
+    thread->active = false;
     return SCRATCH_yieldGeneric;
 }
 
@@ -247,6 +251,7 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_loopJump] = loopJump,
     [SCRATCH_DEBUGEXPRESSION] = DEBUG,
     [SCRATCH_DEBUGSTATEMENT] = DEBUG,
+    [SCRATCH_stop] = stop,
 };
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
@@ -270,3 +275,32 @@ void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* 
         status = SCRATCH_processBlock(stage, sprite, thread);
     }
 }
+
+int SCRATCH_visitAllThreads(struct SCRATCH_sprite* stage, struct SCRATCH_sprite** sprites, int spriteCount) {
+    int activeThreadCount = 0;
+    for (int i = 0; i < spriteCount; i++) {
+        struct SCRATCH_sprite* sprite = sprites[i];
+        for (int ii = 0; ii < sprite->threadCount; ii++) {
+            if (sprite->threads[ii].active) {
+                SCRATCH_processThread(stage, sprite, &sprite->threads[i]);
+                activeThreadCount += sprite->threads[i].active; // may have changed during this execution
+            }
+        }
+    }
+    return activeThreadCount;
+}
+
+struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount) {
+    size_t size = 
+            sizeof(struct SCRATCH_sprite) + 
+            threadCount * sizeof(struct SCRATCH_thread)
+    ;
+    struct SCRATCH_sprite* spriteChunk = malloc(size);
+    if (spriteChunk == NULL) {
+        machineLog("Failed Allocation in SCRATCH_makeNewSprite\n");
+        return NULL;
+    }
+    spriteChunk->threadCount = threadCount;
+    return spriteChunk;
+}
+

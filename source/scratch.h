@@ -53,7 +53,7 @@ struct SCRATCH_thread;
 union SCRATCH_field {
     bool boolean;
     uint16_t number;
-    halfStringPointer string; // can either be datasegment-allocated, variable-allocated (heap), or string buffer-allocated (stack)
+    char* string;
     uint8_t spriteID;
     uint8_t color;
 };
@@ -120,6 +120,8 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_motionSety,
     SCRATCH_motionChangeyby,
     SCRATCH_DEBUGSTATEMENT,
+
+    SCRATCH_stop,
 };
 
 // values indicating which dynamic value to fetch
@@ -210,12 +212,8 @@ struct SCRATCH_thread {
     } operationData;
 };
 
-struct SCRATCH_sprite {
-    struct SCRATCH_thread* threads; // storage of all threads
-    uint8_t threadCount;
-    uint16_t* variables; // for data storage
-    uint16_t* lists; // for list-data storage
 
+struct SCRATCH_sprite {
     // looks-related data
     bool visible;
     int8_t layer;
@@ -226,8 +224,30 @@ struct SCRATCH_sprite {
     bool rotationStyle;
     uint8_t costumeIndex;
     uint8_t costumeMax;
+    SCRATCH_data* variables; // Variable 0 is always the sprite's message (what it might be `say`ing at any moment)
+
+    uint8_t threadCount;
+    uint8_t variableCount;
+    struct SCRATCH_thread threads[];
 };
+
+enum SCRATCH_IOTYPE {
+    SCRATCH_BUFFER_TRANSFER,
+    SCRATCH_PRIVILEGED_BUFFER_ACCESS,
+};
+
+typedef uint8_t SCRATCH_collisionBitfield[32]; // a bitfield one sprite can use to document which other sprites it collides with
+
+struct SCRATCH_input {
+    SCRATCH_collisionBitfield collisionMap[256]; // array for each sprite to document its collisions with the others
+};
+
+extern const enum SCRATCH_opcode code[];
+
+extern enum SCRATCH_IOTYPE IOTYPE;
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
+int SCRATCH_visitAllThreads(struct SCRATCH_sprite* stage, struct SCRATCH_sprite** sprites, int spriteCount);
+struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount);
 #endif
