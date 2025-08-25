@@ -297,7 +297,7 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount) {
     ;
     struct SCRATCH_sprite* spriteChunk = malloc(size);
     if (spriteChunk == NULL) {
-        machineLog("Failed Allocation in SCRATCH_makeNewSprite\n");
+        machineLog("Failed allocation in SCRATCH_makeNewSprite\n");
         return NULL;
     }
     spriteChunk->threadCount = threadCount;
