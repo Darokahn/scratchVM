@@ -224,7 +224,7 @@ struct SCRATCH_sprite {
     bool rotationStyle;
     uint8_t costumeIndex;
     uint8_t costumeMax;
-    SCRATCH_data* variables; // Variable 0 is always the sprite's message (what it might be `say`ing at any moment)
+    struct SCRATCH_data* variables; // Variable 0 is always the sprite's message (what it might be `say`ing at any moment)
 
     uint8_t threadCount;
     uint8_t variableCount;
