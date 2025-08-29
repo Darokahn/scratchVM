@@ -1,10 +1,8 @@
 #include "scratch.h"
 #include <stdlib.h>
 
-struct SCRATCH_sprite masterSprites[16];
-struct SCRATCH_sprite sprites[SPRITEMAX];
-struct SCRATCH_data variableMemory[VARIABLEMAX];
-struct SCRATCH_thread threadMemory[THREADMAX];
+struct SCRATCH_sprite* sprites;
+struct SCRATCH_sprite stage;
 
 const enum SCRATCH_opcode code[] = {
     SCRATCH_DEBUGSTATEMENT,
@@ -19,8 +17,6 @@ const enum SCRATCH_opcode code[] = {
     SCRATCH_DEBUGSTATEMENT,
     SCRATCH_stop,
 };
-
-struct SCRATCH_sprite stage;
 
 int main() {
     struct SCRATCH_sprite* sprite = SCRATCH_makeNewSprite(1);

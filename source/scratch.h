@@ -176,13 +176,6 @@ union SCRATCH_eventInput { // redundant union; meant for semantic labeling
     uint16_t message;
 };
 
-struct SCRATCH_threadMaster {
-    enum SCRATCH_EVENTTYPE startEvent;
-    union SCRATCH_eventInput eventCondition;
-    uint16_t codeIndex;
-    uint16_t instructionLength;
-};
-
 union SCRATCH_stepSize {
     uint16_t value;
     uint8_t bytes[2];
@@ -200,6 +193,12 @@ struct SCRATCH_waitData {
     uint16_t remainingIterations;
 };
 
+struct SCRATCH_threadMaster { // The template each thread should use for initialization, and the static data it should refer to
+    enum SCRATCH_EVENTTYPE startEvent;
+    union SCRATCH_eventInput eventCondition;
+    uint16_t codeIndex;
+};
+
 struct SCRATCH_thread {
     uint8_t masterIndex; // The thread master object to refer to for init data.
     bool active;
@@ -212,6 +211,19 @@ struct SCRATCH_thread {
     } operationData;
 };
 
+struct SCRATCH_spriteMaster { // data a given sprite should start with
+    bool visible;
+    int8_t layer;
+    scaledInt32 x;
+    scaledInt32 y;
+    uint8_t size;
+    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    bool rotationStyle;
+    uint8_t costumeIndex;
+    uint8_t costumeMax;
+    uint8_t threadCount;
+    uint8_t variableCount;
+};
 
 struct SCRATCH_sprite {
     // looks-related data
