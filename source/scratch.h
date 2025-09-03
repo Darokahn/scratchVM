@@ -190,13 +190,27 @@ struct SCRATCH_glideData {
 };
 
 struct SCRATCH_waitData {
-    uint16_t remainingIterations;
+    uint32_t remainingIterations;
 };
 
 struct SCRATCH_threadMaster { // The template each thread should use for initialization, and the static data it should refer to
     enum SCRATCH_EVENTTYPE startEvent;
     union SCRATCH_eventInput eventCondition;
     uint16_t codeIndex;
+};
+
+struct SCRATCH_spriteState { // data a given sprite should start with
+    bool visible;
+    int8_t layer;
+    scaledInt32 x;
+    scaledInt32 y;
+    uint8_t size;
+    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    bool rotationStyle;
+    uint8_t costumeIndex;
+    uint8_t costumeMax;
+    uint8_t threadCount;
+    uint8_t variableCount;
 };
 
 struct SCRATCH_thread {
@@ -211,35 +225,11 @@ struct SCRATCH_thread {
     } operationData;
 };
 
-struct SCRATCH_spriteMaster { // data a given sprite should start with
-    bool visible;
-    int8_t layer;
-    scaledInt32 x;
-    scaledInt32 y;
-    uint8_t size;
-    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
-    bool rotationStyle;
-    uint8_t costumeIndex;
-    uint8_t costumeMax;
-    uint8_t threadCount;
-    uint8_t variableCount;
-};
-
+// a SCRATCH_sprite is designed to sit in a single heap allocation. `variables` should point to the next SCRATCH_data aligned
+// address after the end of `threads`.
 struct SCRATCH_sprite {
-    // looks-related data
-    bool visible;
-    int8_t layer;
-    scaledInt32 x;
-    scaledInt32 y;
-    uint8_t size;
-    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
-    bool rotationStyle;
-    uint8_t costumeIndex;
-    uint8_t costumeMax;
+    struct SCRATCH_spriteState state;
     struct SCRATCH_data* variables; // Variable 0 is always the sprite's message (what it might be `say`ing at any moment)
-
-    uint8_t threadCount;
-    uint8_t variableCount;
     struct SCRATCH_thread threads[];
 };
 
@@ -261,5 +251,5 @@ extern enum SCRATCH_IOTYPE IOTYPE;
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 int SCRATCH_visitAllThreads(struct SCRATCH_sprite* stage, struct SCRATCH_sprite** sprites, int spriteCount);
-struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount);
+struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount, uint8_t variableCount);
 #endif

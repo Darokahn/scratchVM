@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 struct SCRATCH_sprite* sprites;
+uint8_t spriteCount;
 struct SCRATCH_sprite stage;
 
 const enum SCRATCH_opcode code[] = {
@@ -19,7 +20,7 @@ const enum SCRATCH_opcode code[] = {
 };
 
 int main() {
-    struct SCRATCH_sprite* sprite = SCRATCH_makeNewSprite(1);
+    struct SCRATCH_sprite* sprite = SCRATCH_makeNewSprite(1, 1);
     sprite->threads[0] = (struct SCRATCH_thread) {.active = 1, .programCounter = 0, .loopCounterStackIndex = 0};
     struct SCRATCH_sprite* sprites[1] = {sprite};
     int activeThreadCount = 1;
