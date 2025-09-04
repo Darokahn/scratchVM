@@ -2,5 +2,5 @@
 
 __attribute__((naked))
 int machineLog(const char* fmt, ...) {
-    goto *&printf;
+    goto *&printf; // GCC only
 }
