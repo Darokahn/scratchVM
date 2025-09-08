@@ -302,4 +302,3 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount, uint8_t variab
     spriteChunk->variables = (struct SCRATCH_data*) (firstChunkSize + (uint8_t*) spriteChunk);
     return spriteChunk;
 }
-

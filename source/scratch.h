@@ -86,6 +86,7 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_fetch,           // Fetch some special value such as `x position`            @field which property to get
     SCRATCH_fetchFrom,       // Like above, but fetches from an aritrary sprite.         @input which sprite @field which property
     SCRATCH_loadVar,         // Load a variable                                          @field variable index
+    SCRATCH_setVar,          // Set a variable                                           @field variable index @input data
     SCRATCH_loadVarFrom,     // Like above, but from an arbitrary sprite.                @input which sprite @field variable index
     SCRATCH_loadArrayAt,     // Load from an array                                       @field array name @input array position
     SCRATCH_push,            // Push argument                                            @field value
@@ -96,7 +97,7 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_DEBUGEXPRESSION,
 
     SCRATCH_PARTITION_BEGINSTATEMENTS, // Semantic partition.
-    // Only Statement opcodes need to mind their return value. Still, for predictability, expression opcodes should return
+    // Only statement opcodes need to mind their return value. Still, for predictability, expression opcodes should return
     // SCRATCH_continue.
 
     // Statement opcodes. Statements always leave the stack empty, unless there has been an error in compilation or implementation.
@@ -193,27 +194,10 @@ struct SCRATCH_waitData {
     uint32_t remainingIterations;
 };
 
-struct SCRATCH_threadMaster { // The template each thread should use for initialization, and the static data it should refer to
+struct SCRATCH_thread {
     enum SCRATCH_EVENTTYPE startEvent;
     union SCRATCH_eventInput eventCondition;
     uint16_t codeIndex;
-};
-
-struct SCRATCH_spriteState { // data a given sprite should start with
-    bool visible;
-    int8_t layer;
-    scaledInt32 x;
-    scaledInt32 y;
-    uint8_t size;
-    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
-    bool rotationStyle;
-    uint8_t costumeIndex;
-    uint8_t costumeMax;
-    uint8_t threadCount;
-    uint8_t variableCount;
-};
-
-struct SCRATCH_thread {
     uint8_t masterIndex; // The thread master object to refer to for init data.
     bool active;
     uint16_t programCounter; // pc
@@ -228,7 +212,17 @@ struct SCRATCH_thread {
 // a SCRATCH_sprite is designed to sit in a single heap allocation. `variables` should point to the next SCRATCH_data aligned
 // address after the end of `threads`.
 struct SCRATCH_sprite {
-    struct SCRATCH_spriteState state;
+    bool visible;
+    int8_t layer;
+    scaledInt32 x;
+    scaledInt32 y;
+    uint8_t size;
+    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    bool rotationStyle;
+    uint8_t costumeIndex;
+    uint8_t costumeMax;
+    uint8_t threadCount;
+    uint8_t variableCount;
     struct SCRATCH_data* variables; // Variable 0 is always the sprite's message (what it might be `say`ing at any moment)
     struct SCRATCH_thread threads[];
 };
@@ -238,15 +232,7 @@ enum SCRATCH_IOTYPE {
     SCRATCH_PRIVILEGED_BUFFER_ACCESS,
 };
 
-typedef uint8_t SCRATCH_collisionBitfield[32]; // a bitfield one sprite can use to document which other sprites it collides with
-
-struct SCRATCH_input {
-    SCRATCH_collisionBitfield collisionMap[256]; // array for each sprite to document its collisions with the others
-};
-
 extern const enum SCRATCH_opcode code[];
-
-extern enum SCRATCH_IOTYPE IOTYPE;
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
