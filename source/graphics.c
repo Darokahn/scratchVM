@@ -1,5 +1,10 @@
 #include "scratch.h"
+#include <stdint.h>
 
-struct SCRATCH_sprite sprites[256];
+#define SCREENWIDTH 480
+#define SCREENHEIGHT 360
 
-external void updateSprites(struct SCRATCH_sprite* sprites);
+uint8_t screen1[SCREENHEIGHT][SCREENWIDTH];
+uint8_t screen2[SCREENHEIGHT][SCREENWIDTH];
+
+void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, 

@@ -233,6 +233,7 @@ enum SCRATCH_IOTYPE {
 };
 
 extern const enum SCRATCH_opcode code[];
+extern const struct SCRATCH_sprite sprites[];
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
