@@ -245,6 +245,7 @@ struct SCRATCH_input {
 };
 
 extern const enum SCRATCH_opcode code[];
+extern const struct SCRATCH_sprite sprites[];
 
 extern enum SCRATCH_IOTYPE IOTYPE;
 
