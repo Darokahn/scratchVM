@@ -1,0 +1,52 @@
+#ifndef PROGRAMDATA_H
+#define PROGRAMDATA_H
+
+#include <stdint.h>
+#include "scratch.h"
+
+// Note that per scratch terminology, a "sprite" is a game object rather than the more conventional sense of being a game object's associated image.
+
+// Program data consists of:
+// - Header:
+// -- Code length
+// -- Stage count (128x128 images)
+// -- Regular image count (32x32 images)
+// - Data buffer:
+// -- Code
+// -- Images
+// -- Sprites
+//
+// Each sprite is variable length, but needs no entry in the header. 
+// Each sprite has a fixed-length descriptor which can be used to determine how much additional memory it occupies.
+
+// The program data is used to initialize two data structures:
+// - An image map that can be given a sprite index and a costume index, returning a pointer into the image section of the data buffer
+// - An unordered dynamic sprite array
+
+struct SCRATCH_header {
+    uint32_t codeLength;
+    uint32_t imageCount128p;
+    uint32_t imageCount32p;
+};
+
+struct SCRATCH_spriteHeader {
+    bool visible;
+    int8_t layer;
+    scaledInt32 x;
+    scaledInt32 y;
+    uint8_t size;
+    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    bool rotationStyle;
+    uint8_t costumeIndex;
+    uint8_t costumeMax;
+    uint8_t threadCount;
+    uint8_t variableCount;
+};
+
+struct SCRATCH_threadHeader {
+    enum SCRATCH_EVENTTYPE startEvent;
+    union SCRATCH_eventInput eventCondition;
+    uint16_t programCounter;
+};
+
+#endif

@@ -195,12 +195,10 @@ struct SCRATCH_waitData {
 };
 
 struct SCRATCH_thread {
-    enum SCRATCH_EVENTTYPE startEvent;
-    union SCRATCH_eventInput eventCondition;
-    uint16_t codeIndex;
-    uint8_t masterIndex; // The thread master object to refer to for init data.
+    enum SCRATCH_EVENTTYPE startEvent; // The event that starts this thread, like "when key ... clicked"
+    union SCRATCH_eventInput eventCondition; // The specific input that must match like "when key SPACE clicked"
     bool active;
-    uint16_t programCounter; // pc
+    uint16_t programCounter;
     uint16_t loopCounterStack[LOOPNESTMAX];
     uint8_t loopCounterStackIndex;
     union {
