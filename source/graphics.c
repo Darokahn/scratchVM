@@ -7,4 +7,5 @@
 uint8_t screen1[SCREENHEIGHT][SCREENWIDTH];
 uint8_t screen2[SCREENHEIGHT][SCREENWIDTH];
 
-void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, 
+void drawSprites(struct SCRATCH_spriteArray* sprites, struct SCRATCH_imageTable* images) {
+}

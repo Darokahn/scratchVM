@@ -1,4 +1,4 @@
 all: hello
 
-hello: source/main.c source/log.c source/scratch.c
+hello: source/log.c source/scratch.c source/programData.c source/definitions.c
 	gcc $^ -lm -g -fsanitize=address

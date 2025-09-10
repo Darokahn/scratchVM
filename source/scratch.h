@@ -8,12 +8,13 @@
 #define STRINGREGISTERMAX (4096)
 #define MAXOPCODE (255)
 #define LOOPNESTMAX (8) // deepest nesting for `repeat x` loops before failure
-#define SPRITEMAX (256) // maximum spritecount
-#define VARIABLEMAX (2048) // maximum variable count for whole project
-#define THREADRATIO (4) // ratio of threads to sprites; Either each sprite has this many or amount is dispersed unevenly.
-#define THREADMAX (32)
+#define SPRITEMAX (16) // maximum spritecount
+#define IMAGEMAX (16)
 
 #define FRAMESPERSEC 30
+
+#define STAGERESOLUTION 128
+#define SPRITERESOLUTION 32
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     typedef union {
@@ -150,7 +151,7 @@ enum SCRATCH_continueStatus {
 };
 
 typedef bool (*SCRATCH_functionIterator)(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, int iteration);
-typedef enum SCRATCH_continueStatus (*SCRATCH_function)(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread);
+typedef enum SCRATCH_continueStatus (*SCRATCH_function)(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread);
 // SCRATCH_functionIterator is used for animated blocks. A SCRATCH_function that returns non-null signals to the thread
 // that this block should yield and use the returned enumeration to set a new current task.
 
@@ -225,16 +226,8 @@ struct SCRATCH_sprite {
     struct SCRATCH_thread threads[];
 };
 
-enum SCRATCH_IOTYPE {
-    SCRATCH_BUFFER_TRANSFER,
-    SCRATCH_PRIVILEGED_BUFFER_ACCESS,
-};
-
-extern const enum SCRATCH_opcode code[];
-extern const struct SCRATCH_sprite sprites[];
-
-enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
-void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
-int SCRATCH_visitAllThreads(struct SCRATCH_sprite* stage, struct SCRATCH_sprite** sprites, int spriteCount);
+enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
+void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
+int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount);
 struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount, uint8_t variableCount);
 #endif

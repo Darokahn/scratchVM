@@ -2,8 +2,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include "scratch.h"
+#include "programData.h"
 
-#define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
+#define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
 
 #define INTERPRET_AS(type, value) *(type*)&(value)
 #define PI 3.14159265358979323846264338279f
@@ -50,7 +51,7 @@ SCRATCH_implementFunction(fetch) {
     uint16_t fetchedValue;
     switch (toFetch) {
         case SCRATCH_xPosition:
-            fetchedValue = sprite->state.x.halves.high; break;
+            fetchedValue = sprite->x.halves.high; break;
     }
     stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = fetchedValue}};
     (*stackIndex) += 1;
@@ -91,34 +92,34 @@ SCRATCH_implementFunction(motionGoto) {
     if (op2.type == SCRATCH_NUMBER) {
         y = op2.data.number;
     } else return SCRATCH_yieldGeneric;
-    sprite->state.x.halves.high = x;
-    sprite->state.y.halves.high = y;
+    sprite->x.halves.high = x;
+    sprite->y.halves.high = y;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(motionMovesteps) {
     (*stackIndex)--;
     struct SCRATCH_data steps = stack[*stackIndex];
-    float rotation = sprite->state.rotation * degreeToRadian;
+    float rotation = sprite->rotation * degreeToRadian;
 
     int x = sin(rotation) * steps.data.number;
     int y = cos(rotation) * steps.data.number;
-    sprite->state.x.halves.high += x;
-    sprite->state.y.halves.high += y;
+    sprite->x.halves.high += x;
+    sprite->y.halves.high += y;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(motionTurnright) {
     (*stackIndex)--;
     struct SCRATCH_data degrees = stack[*stackIndex];
-    sprite->state.rotation += degrees.data.number;
+    sprite->rotation += degrees.data.number;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(motionTurnleft) {
     (*stackIndex)--;
     struct SCRATCH_data degrees = stack[*stackIndex];
-    sprite->state.rotation -= degrees.data.number;
+    sprite->rotation -= degrees.data.number;
     return SCRATCH_yieldGeneric;
 }
 
@@ -129,12 +130,12 @@ SCRATCH_implementFunction(motionGlideto) {
     struct SCRATCH_data x = stack[*stackIndex];
     (*stackIndex)--;
     struct SCRATCH_data y = stack[*stackIndex];
-    int32_t xDiff = (x.data.number - sprite->state.x.halves.high) << 16;
-    int32_t yDiff = (y.data.number - sprite->state.y.halves.high) << 16;
+    int32_t xDiff = (x.data.number - sprite->x.halves.high) << 16;
+    int32_t yDiff = (y.data.number - sprite->y.halves.high) << 16;
     uint16_t iterations = (scaledSecs.data.number * FRAMESPERSEC) >> 5;
     if (iterations == 0) {
-        sprite->state.x.halves.high = x.data.number;
-        sprite->state.y.halves.high = y.data.number;
+        sprite->x.halves.high = x.data.number;
+        sprite->y.halves.high = y.data.number;
         thread->operationData.glideData.remainingIterations = 0;
         return SCRATCH_continue;
     }
@@ -149,14 +150,14 @@ SCRATCH_implementFunction(motionGlideto) {
 }
 
 SCRATCH_implementFunction(_glideIteration) {
-    sprite->state.x.i += thread->operationData.glideData.stepX;
-    sprite->state.y.i += thread->operationData.glideData.stepY;
+    sprite->x.i += thread->operationData.glideData.stepX;
+    sprite->y.i += thread->operationData.glideData.stepY;
     thread->operationData.glideData.remainingIterations--;
     if (thread->operationData.glideData.remainingIterations <= 0) {
-        sprite->state.x.halves.high = thread->operationData.glideData.targetX;
-        sprite->state.y.halves.high = thread->operationData.glideData.targetY;
-        sprite->state.x.halves.low = 0;
-        sprite->state.y.halves.low = 0;
+        sprite->x.halves.high = thread->operationData.glideData.targetX;
+        sprite->y.halves.high = thread->operationData.glideData.targetY;
+        sprite->x.halves.low = 0;
+        sprite->y.halves.low = 0;
         return SCRATCH_yieldGeneric;
     }
     thread->programCounter--; // re-align program counter with this instruction so it runs again
@@ -166,7 +167,7 @@ SCRATCH_implementFunction(_glideIteration) {
 SCRATCH_implementFunction(motionPointindirection) {
     (*stackIndex)--;
     struct SCRATCH_data degrees = stack[*stackIndex];
-    sprite->state.rotation = degrees.data.number;
+    sprite->rotation = degrees.data.number;
     return SCRATCH_yieldGeneric;
 }
 
@@ -177,42 +178,42 @@ SCRATCH_implementFunction(motionPointtowards) {
     struct SCRATCH_data y = stack[*stackIndex];
     float direction = atan2(y.data.number, x.data.number);
     direction *= radianToDegree;
-    sprite->state.rotation = (uint16_t) direction;
+    sprite->rotation = (uint16_t) direction;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(motionSetx) {
     (*stackIndex)--;
     struct SCRATCH_data x = stack[*stackIndex];
-    sprite->state.x.halves.high = x.data.number;
+    sprite->x.halves.high = x.data.number;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(motionChangexby) {
     (*stackIndex)--;
     struct SCRATCH_data x = stack[*stackIndex];
-    sprite->state.x.halves.high += x.data.number;
+    sprite->x.halves.high += x.data.number;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(motionSety) {
     (*stackIndex)--;
     struct SCRATCH_data y = stack[*stackIndex];
-    sprite->state.y.halves.high = y.data.number;
+    sprite->y.halves.high = y.data.number;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(motionChangeyby) {
     (*stackIndex)--;
     struct SCRATCH_data y = stack[*stackIndex];
-    sprite->state.y.halves.high += y.data.number;
+    sprite->y.halves.high += y.data.number;
     return SCRATCH_yieldGeneric;
 }
 
 SCRATCH_implementFunction(motionSetrotationstyle) {
     (*stackIndex)--;
     struct SCRATCH_data style = stack[*stackIndex];
-    sprite->state.rotationStyle = style.data.boolean;
+    sprite->rotationStyle = style.data.boolean;
     return SCRATCH_yieldGeneric;
 }
 
@@ -249,7 +250,7 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_stop] = stop,
 };
 
-enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
+enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
     struct SCRATCH_data stack[STACKMAX];
     int stackIndex = 0;
     char stringRegisterA[STRINGREGISTERMAX];
@@ -259,25 +260,25 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* stage, s
     enum SCRATCH_opcode operation;
     while (true) {
         operation = code[thread->programCounter++];
-        enum SCRATCH_continueStatus status = operations[operation](stage, sprite, (struct SCRATCH_data*) stack, &stackIndex, thread);
+        enum SCRATCH_continueStatus status = operations[operation](sprite, (struct SCRATCH_data*) stack, &stackIndex, thread);
         if (operation > SCRATCH_PARTITION_BEGINSTATEMENTS) return status; // A block has completed
     }
 }
 
-void SCRATCH_processThread(struct SCRATCH_sprite* stage, struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
+void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
     enum SCRATCH_continueStatus status = SCRATCH_continue;
     while (status == SCRATCH_continue) {
-        status = SCRATCH_processBlock(stage, sprite, thread);
+        status = SCRATCH_processBlock(sprite, thread);
     }
 }
 
-int SCRATCH_visitAllThreads(struct SCRATCH_sprite* stage, struct SCRATCH_sprite** sprites, int spriteCount) {
+int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount) {
     int activeThreadCount = 0;
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
-        for (int ii = 0; ii < sprite->state.threadCount; ii++) {
+        for (int ii = 0; ii < sprite->threadCount; ii++) {
             if (sprite->threads[ii].active) {
-                SCRATCH_processThread(stage, sprite, &sprite->threads[ii]);
+                SCRATCH_processThread(sprite, &sprite->threads[ii]);
                 activeThreadCount += sprite->threads[ii].active; // may have changed during this execution
             }
         }
@@ -297,8 +298,8 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount, uint8_t variab
         machineLog("Failed allocation in SCRATCH_makeNewSprite\n");
         return NULL;
     }
-    spriteChunk->state.variableCount = variableCount;
-    spriteChunk->state.threadCount = threadCount;
+    spriteChunk->variableCount = variableCount;
+    spriteChunk->threadCount = threadCount;
     spriteChunk->variables = (struct SCRATCH_data*) (firstChunkSize + (uint8_t*) spriteChunk);
     return spriteChunk;
 }

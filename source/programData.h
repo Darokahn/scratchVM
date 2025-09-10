@@ -21,12 +21,18 @@
 
 // The program data is used to initialize two data structures:
 // - An image map that can be given a sprite index and a costume index, returning a pointer into the image section of the data buffer
-// - An unordered dynamic sprite array
+// - An unordered sprite array
+
+extern struct SCRATCH_sprite* sprites[SPRITEMAX];
+extern int spriteCount;
+extern enum SCRATCH_opcode code[];
+extern uint8_t* imageTable[IMAGEMAX];
 
 struct SCRATCH_header {
     uint32_t codeLength;
     uint32_t imageCount128p;
     uint32_t imageCount32p;
+    uint32_t spriteCount;
 };
 
 struct SCRATCH_spriteHeader {
@@ -49,4 +55,7 @@ struct SCRATCH_threadHeader {
     uint16_t programCounter;
 };
 
+uint8_t* getImage(uint8_t* images[IMAGEMAX], int spriteIndex, int costumeIndex);
+
+void initData(struct SCRATCH_header header, uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], uint8_t* images[IMAGEMAX]);
 #endif
