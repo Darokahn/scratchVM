@@ -9,8 +9,8 @@
 // Program data consists of:
 // - Header:
 // -- Code length
-// -- Stage count (128x128 images)
-// -- Regular image count (32x32 images)
+// -- Image data length
+// -- Sprite count
 // - Data buffer:
 // -- Code
 // -- Images
@@ -25,13 +25,12 @@
 
 extern struct SCRATCH_sprite* sprites[SPRITEMAX];
 extern int spriteCount;
-extern enum SCRATCH_opcode code[];
+extern enum SCRATCH_opcode* code;
 extern uint8_t* imageTable[IMAGEMAX];
 
 struct SCRATCH_header {
     uint32_t codeLength;
-    uint32_t imageCount128p;
-    uint32_t imageCount32p;
+    uint32_t imageLength;
     uint32_t spriteCount;
 };
 
