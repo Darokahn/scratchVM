@@ -195,11 +195,36 @@ struct SCRATCH_waitData {
     uint32_t remainingIterations;
 };
 
-struct SCRATCH_thread {
-    enum SCRATCH_EVENTTYPE startEvent; // The event that starts this thread, like "when key ... clicked"
-    union SCRATCH_eventInput eventCondition; // The specific input that must match like "when key SPACE clicked"
-    bool active;
+struct SCRATCH_header {
+    uint32_t codeLength;
+    uint32_t imageLength;
+    uint32_t spriteCount;
+};
+
+struct SCRATCH_spriteHeader {
+    scaledInt32 x;
+    scaledInt32 y;
+    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    bool visible;
+    int8_t layer;
+    uint8_t size;
+    bool rotationStyle;
+    uint8_t costumeIndex;
+    uint8_t costumeMax;
+    uint8_t threadCount;
+    uint8_t variableCount;
+};
+
+struct SCRATCH_threadHeader {
+    union SCRATCH_eventInput eventCondition;
     uint16_t programCounter;
+    enum SCRATCH_EVENTTYPE startEvent;
+};
+
+
+struct SCRATCH_thread {
+    struct SCRATCH_threadHeader base;
+    bool active;
     uint16_t loopCounterStack[LOOPNESTMAX];
     uint8_t loopCounterStackIndex;
     union {
@@ -211,17 +236,7 @@ struct SCRATCH_thread {
 // a SCRATCH_sprite is designed to sit in a single heap allocation. `variables` should point to the next SCRATCH_data aligned
 // address after the end of `threads`.
 struct SCRATCH_sprite {
-    bool visible;
-    int8_t layer;
-    scaledInt32 x;
-    scaledInt32 y;
-    uint8_t size;
-    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
-    bool rotationStyle;
-    uint8_t costumeIndex;
-    uint8_t costumeMax;
-    uint8_t threadCount;
-    uint8_t variableCount;
+    struct SCRATCH_spriteHeader base;
     struct SCRATCH_data* variables; // Variable 0 is always the sprite's message (what it might be `say`ing at any moment)
     struct SCRATCH_thread threads[];
 };
@@ -229,5 +244,5 @@ struct SCRATCH_sprite {
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount);
-struct SCRATCH_sprite* SCRATCH_makeNewSprite(uint8_t threadCount, uint8_t variableCount);
+struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header);
 #endif

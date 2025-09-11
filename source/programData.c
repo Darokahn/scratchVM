@@ -1,7 +1,7 @@
-#include "scratch.h"
-#include "programData.h"
+#include <stdint.h>
 
-#define ALIGN8(ptr) ((ptr + 7) & ~7)
+#include "programData.h"
+#include "scratch.h"
 
 uint8_t* getImage(uint8_t* table[IMAGEMAX], int spriteIndex, int costumeIndex) {
     int imageResolution;
@@ -19,6 +19,27 @@ void initData(struct SCRATCH_header header, uint8_t* buffer, struct SCRATCH_spri
     buffer += header.codeLength;
     buffer = ALIGN8(buffer);
     uint8_t* imageBase = buffer;
+    int imageIndex = 0;
     buffer += header.imageLength;
     buffer = ALIGN8(buffer);
+    for (int i = 0; i < header.spriteCount; i++) {
+        struct SCRATCH_spriteHeader h = *(struct SCRATCH_spriteHeader*) buffer;
+        struct SCRATCH_sprite* s = SCRATCH_makeNewSprite(h);
+        sprites[i] = s;
+        buffer += sizeof h;
+        buffer = ALIGN8(buffer);
+        for (int j = 0; j < h.threadCount; j++) {
+            s->threads[j].base = *(struct SCRATCH_threadHeader*) buffer;
+            buffer += sizeof(struct SCRATCH_threadHeader);
+            buffer = ALIGN8(buffer);
+        }
+        int imageSize;
+        if (i == 0) imageSize = STAGERESOLUTION * STAGERESOLUTION;
+        else imageSize = SPRITERESOLUTION * SPRITERESOLUTION;
+        for (int j = 0; j < h.costumeMax; j++) {
+            images[imageIndex] = imageBase;
+            imageIndex++;
+            imageBase += imageSize;
+        }
+    }
 }
