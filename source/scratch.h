@@ -8,7 +8,7 @@
 #define STRINGREGISTERMAX (4096)
 #define MAXOPCODE (255)
 #define LOOPNESTMAX (8) // deepest nesting for `repeat x` loops before failure
-#define SPRITEMAX (16) // maximum spritecount
+#define SPRITEMAX (8) // maximum spritecount
 #define IMAGEMAX (16)
 
 #define FRAMESPERSEC 30
@@ -106,7 +106,7 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_loopJump,        // Signal a loop iteration to interpreter                   @field jump destination
     SCRATCH_joinString,      // For string join operations                               @input string1 @input string2
     SCRATCH_clone,           // Treat cloning as a privileged primitive operation        @input sprite index
-    SCRATCH_jumpIf,          // Jump if top of stack is truthy                           @input condition
+    SCRATCH_jumpIf,          // Jump if top of stack is truthy                           @input evaluand @field jump destination
     SCRATCH_jump,            // Unconditional jump
 
     SCRATCH_motionGoto,
@@ -217,13 +217,14 @@ struct SCRATCH_spriteHeader {
 
 struct SCRATCH_threadHeader {
     union SCRATCH_eventInput eventCondition;
-    uint16_t programCounter;
+    uint16_t entryPoint;
     enum SCRATCH_EVENTTYPE startEvent;
 };
 
 
 struct SCRATCH_thread {
     struct SCRATCH_threadHeader base;
+    uint16_t programCounter;
     bool active;
     uint16_t loopCounterStack[LOOPNESTMAX];
     uint8_t loopCounterStackIndex;

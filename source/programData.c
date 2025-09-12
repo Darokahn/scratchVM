@@ -30,6 +30,7 @@ void initData(struct SCRATCH_header header, uint8_t* buffer, struct SCRATCH_spri
         buffer = ALIGN8(buffer);
         for (int j = 0; j < h.threadCount; j++) {
             s->threads[j].base = *(struct SCRATCH_threadHeader*) buffer;
+            s->threads[j].programCounter = s->threads[j].base.entryPoint;
             buffer += sizeof(struct SCRATCH_threadHeader);
             buffer = ALIGN8(buffer);
         }

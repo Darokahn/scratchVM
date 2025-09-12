@@ -101,3 +101,6 @@ void writeMock() {
     }
     printf("%s", "\n};");
 }
+
+int main() {
+}
