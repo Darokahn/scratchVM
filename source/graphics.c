@@ -19,6 +19,7 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint8_t
         float yStride = ((float)imageResolution) / height;
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
+                if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
                 uint8_t color = image[(int) ((y * imageResolution) * yStride + x * xStride)];
                 if (color == 0) {
                     if (i == 0) color = 255;
