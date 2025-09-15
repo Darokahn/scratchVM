@@ -208,6 +208,8 @@ struct SCRATCH_spriteHeader {
     bool visible;
     int8_t layer;
     uint8_t size;
+    uint8_t widthRatio; // ratio of sprite width to screen width when unscaled, as a map from (0 -> 1) to (0 -> 255).
+    uint8_t heightRatio;
     bool rotationStyle;
     uint8_t costumeIndex;
     uint8_t costumeMax;

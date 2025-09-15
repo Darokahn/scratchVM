@@ -1,7 +1,8 @@
 #include <string.h>
 #include <stdlib.h>
-#include "programData.h"
 #include "scratch.h"
+
+#define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
 
 struct SCRATCH_header header;
 uint8_t programData[4096 * 10];
@@ -15,12 +16,42 @@ enum SCRATCH_opcode* code;
 uint8_t checkerboard128[SIZE128 * SIZE128];
 uint8_t checkerboard32[SIZE32 * SIZE32];
 
+enum phases {
+    HIGH,
+    RISING,
+    LOW,
+    FALLING
+};
+
 void generate_checkerboards() {
     // Generate 128x128 checkerboard (1 pixel per square)
-    for (int y = 0; y < SIZE128; y++) {
-        for (int x = 0; x < SIZE128; x++) {
-            checkerboard128[y * SIZE128 + x] = ((x + y) % 2 == 0) ? 0 : 255;
+    uint8_t colors[4] = {0};
+    unsigned int rPhase = HIGH;
+    unsigned int gPhase = RISING;
+    unsigned int bPhase = LOW;
+    colors[HIGH] = 255;
+    colors[LOW] = 0;
+    for (int phase = 0; phase < 4; phase++) {
+        colors[RISING] = 0;
+        colors[FALLING] = 255;
+        for (int i = 0; i < 32; i++) {
+            int red = (colors[rPhase]);
+            int green = (colors[gPhase]);
+            int blue = (colors[bPhase]);
+            int x = (phase * 32) + i;
+            for (int y = 0; y < 128; y++) {
+                int redTemp = red * 7 / 256;
+                int greenTemp = green * 7 / 256;
+                int blueTemp = blue * 3 / 256;
+                int color = (redTemp << 5) | (greenTemp << 3) | blueTemp;
+                checkerboard128[y * 128 + x] = color;
+            }
+            colors[RISING] += 4;
+            colors[FALLING] -= 4;
         }
+        rPhase = (rPhase - 1) % 4;
+        gPhase = (gPhase - 1) % 4;
+        bPhase = (bPhase - 1) % 4;
     }
 
     // Generate 32x32 checkerboard (1 pixel per square)
@@ -30,14 +61,33 @@ void generate_checkerboards() {
         }
     }
 }
+
 void mockProgram() {
-    struct SCRATCH_spriteHeader spriteTemplate = {
+    struct SCRATCH_spriteHeader stageTemplate = {
         .x = {0},
         .y = {0},
         .rotation = 0,
         .visible = true,
         .layer = 0,
         .size = 128,
+        .widthRatio = 255,
+        .heightRatio = 255,
+        .rotationStyle = 0,
+        .costumeIndex = 0,
+        .costumeMax = 1,
+        .threadCount = 1,
+        .variableCount = 1
+    };
+
+    struct SCRATCH_spriteHeader spriteTemplate = {
+        .x = {.halves.high=30},
+        .y = {0},
+        .rotation = 0,
+        .visible = true,
+        .layer = 0,
+        .size = 128,
+        .widthRatio = 50,
+        .heightRatio = 50,
         .rotationStyle = 0,
         .costumeIndex = 0,
         .costumeMax = 1,
@@ -46,7 +96,7 @@ void mockProgram() {
     };
 
     struct SCRATCH_threadHeader threadTemplate = {
-        .programCounter = 0
+        .entryPoint = 0
     };
 
     generate_checkerboards();
@@ -73,8 +123,8 @@ void mockProgram() {
     memcpy(data, checkerboard32, sizeof checkerboard32);
     data += sizeof checkerboard32;
     data = ALIGN8(data);
-    memcpy(data, &spriteTemplate, sizeof spriteTemplate);
-    data += sizeof spriteTemplate;
+    memcpy(data, &stageTemplate, sizeof stageTemplate);
+    data += sizeof stageTemplate;
     data = ALIGN8(data);
     memcpy(data, &threadTemplate, sizeof threadTemplate);
     data += sizeof threadTemplate;
@@ -88,14 +138,12 @@ void mockProgram() {
     header.spriteCount = 2;
     header.codeLength = (int) ALIGN8(sizeof codeTemplate);
     header.imageLength = sizeof checkerboard128 + sizeof checkerboard32;
-
-    struct SCRATCH_sprite s;
 }
 
 void writeMock() {
     printf("%s", "#include <string.h>\n#include <stdlib.h>\n#include \"programData.h\"\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\n");
-    printf("struct SCRATCH_header header = {.spriteCount = %d, .codeLength = %d, .imageLength = %d};\n", header.spriteCount, header.codeLength, header.imageLength);
-    printf("uint8_t programData[] = {");
+    printf("const struct SCRATCH_header header = {.spriteCount = %d, .codeLength = %d, .imageLength = %d};\n", header.spriteCount, header.codeLength, header.imageLength);
+    printf("const uint8_t programData[] = {");
     for (int i = 0; i < sizeof programData; i++) {
         printf("0x%x, ", programData[i]);
     }
@@ -103,4 +151,6 @@ void writeMock() {
 }
 
 int main() {
+    mockProgram();
+    writeMock();
 }
