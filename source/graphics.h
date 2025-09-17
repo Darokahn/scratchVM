@@ -12,8 +12,6 @@
 #define WIDTHRATIO (((float) LCDWIDTH) / SCRATCHWIDTH)
 #define HEIGHTRATIO (((float) LCDHEIGHT) / SCRATCHHEIGHT)
 
-
-
 void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t screen[LCDHEIGHT][LCDWIDTH]);
 void debugImage(uint16_t *img, int width, int height);
 
