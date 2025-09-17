@@ -14,45 +14,86 @@ enum SCRATCH_opcode* code;
 #define SIZE128 128
 #define SIZE32  32
 
-uint8_t pattern128[SIZE128 * SIZE128];
-uint8_t pattern32[SIZE32 * SIZE32];
+uint16_t pattern128[SIZE128 * SIZE128];
+uint16_t pattern32[SIZE32 * SIZE32];
 
-enum phases {
-    HIGH,
-    RISING,
-    LOW,
-    FALLING
+uint8_t letters[] = {
+    "! !! !!!!! !! !!!!!  !!!!  !!!!  !  !  !  !!!!!!! !! !! !!!!! !! !!!!!!!! !!!!! !!! ! !! !!! ! !! !! !!! "
 };
+
+uint8_t getLetterValue(int letter, int row, int col) {
+    int index = (letter * 15) + (row * 3) + col;
+    return letters[index] - ' ';
+}
+
+uint8_t getGradientPeriod(int index) {
+    index %= 1536;
+    if (index < 0) return 0;
+    // low phase
+    if (index < 512) {
+        return 0;
+    }
+    index -= 512;
+    // rising phase
+    if (index < 256) {
+        return index;
+    }
+    index -= 256;
+    // high phase
+    if (index < 512) {
+        return 255;
+    }
+    // falling phase
+    index -= 512;
+    if (index < 256) {
+        return 255 - index;
+    }
+    else return 0;
+}
+
+uint16_t getGradientAt(int x) {
+    int redOffset = 1024;
+    int greenOffset = 512;
+    int blueOffset = 0;
+    int red = getGradientPeriod((redOffset + x));
+    int green = getGradientPeriod((greenOffset + x));
+    int blue = getGradientPeriod((blueOffset + x));
+    int tempRed = red;
+    int tempGreen = green;
+    int tempBlue = blue;
+    tempRed = (tempRed * 31) / 255;
+    tempGreen = (tempGreen * 63) / 255;
+    tempBlue = (tempBlue * 31) / 255;
+    uint16_t color = tempRed << 11 | tempGreen << 5 | tempBlue;
+    return color;
+}
 
 void generatePatterns() {
     // Generate 128x128 pattern (1 pixel per square)
-    uint8_t colors[4] = {0};
-    unsigned int rPhase = HIGH;
-    unsigned int gPhase = RISING;
-    unsigned int bPhase = LOW;
-    colors[HIGH] = 255;
-    colors[LOW] = 0;
-    for (int phase = 0; phase < 4; phase++) {
-        colors[RISING] = 0;
-        colors[FALLING] = 255;
-        for (int i = 0; i < 32; i++) {
-            int red = (colors[rPhase]);
-            int green = (colors[gPhase]);
-            int blue = (colors[bPhase]);
-            int x = (phase * 32) + i;
-            for (int y = 0; y < 128; y++) {
-                int redTemp = red * 7 / 256;
-                int greenTemp = green * 7 / 256;
-                int blueTemp = blue * 3 / 256;
-                int color = (redTemp << 5) | (greenTemp << 3) | blueTemp;
-                pattern128[y * 128 + x] = color;
-            }
-            colors[RISING] += 4;
-            colors[FALLING] -= 4;
+    int redOffset = 1024;
+    int greenOffset = 512;
+    int blueOffset = 0;
+    for (int x = 0; x < 128; x++) {
+        int index = x * (1536 / 128);
+        int red = getGradientPeriod((redOffset + index));
+        int green = getGradientPeriod((greenOffset + index));
+        int blue = getGradientPeriod((blueOffset + index));
+        for (int y = 0; y < 128; y++) {
+            int tempRed = red;
+            int tempGreen = green;
+            int tempBlue = blue;
+            /*
+            tempRed = (tempRed * y) / 128;
+            tempGreen = (tempGreen * y) / 128;
+            tempBlue = (tempBlue * y) / 128;
+            */
+            tempRed = (tempRed * 31) / 255;
+            tempGreen = (tempGreen * 63) / 255;
+            tempBlue = (tempBlue * 31) / 255;
+            uint16_t color = tempRed << 11 | tempGreen << 5 | tempBlue;
+            if (color == 0) color = 1;
+            pattern128[y * 128 + x] = color;
         }
-        rPhase = (rPhase - 1) % 4;
-        gPhase = (gPhase - 1) % 4;
-        bPhase = (bPhase - 1) % 4;
     }
 
     // Generate 32x32 pattern (1 pixel per square)
@@ -60,8 +101,8 @@ void generatePatterns() {
         int alt = sqrt(-(x - 16) * (x - 16) + 256);
         for (int y = 0; y < 16; y++) {
             if (y <= alt) {
-                pattern32[(16 + y) * 32 + x] = 0xff;
-                pattern32[(16 - y) * 32 + x] = 0xff;
+                pattern32[(16 + y) * 32 + x] = 28;
+                pattern32[(16 - y) * 32 + x] = 28;
             }
             else {
                 pattern32[(16 + y) * 32 + x] = 0x00;
@@ -71,7 +112,41 @@ void generatePatterns() {
     }
 }
 
+void drawLetters() {
+    int letterWidth = 8; // (row width + space) * 2
+    int letterCount = 11; // "hello world"
+    int phraseWidth = letterWidth * letterCount;
+    int letterHeight = 10; // column width * 2
+    int xCursor = (128 - phraseWidth) / 2;
+    int yCursor = (128 - letterHeight) / 2;
+    uint8_t message[] = {0, 1, 2, 2, 3, 255, 4, 3, 5, 2, 6};
+    for (int i = 0; i < 11; (i++, xCursor += 8)) {
+        uint8_t letter = message[i];
+        if (letter == 255) continue;
+        for (int x = 0; x < 6; x++) {
+            for (int y = 0; y < 10; y++) {
+                if (!getLetterValue(letter, y / 2, x / 2)) continue;
+                pattern128[(y + yCursor) * 128 + (x + xCursor)] = 0xffff;
+            }
+        }
+    }
+}
+
 void mockProgram() {
+    const enum SCRATCH_opcode codeTemplate[] = {
+        SCRATCH_DEBUGSTATEMENT,
+        SCRATCH_push, SCRATCH_NUMBER, 30, 0,
+        SCRATCH_push, SCRATCH_NUMBER, 30, 0,
+        SCRATCH_push, SCRATCH_NUMBER, 112, 0,
+        SCRATCH_motionGlideto,
+        SCRATCH_motion_glideIteration,
+        SCRATCH_DEBUGSTATEMENT,
+        SCRATCH_stop,
+
+        SCRATCH_DEBUGSTATEMENT,
+        SCRATCH_stop,
+    };
+
     struct SCRATCH_spriteHeader stageTemplate = {
         .x = {0},
         .y = {0},
@@ -104,25 +179,15 @@ void mockProgram() {
         .variableCount = 1
     };
 
-    struct SCRATCH_threadHeader threadTemplate = {
+    struct SCRATCH_threadHeader threadTemplate1 = {
+        .entryPoint = (sizeof codeTemplate) - 1
+    };
+    struct SCRATCH_threadHeader threadTemplate2 = {
         .entryPoint = 0
     };
 
     generatePatterns();
-    const enum SCRATCH_opcode codeTemplate[] = {
-        SCRATCH_DEBUGSTATEMENT,
-        SCRATCH_push, SCRATCH_NUMBER, 30, 0,
-        SCRATCH_push, SCRATCH_NUMBER, 30, 0,
-        SCRATCH_push, SCRATCH_NUMBER, 3, 0,
-        SCRATCH_motionGlideto,
-        SCRATCH_motion_glideIteration,
-        SCRATCH_DEBUGSTATEMENT,
-        SCRATCH_stop,
-
-        SCRATCH_DEBUGSTATEMENT,
-        SCRATCH_stop,
-    };
-
+    drawLetters();
     uint8_t* data = (uint8_t*) programData;
     memcpy(data, codeTemplate, sizeof codeTemplate);
     data += sizeof codeTemplate;
@@ -135,17 +200,17 @@ void mockProgram() {
     memcpy(data, &stageTemplate, sizeof stageTemplate);
     data += sizeof stageTemplate;
     data = ALIGN8(data);
-    memcpy(data, &threadTemplate, sizeof threadTemplate);
-    data += sizeof threadTemplate;
+    memcpy(data, &threadTemplate1, sizeof threadTemplate1);
+    data += sizeof threadTemplate1;
     data = ALIGN8(data);
     memcpy(data, &spriteTemplate, sizeof spriteTemplate);
     data += sizeof spriteTemplate;
     data = ALIGN8(data);
-    memcpy(data, &threadTemplate, sizeof threadTemplate);
-    data += sizeof threadTemplate;
+    memcpy(data, &threadTemplate2, sizeof threadTemplate2);
+    data += sizeof threadTemplate2;
     data = ALIGN8(data);
     header.spriteCount = 2;
-    header.codeLength = (int) ALIGN8(sizeof codeTemplate);
+    header.codeLength = (int)(uintptr_t)ALIGN8(sizeof codeTemplate);
     header.imageLength = sizeof pattern128 + sizeof pattern32;
 }
 

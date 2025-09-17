@@ -12,7 +12,7 @@
 
 
 
-void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint8_t** imageTable, uint8_t screen[LCDWIDTH][LCDHEIGHT]);
-void debugImage(uint8_t *img, int width, int height);
+void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t screen[LCDWIDTH][LCDHEIGHT]);
+void debugImage(uint16_t *img, int width, int height);
 
 #endif
