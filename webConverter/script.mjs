@@ -1,5 +1,27 @@
 import { unzipSync } from "fflate";
-import fs from "fs"
+
+const offsets = {
+  sprite: {
+    x: 0,
+    y: 4,
+    rotation: 8,
+    visible: 10,
+    layer: 11,
+    size: 12,
+    widthRatio: 14,
+    heightRatio: 15,
+    rotationStyle: 16,
+    costumeIndex: 17,
+    costumeMax: 18,
+    threadCount: 19,
+    variableCount: 20,
+  },
+  thread: {
+    eventCondition: 0,
+    entryPoint: 2,
+    startEvent: 4,
+  }
+};
 
 // template for the object representing the runtime of a stack of blocks
 function threadTemplate() {
@@ -33,15 +55,14 @@ function detailsTemplate() {
     return {
         unzippedFile: null,
         sprites: [],
-        images: [],
+        stageImages: [],
+        spriteImages: [],
         code: []
     };
 }
 
 // get the sb3 file from the operation layer
 function getFile(name) {
-    let file = fs.readFileSync(name);
-    return file;
 }
 
 // get the static binary for patching
@@ -69,11 +90,16 @@ function getDetails(sb3File) {
         sprite.rotationStyle = target.rotationStyle;
         for (let costume of target.costumes) {
             let filename = costume.assetId + "." + costume.dataFormat;
-            details.images.push(filename);
+            if (sprite.isStage) details.stageImages.push(filename);
+            else details.spriteImages.push(filename);
         }
         details.sprites.push(sprite);
     }
     console.log(details);
+}
+
+// copy a sprite into the array's memory
+function copySprite(array, offset, sprite) {
 }
 
 // convert table-formatted details into a blob to be loaded

@@ -207,7 +207,7 @@ struct SCRATCH_spriteHeader {
     uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
     bool visible;
     int8_t layer;
-    uint8_t size;
+    uint16_t size;
     uint8_t widthRatio; // ratio of sprite width to screen width when unscaled, as a map from (0 -> 1) to (0 -> 255).
     uint8_t heightRatio;
     bool rotationStyle;

@@ -136,8 +136,8 @@ void mockProgram() {
     const enum SCRATCH_opcode codeTemplate[] = {
         SCRATCH_DEBUGSTATEMENT,
         SCRATCH_push, SCRATCH_NUMBER, 30, 0,
-        SCRATCH_push, SCRATCH_NUMBER, 30, 0,
-        SCRATCH_push, SCRATCH_NUMBER, 112, 0,
+        SCRATCH_push, SCRATCH_NUMBER, 255, 0,
+        SCRATCH_push, SCRATCH_NUMBER, 255, 10,
         SCRATCH_motionGlideto,
         SCRATCH_motion_glideIteration,
         SCRATCH_DEBUGSTATEMENT,
@@ -180,7 +180,7 @@ void mockProgram() {
     };
 
     struct SCRATCH_threadHeader threadTemplate1 = {
-        .entryPoint = (sizeof codeTemplate) - 1
+        .entryPoint = (sizeof codeTemplate) - 2
     };
     struct SCRATCH_threadHeader threadTemplate2 = {
         .entryPoint = 0
@@ -215,7 +215,7 @@ void mockProgram() {
 }
 
 void writeMock() {
-    printf("%s", "#include <string.h>\n#include <stdlib.h>\n#include \"programData.h\"\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\n");
+    printf("%s", "// THIS IS A GENERATED FILE! Check generateDefinitions.c to see how it was created.\n#include <string.h>\n#include <stdlib.h>\n#include \"programData.h\"\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\n");
     printf("const struct SCRATCH_header header = {.spriteCount = %d, .codeLength = %d, .imageLength = %d};\n", header.spriteCount, header.codeLength, header.imageLength);
     printf("const uint8_t programData[] = {");
     for (int i = 0; i < sizeof programData; i++) {

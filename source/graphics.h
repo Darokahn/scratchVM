@@ -1,8 +1,10 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
-#define LCDWIDTH 128 // 220
-#define LCDHEIGHT 128 // 176
+#include "scratch.h"
+
+#define LCDWIDTH 320
+#define LCDHEIGHT 240
 
 #define SCRATCHWIDTH 480
 #define SCRATCHHEIGHT 360
@@ -12,7 +14,7 @@
 
 
 
-void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t screen[LCDWIDTH][LCDHEIGHT]);
+void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t screen[LCDHEIGHT][LCDWIDTH]);
 void debugImage(uint16_t *img, int width, int height);
 
 #endif
