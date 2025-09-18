@@ -37,7 +37,6 @@
 #endif
 
 typedef uint16_t halfStringPointer; // used to represent the bottom half of a pointer; safe to use with some static buffers.
-extern int machineLog(const char* fmt, ...);
 
 // using GNU typed enum extension
 enum SCRATCH_fieldType : uint8_t {

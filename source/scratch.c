@@ -4,6 +4,7 @@
 #include <string.h>
 #include "scratch.h"
 #include "programData.h"
+#include "externalDefinitions.h"
 
 #define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
 

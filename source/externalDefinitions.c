@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "graphics.h"
 
@@ -32,4 +33,13 @@ void updateGraphics(uint16_t* framebuffer) {
     SDL_RenderPresent(renderer);
     SDL_Event e;
     SDL_PollEvent(&e);
+}
+
+__attribute__((naked))
+int machineLog(const char* fmt, ...) {
+    goto *&printf; // GCC only
+}
+
+void* mallocDMA(size_t size) {
+    return malloc(size);
 }

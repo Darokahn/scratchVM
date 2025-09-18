@@ -6,8 +6,9 @@
 #include "graphics.h"
 #include "programData.h"
 #include "letters.h"
+#include "externalDefinitions.h"
 
-void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t screen[LCDHEIGHT][LCDWIDTH]) {
+void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t* screen) {
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
         const uint16_t* image = getImage(imageTable, i, sprite->base.costumeIndex);
@@ -31,11 +32,10 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_
                     if (i == 0) color = 0xffff;
                     else continue;
                 }
-                screen[y + baseY][x + baseX] = color;
+                screen[(y + baseY ) * LCDWIDTH + x + baseX] = color;
             }
         }
     }
-    //debugImage((uint16_t*) screen, LCDWIDTH, LCDHEIGHT);
 }
 
 void debugImage(uint16_t *img, int width, int height) {

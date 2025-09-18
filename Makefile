@@ -1,11 +1,11 @@
 all: main
 
-main: source/log.c source/scratch.c source/programData.c source/definitions.c source/main.c source/graphics.c source/graphicsOutput.c
+main: source/scratch.c source/programData.c source/definitions.c source/main.c source/graphics.c source/externalDefinitions.c
 	gcc $^ -lm -lSDL2 -g -fsanitize=address
 
 # Rule to build definitions.c using the generator
-source/definitions.c: source/gdef
-	./$< > $@
+#source/definitions.c: source/gdef
+	#./$< > $@
 
 # Rule to build the generator program
 source/gdef: source/generateDefinitions.c

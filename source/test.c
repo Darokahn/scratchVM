@@ -16,11 +16,13 @@ int main(void) {
     printf("costumeMax    = %zu\n", offsetof(struct SCRATCH_spriteHeader, costumeMax));
     printf("threadCount   = %zu\n", offsetof(struct SCRATCH_spriteHeader, threadCount));
     printf("variableCount = %zu\n", offsetof(struct SCRATCH_spriteHeader, variableCount));
+    printf("sizeof        = %zu\n", sizeof(struct SCRATCH_spriteHeader));
 
     printf("\nOffsets in SCRATCH_threadHeader:\n");
     printf("eventCondition = %zu\n", offsetof(struct SCRATCH_threadHeader, eventCondition));
     printf("entryPoint     = %zu\n", offsetof(struct SCRATCH_threadHeader, entryPoint));
     printf("startEvent     = %zu\n", offsetof(struct SCRATCH_threadHeader, startEvent));
+    printf("sizeof         = %zu\n", sizeof(struct SCRATCH_threadHeader));
 
     return 0;
 }
