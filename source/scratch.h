@@ -20,7 +20,7 @@
     typedef union {
         int32_t i; 
         __attribute__((packed)) struct {
-            int16_t low; 
+            uint16_t low; 
             int16_t high;
         } halves;
     } scaledInt32;
@@ -29,7 +29,7 @@
         int32_t i; 
         __attribute__((packed)) struct {
             int16_t high; 
-            int16_t low;
+            uint16_t low;
         } halves;
     } scaledInt32;
 #else
@@ -201,12 +201,12 @@ struct SCRATCH_header {
 };
 
 struct SCRATCH_spriteHeader {
-    scaledInt32 x;
+    scaledInt32 x; // Scaled int split into a whole and fractional part. whole part is a Number that, according to my testing, can go from -1000 to 1000.
     scaledInt32 y;
     uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
     bool visible;
     int8_t layer;
-    uint16_t size;
+    uint16_t size; // number representing percent of original size
     uint8_t widthRatio; // ratio of sprite width to screen width when unscaled, as a map from (0 -> 1) to (0 -> 255).
     uint8_t heightRatio;
     bool rotationStyle;

@@ -46,7 +46,9 @@ function spriteTemplate() {
         visible: true,
         layer: 0,
         size: 128,
-        rotationStyle: "",
+        widthRatio: 0,
+        heightRatio: 0,
+        rotationStyle: 0,
         costumeIndex: 0,
         costumeMax: 0,
         threadCount: 0,
@@ -124,7 +126,12 @@ function getDetails(project) {
 }
 
 // adjust the sprite's parameters to match the quirks of my C representation
-function adjustSprite(sprite) {
+
+function adjustSprite(sprite, isStage) {
+    if (isStage) {
+        console.log(sprite);
+    }
+
 }
 
 // copy a sprite into the array's memory
@@ -149,63 +156,62 @@ function copyStruct(buffer, offset, struct, name) {
     }
 }
 
-// Replace the program data of a binary with the loaded data in the blob
-function patchBinary(blob) {
-}
-
-let PROJECTMAX = 4096 * 100;
+let PROJECTMAX = 4096 * 20;
 
 async function convertScratchProject() {
+    let header = {
+        codeLength: 0,
+        imageLength: 0,
+        spriteCount: 0
+    };
     const file = getFsEntry("project");
     const buffer = new Uint8Array(PROJECTMAX);
     let details = getDetails(file);
+    let isStage = true;
     for (let sprite of details.sprites) {
-        adjustSprite(sprite);
+        adjustSprite(sprite, isStage);
+        isStage = false;
     }
     let index = 0;
     buffer.set(new Uint8Array(details.code), index);
     index += details.code.length;
     index = (index + 7) & ~7;
-    console.log(index);
+    header.codeLength = index;
     for (let image of details.stageImages) {
         let array = await getScaledImage(file, image, true);
         buffer.set(array, index);
-        console.log(array);
-        index += array.length * 2;
-        console.log(index);
+        index += array.byteLength;
     }
     for (let image of details.spriteImages) {
-        let array = getScaledImage(file, image, false);
+        let array = await getScaledImage(file, image, false);
         buffer.set(array, index);
-        index += array.length * 2;
-        console.log(index);
+        index += array.byteLength;
     }
     index = (index + 7) & ~7;
-    console.log(index);
+    header.imageLength = index;
     for (let sprite of details.sprites) {
         copyStruct(buffer.buffer, index, sprite, "sprite");
         index += offsets.sprite.sizeof;
         index = (index + 7) & ~7;
-        console.log(index);
         for (let thread of sprite.threads) {
             copyStruct(buffer.buffer, index, thread, "thread");
             index += offsets.thread.sizeof;
             index = (index + 7) & ~7;
-            console.log(index);
         }
     }
-    printAsCfile(details, buffer);
+    header.spriteCount = details.sprites.length;
+    printAsCfile(details, header, buffer);
 }
 
-function printAsCfile(details, buffer) {
+function printAsCfile(details, header, buffer) {
     let totalString = ""
     totalString += (
         "// THIS IS A GENERATED FILE!\n#include <string.h>\n#include <stdlib.h>\n#include \"programData.h\"\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\n"
     );
     totalString += (
-        "const struct SCRATCH_header header = {.spriteCount = " + details.sprites.length + 
-        ", .codeLength = " + details.code.length + 
-        ", .imageLength = " + (details.spriteImages.length * 32 * 32 + details.stageImages.length * 128 * 128) +
+        "const struct SCRATCH_header header = {.spriteCount = " + header.spriteCount + 
+        ", .codeLength = " + header.codeLength + 
+        ", .imageLength = " + header.imageLength +
         "};\n"
     );
     totalString += ("const uint8_t programData[] = {");

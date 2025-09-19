@@ -3,8 +3,8 @@
 
 #include "scratch.h"
 
-#define LCDWIDTH 100//320
-#define LCDHEIGHT 100//240
+#define LCDWIDTH 320
+#define LCDHEIGHT 240
 
 #define SCRATCHWIDTH 480
 #define SCRATCHHEIGHT 360
@@ -13,6 +13,5 @@
 #define HEIGHTRATIO (((float) LCDHEIGHT) / SCRATCHHEIGHT)
 
 void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t* screen);
-void debugImage(uint16_t *img, int width, int height);
 
 #endif

@@ -126,7 +126,7 @@ void drawLetters() {
         for (int x = 0; x < 6; x++) {
             for (int y = 0; y < 10; y++) {
                 if (!getLetterValue(letter, y / 2, x / 2)) continue;
-                pattern128[(y + yCursor) * 128 + (x + xCursor)] = 0xffff;
+                pattern128[(y + yCursor) * 128 + (x + xCursor)] = getGradientAt((phraseWidth - (x + xCursor)) / 2);
             }
         }
     }
