@@ -12,6 +12,5 @@
 #define WIDTHRATIO (((float) LCDWIDTH) / SCRATCHWIDTH)
 #define HEIGHTRATIO (((float) LCDHEIGHT) / SCRATCHHEIGHT)
 
-void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t* screen);
-
+typedef uint8_t pixel;
 #endif

@@ -3,22 +3,22 @@
 #include "programData.h"
 #include "scratch.h"
 
-const uint16_t* getImage(const uint16_t* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
+const pixel* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
     int imageResolution;
     // The first sprite is implicitly the stage
     if (spriteIndex == 0) imageResolution = STAGERESOLUTION;
     else imageResolution = SPRITERESOLUTION;
 
-    const uint16_t* base = imageTable[spriteIndex];
+    const pixel* base = imageTable[spriteIndex];
     base += costumeIndex * (imageResolution * imageResolution);
     return base;
 }
 
-void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const uint16_t* images[IMAGEMAX]) {
+void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]) {
     code = (enum SCRATCH_opcode*) buffer;
     buffer += header.codeLength;
     buffer = ALIGN8(buffer);
-    const uint16_t* imageBase = (const uint16_t*) buffer;
+    const pixel* imageBase = (const pixel*) buffer;
     int imageIndex = 0;
     buffer += header.imageLength;
     buffer = ALIGN8(buffer);

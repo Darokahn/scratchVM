@@ -3,6 +3,7 @@
 ### This is all the tasks that need to be completed before the end of the class.
 
 - Introduce game design, hardware, computer architecture
+- Talk about assembly and its role
 - Create art for a scratch game
 - Code game
 - Assemble gameboy

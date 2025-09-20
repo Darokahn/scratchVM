@@ -2,12 +2,19 @@
 #define EXTERNALDEFINITIONS_H
 
 #include <stdint.h>
+#include <stdio.h>
 
-int machineLog(const char* fmt, ...);
+#include "graphics.h"
+#include "scratch.h"
+#include "programData.h"
 
 void startGraphics();
-void updateGraphics(uint16_t* framebuffer);
+void updateGraphics();
+int machineLog(const char* fmt, ...);
 
 void* mallocDMA(size_t size);
+
+void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable);
+void debugImage(pixel *img, int width, int height);
 
 #endif

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "scratch.h"
+#include "graphics.h"
 
 #define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
 
@@ -30,7 +31,7 @@ extern const struct SCRATCH_header header;
 extern const uint8_t programData[];
 extern enum SCRATCH_opcode* code;
 
-const uint16_t* getImage(const uint16_t* images[IMAGEMAX], int spriteIndex, int costumeIndex);
+const pixel* getImage(const pixel* images[IMAGEMAX], int spriteIndex, int costumeIndex);
 
-void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const uint16_t* images[IMAGEMAX]);
+void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]);
 #endif

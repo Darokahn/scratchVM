@@ -8,7 +8,9 @@
 #include "letters.h"
 #include "externalDefinitions.h"
 
-void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint16_t** imageTable, uint16_t* screen) {
+uint16_t* screen;
+
+void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const uint8_t** imageTable, uint16_t* screen) {
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
         const uint16_t* image = getImage(imageTable, i, sprite->base.costumeIndex);

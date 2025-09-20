@@ -5,17 +5,21 @@
 
 #define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
 
+#define TONATIVECOLOR(red, green, blue) (((red * 7 / 255) << 5) | ((green * 7 / 255) << 5) | (blue * 3 / 255))
+
 struct SCRATCH_header header;
 uint8_t programData[4096 * 10];
 enum SCRATCH_opcode* code;
+
+typedef uint8_t pixel;
 
 #define SIZE 128
 
 #define SIZE128 128
 #define SIZE32  32
 
-uint16_t pattern128[SIZE128 * SIZE128];
-uint16_t pattern32[SIZE32 * SIZE32];
+pixel pattern128[SIZE128 * SIZE128];
+pixel pattern32[SIZE32 * SIZE32];
 
 uint8_t letters[] = {
     "! !! !!!!! !! !!!!!  !!!!  !!!!  !  !  !  !!!!!!! !! !! !!!!! !! !!!!!!!! !!!!! !!! ! !! !!! ! !! !! !!! "
@@ -51,7 +55,7 @@ uint8_t getGradientPeriod(int index) {
     else return 0;
 }
 
-uint16_t getGradientAt(int x) {
+pixel getGradientAt(int x) {
     int redOffset = 1024;
     int greenOffset = 512;
     int blueOffset = 0;
@@ -61,10 +65,7 @@ uint16_t getGradientAt(int x) {
     int tempRed = red;
     int tempGreen = green;
     int tempBlue = blue;
-    tempRed = (tempRed * 31) / 255;
-    tempGreen = (tempGreen * 63) / 255;
-    tempBlue = (tempBlue * 31) / 255;
-    uint16_t color = tempRed << 11 | tempGreen << 5 | tempBlue;
+    pixel color = TONATIVECOLOR(red, green, blue);
     return color;
 }
 
@@ -82,15 +83,7 @@ void generatePatterns() {
             int tempRed = red;
             int tempGreen = green;
             int tempBlue = blue;
-            /*
-            tempRed = (tempRed * y) / 128;
-            tempGreen = (tempGreen * y) / 128;
-            tempBlue = (tempBlue * y) / 128;
-            */
-            tempRed = (tempRed * 31) / 255;
-            tempGreen = (tempGreen * 63) / 255;
-            tempBlue = (tempBlue * 31) / 255;
-            uint16_t color = tempRed << 11 | tempGreen << 5 | tempBlue;
+            pixel color = TONATIVECOLOR(red, green, blue);
             if (color == 0) color = 1;
             pattern128[y * 128 + x] = color;
         }

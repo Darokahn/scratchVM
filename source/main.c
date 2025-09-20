@@ -7,17 +7,16 @@
 #include "externalDefinitions.h"
 
 struct SCRATCH_sprite* sprites[SPRITEMAX];
-const uint16_t* imageTable[IMAGEMAX];
-
-uint16_t* screen;
+const pixel* imageTable[IMAGEMAX];
 
 int main() {
     initData(header, programData, sprites, imageTable);
-    screen = mallocDMA(LCDWIDTH*LCDHEIGHT*sizeof(uint16_t));
     startGraphics();
     machineLog("test\n");
     while (SCRATCH_visitAllThreads(sprites, header.spriteCount)) {
-        drawSprites(sprites, 2, imageTable, screen);
-        updateGraphics(screen);
+        drawSprites(sprites, 2, imageTable);
+        updateGraphics();
     }
+    drawSprites(sprites, 2, imageTable);
+    updateGraphics();
 }
