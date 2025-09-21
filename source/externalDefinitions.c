@@ -38,6 +38,7 @@ void updateGraphics() {
     SDL_RenderPresent(renderer);
     SDL_Event e;
     SDL_PollEvent(&e);
+    debugImage(screen, LCDWIDTH, LCDHEIGHT);
 }
 
 __attribute__((naked))
@@ -68,6 +69,7 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
                 int row = (y * yStride);
                 int index = ((row * imageResolution) + (x * xStride));
                 pixel color = image[index];
+
                 // transparent pixels reveal white if they are on the background; do nothing if they are on a sprite.
                 if (color == 0) {
                     if (i == 0) color = (pixel) 0xffff;
@@ -84,15 +86,15 @@ void debugImage(pixel *img, int width, int height) {
     char* pixelPointer = pixels;
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
-            uint16_t pixel = img[y * width + x];
+            pixel pixel = img[y * width + x];
 
-            uint8_t r = (pixel >> 11) & 31;
-            uint8_t g = (pixel >> 5) & 63;
-            uint8_t b = pixel & 31;
+            uint8_t r = (pixel >> 5) & 7;
+            uint8_t g = (pixel >> 2) & 7;
+            uint8_t b = pixel & 3;
 
-            uint8_t R = (r * 255) / 31;
-            uint8_t G = (g * 255) / 63;
-            uint8_t B = (b * 255) / 31;
+            uint8_t R = (r * 255) / 7;
+            uint8_t G = (g * 255) / 7;
+            uint8_t B = (b * 255) / 3;
 
             pixelPointer += sprintf(pixelPointer, "\x1b[48;2;%u;%u;%um  ", R, G, B);
         }

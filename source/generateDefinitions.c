@@ -5,7 +5,8 @@
 
 #define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
 
-#define TONATIVECOLOR(red, green, blue) (((red * 7 / 255) << 5) | ((green * 7 / 255) << 5) | (blue * 3 / 255))
+#define TONATIVECOLOR(red, green, blue) (((red * 7 / 255) << 5) | ((green * 7 / 255) << 3) | (blue * 3 / 255))
+#define BYTECOLORTOSTRING(color) "%d, %d, %d\n", ((color >> 5) & 7) * 255 / 7, ((color >> 2) & 7) * 255 / 7, (color & 3) * 255 / 3
 
 struct SCRATCH_header header;
 uint8_t programData[4096 * 10];
@@ -79,11 +80,8 @@ void generatePatterns() {
         int red = getGradientPeriod((redOffset + index));
         int green = getGradientPeriod((greenOffset + index));
         int blue = getGradientPeriod((blueOffset + index));
+        pixel color = TONATIVECOLOR(red, green, blue);
         for (int y = 0; y < 128; y++) {
-            int tempRed = red;
-            int tempGreen = green;
-            int tempBlue = blue;
-            pixel color = TONATIVECOLOR(red, green, blue);
             if (color == 0) color = 1;
             pattern128[y * 128 + x] = color;
         }

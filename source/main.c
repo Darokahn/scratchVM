@@ -14,8 +14,8 @@ int main() {
     startGraphics();
     machineLog("test\n");
     while (SCRATCH_visitAllThreads(sprites, header.spriteCount)) {
-        drawSprites(sprites, 2, imageTable);
-        updateGraphics();
+        //drawSprites(sprites, 2, imageTable);
+        //updateGraphics();
     }
     drawSprites(sprites, 2, imageTable);
     updateGraphics();
