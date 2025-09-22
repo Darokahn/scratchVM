@@ -12,7 +12,6 @@ const pixel* imageTable[IMAGEMAX];
 int main() {
     initData(header, programData, sprites, imageTable);
     startGraphics();
-    machineLog("test\n");
     while (SCRATCH_visitAllThreads(sprites, header.spriteCount)) {
         //drawSprites(sprites, 2, imageTable);
         //updateGraphics();

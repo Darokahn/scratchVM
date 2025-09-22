@@ -5,14 +5,14 @@
 
 #define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
 
-#define TONATIVECOLOR(red, green, blue) (((red * 7 / 255) << 5) | ((green * 7 / 255) << 3) | (blue * 3 / 255))
+#define TONATIVECOLOR(red, green, blue) (((red * 31 / 255) << 11) | ((green * 61 / 255) << 5) | (blue * 31 / 255))
 #define BYTECOLORTOSTRING(color) "%d, %d, %d\n", ((color >> 5) & 7) * 255 / 7, ((color >> 2) & 7) * 255 / 7, (color & 3) * 255 / 3
 
 struct SCRATCH_header header;
 uint8_t programData[4096 * 10];
 enum SCRATCH_opcode* code;
 
-typedef uint8_t pixel;
+typedef uint16_t pixel;
 
 #define SIZE 128
 
@@ -125,11 +125,19 @@ void drawLetters() {
 
 const enum SCRATCH_opcode codeTemplate[] = {
     SCRATCH_DEBUGSTATEMENT,
+    /*
     SCRATCH_push, SCRATCH_NUMBER, 30, 0,
     SCRATCH_push, SCRATCH_NUMBER, 255, 0,
-    SCRATCH_push, SCRATCH_NUMBER, 255, 10,
+    SCRATCH_push, SCRATCH_NUMBER, 255, 0,
     SCRATCH_motionGlideto,
     SCRATCH_motion_glideIteration,
+    */
+    SCRATCH_push, SCRATCH_NUMBER, 30, 0,
+    SCRATCH_push, SCRATCH_NUMBER, 30, 0,
+    SCRATCH_motionGoto,
+    SCRATCH_DEBUGSTATEMENT,
+    SCRATCH_DEBUGSTATEMENT,
+    SCRATCH_DEBUGSTATEMENT,
     SCRATCH_DEBUGSTATEMENT,
     SCRATCH_stop,
 

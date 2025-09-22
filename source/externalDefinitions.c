@@ -10,7 +10,7 @@
 SDL_Window* window;
 SDL_Renderer* renderer;
 SDL_Texture* texture;
-uint8_t* screen;
+pixel* screen;
 
 void startGraphics() {
     SDL_Init(SDL_INIT_VIDEO);
@@ -41,9 +41,16 @@ void updateGraphics() {
     debugImage(screen, LCDWIDTH, LCDHEIGHT);
 }
 
-__attribute__((naked))
-int machineLog(const char* fmt, ...) {
-    goto *&printf; // GCC only
+int machineLog(const char* format, ...) {
+    int result;
+    va_list args;
+    va_start(args, format);
+
+    // Forward all arguments to printf
+    result = vprintf(format, args);
+
+    va_end(args);
+    return result;
 }
 
 void* mallocDMA(size_t size) {
@@ -63,6 +70,8 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
         int height = ((float)sprite->base.heightRatio / 255) * LCDHEIGHT;
         float xStride = ((float)imageResolution) / width;
         float yStride = ((float)imageResolution) / height;
+        machineLog("WIDTHRATIO: %f, HEIGHTRATIO: %f\n", WIDTHRATIO, HEIGHTRATIO);
+        machineLog("x, y: %d, %d\n", sprite->base.x.halves.high, sprite->base.y.halves.high);
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
@@ -82,6 +91,7 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
 }
 
 void debugImage(pixel *img, int width, int height) {
+    return;
     uint8_t pixels[(width * height * 21) + (5 * 128) + 1];
     char* pixelPointer = pixels;
     for (int y = 0; y < height; y++) {
