@@ -4,8 +4,8 @@ main: source/scratch.c source/programData.c source/definitions.c source/main.c s
 	gcc $^ -lm -lSDL2 -g -fsanitize=address
 
 # Rule to build definitions.c using the generator
-source/definitions.c: source/gdef
-	./$< > $@
+#source/definitions.c: source/gdef
+#	./$< > $@
 
 # Rule to build the generator program
 source/gdef: source/generateDefinitions.c

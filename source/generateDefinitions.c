@@ -125,16 +125,11 @@ void drawLetters() {
 
 const enum SCRATCH_opcode codeTemplate[] = {
     SCRATCH_DEBUGSTATEMENT,
-    /*
     SCRATCH_push, SCRATCH_NUMBER, 30, 0,
     SCRATCH_push, SCRATCH_NUMBER, 255, 0,
-    SCRATCH_push, SCRATCH_NUMBER, 255, 0,
+    SCRATCH_push, SCRATCH_NUMBER, 255, 10,
     SCRATCH_motionGlideto,
     SCRATCH_motion_glideIteration,
-    */
-    SCRATCH_push, SCRATCH_NUMBER, 30, 0,
-    SCRATCH_push, SCRATCH_NUMBER, 30, 0,
-    SCRATCH_motionGoto,
     SCRATCH_DEBUGSTATEMENT,
     SCRATCH_DEBUGSTATEMENT,
     SCRATCH_DEBUGSTATEMENT,

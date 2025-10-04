@@ -51,7 +51,7 @@ function spriteTemplate() {
         rotationStyle: 0,
         costumeIndex: 0,
         costumeMax: 0,
-        threadCount: 0,
+        threadCount: 1,
         variableCount: 0,
         threads: []
     };
@@ -128,6 +128,9 @@ function getDetails(project) {
 // adjust the sprite's parameters to match the quirks of my C representation
 
 function adjustSprite(sprite, isStage) {
+    for (let i = 0; i < sprite.threadCount; i++) {
+        sprite.threads.push(threadTemplate());
+    }
     if (isStage) {
         console.log(sprite);
     }
@@ -188,12 +191,14 @@ async function convertScratchProject() {
         index += array.byteLength;
     }
     index = (index + 7) & ~7;
-    header.imageLength = index;
+    header.imageLength = index - header.codeLength;
     for (let sprite of details.sprites) {
+        console.log("doing sprite");
         copyStruct(buffer.buffer, index, sprite, "sprite");
         index += offsets.sprite.sizeof;
         index = (index + 7) & ~7;
         for (let thread of sprite.threads) {
+            console.log("doing thread");
             copyStruct(buffer.buffer, index, thread, "thread");
             index += offsets.thread.sizeof;
             index = (index + 7) & ~7;

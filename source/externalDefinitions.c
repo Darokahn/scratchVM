@@ -37,7 +37,9 @@ void updateGraphics() {
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
     SDL_Event e;
-    SDL_PollEvent(&e);
+    while(SDL_PollEvent(&e)) {
+        if (e.type == SDL_QUIT) exit(0);
+    }
     debugImage(screen, LCDWIDTH, LCDHEIGHT);
 }
 
@@ -70,8 +72,6 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
         int height = ((float)sprite->base.heightRatio / 255) * LCDHEIGHT;
         float xStride = ((float)imageResolution) / width;
         float yStride = ((float)imageResolution) / height;
-        machineLog("WIDTHRATIO: %f, HEIGHTRATIO: %f\n", WIDTHRATIO, HEIGHTRATIO);
-        machineLog("x, y: %d, %d\n", sprite->base.x.halves.high, sprite->base.y.halves.high);
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
@@ -91,7 +91,6 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
 }
 
 void debugImage(pixel *img, int width, int height) {
-    return;
     uint8_t pixels[(width * height * 21) + (5 * 128) + 1];
     char* pixelPointer = pixels;
     for (int y = 0; y < height; y++) {
