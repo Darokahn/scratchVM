@@ -46,8 +46,8 @@ function spriteTemplate() {
         visible: true,
         layer: 0,
         size: 128,
-        widthRatio: 0,
-        heightRatio: 0,
+        widthRatio: 20,
+        heightRatio: 20,
         rotationStyle: 0,
         costumeIndex: 0,
         costumeMax: 0,
@@ -182,11 +182,17 @@ async function convertScratchProject() {
     header.codeLength = index;
     for (let image of details.stageImages) {
         let array = await getScaledImage(file, image, true);
+        let canvas = document.createElement('canvas');
+        drawScaledImageToCanvas(canvas, array);
+        document.body.appendChild(canvas);
         buffer.set(array, index);
         index += array.byteLength;
     }
     for (let image of details.spriteImages) {
         let array = await getScaledImage(file, image, false);
+        let canvas = document.createElement('canvas');
+        drawScaledImageToCanvas(canvas, array);
+        document.body.appendChild(canvas);
         buffer.set(array, index);
         index += array.byteLength;
     }
@@ -267,12 +273,39 @@ async function getScaledImage(directory, filename, isStage) {
     let scaledImage = new Uint16Array(resolution * resolution);
     let xStride = (width / resolution);
     let yStride = (height / resolution);
-    for (let y = 0; y < resolution; y++) {
-        for (let x = 0; x < resolution; x++) {
-            scaledImage[y * resolution + x] = pixels[Math.trunc(y * resolution * yStride) + Math.trunc(x * xStride)]
+    for (let y = 0; y < resolution * 3; y += 3) {
+        for (let x = 0; x < resolution * 3; x += 3) {
+            let index = Math.trunc(y * resolution * yStride) + Math.trunc(x * xStride);
+            let red = pixels[index];
+            let green = pixels[index + 1];
+            let blue = pixels[index + 2];
+            scaledImage[y / 3 * resolution + x / 3] = (red * 255/32 ) << 11 | (green  * 255/63) << 5 | (blue * 255/32);
         }
     }
     return scaledImage;
+}
+
+function drawScaledImageToCanvas(canvas, scaledImage) {
+    const ctx = canvas.getContext('2d');
+    const resolution = Math.sqrt(scaledImage.length);
+    canvas.width = resolution;
+    canvas.height = resolution;
+
+    const imageData = ctx.createImageData(resolution, resolution);
+    const data = imageData.data;
+
+    for (let i = 0, j = 0; i < scaledImage.length; i++, j += 4) {
+        const color = scaledImage[i];
+        const r = ((color >> 11) & 0x1F) * 255 / 31;
+        const g = ((color >> 5) & 0x3F) * 255 / 63;
+        const b = (color & 0x1F) * 255 / 31;
+
+        data[j]     = r;
+        data[j + 1] = g;
+        data[j + 2] = b;
+        data[j + 3] = 255; // opaque
+    }
+    ctx.putImageData(imageData, 0, 0);
 }
 
 function main() {
@@ -290,6 +323,11 @@ function main() {
     dropzone.addEventListener("drop", e => {
       e.preventDefault();
       dropzone.style.background = "";
+        
+        console.log("origin: ", location.origin);
+        console.log("referrer: ", document.referrer);
+        console.log("Security Policy: ", document.querySelector("meta[http-equiv='Content-Security-Policy']"));
+        console.log("dataTransfer [files, items]: ", e.dataTransfer.files, e.dataTransfer.items);
 
       const file = e.dataTransfer.files[0];
       if (file && file.name.endsWith(".sb3")) {

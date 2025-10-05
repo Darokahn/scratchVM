@@ -40,7 +40,6 @@ void updateGraphics() {
     while(SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) exit(0);
     }
-    debugImage(screen, LCDWIDTH, LCDHEIGHT);
 }
 
 int machineLog(const char* format, ...) {
@@ -91,19 +90,19 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
 }
 
 void debugImage(pixel *img, int width, int height) {
-    uint8_t pixels[(width * height * 21) + (5 * 128) + 1];
-    char* pixelPointer = pixels;
+    uint16_t pixels[(width * height * 21) + (5 * 128) + 1];
+    uint8_t* pixelPointer = (uint8_t*) &pixels;
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             pixel pixel = img[y * width + x];
 
-            uint8_t r = (pixel >> 5) & 7;
-            uint8_t g = (pixel >> 2) & 7;
-            uint8_t b = pixel & 3;
+            uint8_t r = (pixel >> 11) & 31;
+            uint8_t g = (pixel >> 5) & 64;
+            uint8_t b = pixel & 31;
 
-            uint8_t R = (r * 255) / 7;
-            uint8_t G = (g * 255) / 7;
-            uint8_t B = (b * 255) / 3;
+            uint8_t R = (r * 255) / 31;
+            uint8_t G = (g * 255) / 63;
+            uint8_t B = (b * 255) / 31;
 
             pixelPointer += sprintf(pixelPointer, "\x1b[48;2;%u;%u;%um  ", R, G, B);
         }
