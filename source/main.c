@@ -14,7 +14,7 @@ int main() {
     startGraphics();
     while (true) {
         SCRATCH_visitAllThreads(sprites, header.spriteCount);
-        drawSprites(sprites, 2, imageTable);
+        drawSprites(sprites, 3, imageTable);
         updateGraphics();
     }
 }

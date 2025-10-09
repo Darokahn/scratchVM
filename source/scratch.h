@@ -177,6 +177,11 @@ union SCRATCH_eventInput { // redundant union; meant for semantic labeling
     uint16_t message;
 };
 
+struct SCRATCH_event {
+    enum SCRATCH_EVENTTYPE type;
+    union SCRATCH_eventInput input;
+};
+
 union SCRATCH_stepSize {
     uint16_t value;
     uint8_t bytes[2];

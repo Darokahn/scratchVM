@@ -80,6 +80,8 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
             baseY = -sprite->base.y.halves.high + (SCRATCHHEIGHT / 2) * HEIGHTRATIO;
             width = ((float)image->widthRatio / 255) * LCDWIDTH;
             height = ((float)image->heightRatio/ 255) * LCDHEIGHT;
+            baseX -= (width / 2);
+            baseY -= (height / 2);
         }
         // convert from inner scratch-centric coordinates to real screen coordinates
         float xStride = ((float)imageResolution) / width;
