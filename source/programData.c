@@ -3,22 +3,23 @@
 #include "programData.h"
 #include "scratch.h"
 
-const pixel* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
+struct image* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
     int imageResolution;
     // The first sprite is implicitly the stage
     if (spriteIndex == 0) imageResolution = STAGERESOLUTION;
     else imageResolution = SPRITERESOLUTION;
+    int imageSize = imageResolution * imageResolution * sizeof (pixel) + sizeof(struct image);
 
-    const pixel* base = imageTable[spriteIndex];
-    base += costumeIndex * (imageResolution * imageResolution);
-    return base;
+    uint8_t* base = (uint8_t*) imageTable[spriteIndex];
+    base += costumeIndex * imageSize;
+    return (struct image*) base;
 }
 
 void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]) {
     code = (enum SCRATCH_opcode*) buffer;
     buffer += header.codeLength;
     buffer = ALIGN8(buffer);
-    const pixel* imageBase = (const pixel*) buffer;
+    const uint8_t* imageBase = (const uint8_t*) buffer;
     int imageIndex = 0;
     buffer += header.imageLength;
     buffer = ALIGN8(buffer);
@@ -35,11 +36,11 @@ void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct 
             buffer = ALIGN8(buffer);
         }
         int imageSize;
-        if (i == 0) imageSize = STAGERESOLUTION * STAGERESOLUTION;
-        else imageSize = SPRITERESOLUTION * SPRITERESOLUTION;
+        if (i == 0) imageSize = STAGERESOLUTION * STAGERESOLUTION * sizeof(pixel) + sizeof (struct image);
+        else imageSize = SPRITERESOLUTION * SPRITERESOLUTION * sizeof(pixel) + sizeof (struct image);
+        images[imageIndex] = (pixel*) imageBase;
+        imageIndex++;
         for (int j = 0; j < h.costumeMax; j++) {
-            images[imageIndex] = imageBase;
-            imageIndex++;
             imageBase += imageSize;
         }
     }

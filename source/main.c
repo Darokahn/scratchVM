@@ -16,7 +16,5 @@ int main() {
         SCRATCH_visitAllThreads(sprites, header.spriteCount);
         drawSprites(sprites, 2, imageTable);
         updateGraphics();
-        puts("=============");
-        debugImage(getImage(imageTable, 0, 1), 128, 128);
     }
 }

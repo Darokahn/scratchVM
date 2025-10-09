@@ -31,7 +31,7 @@ extern const struct SCRATCH_header header;
 extern const uint8_t programData[];
 extern enum SCRATCH_opcode* code;
 
-const pixel* getImage(const pixel* images[IMAGEMAX], int spriteIndex, int costumeIndex);
+struct image* getImage(const pixel* images[IMAGEMAX], int spriteIndex, int costumeIndex);
 
 void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]);
 #endif
