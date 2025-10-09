@@ -14,6 +14,12 @@ enum SCRATCH_opcode* code;
 
 typedef uint16_t pixel;
 
+struct image {
+    uint8_t widthRatio;
+    uint8_t heightRatio;
+    pixel pixels[];
+};
+
 #define SIZE 128
 
 #define SIZE128 128
@@ -148,8 +154,6 @@ void mockProgram() {
         .visible = true,
         .layer = 0,
         .size = 128,
-        .widthRatio = 255,
-        .heightRatio = 255,
         .rotationStyle = 0,
         .costumeIndex = 0,
         .costumeMax = 1,
@@ -164,8 +168,6 @@ void mockProgram() {
         .visible = true,
         .layer = 0,
         .size = 128,
-        .widthRatio = 64,
-        .heightRatio = 64,
         .rotationStyle = 0,
         .costumeIndex = 0,
         .costumeMax = 1,
@@ -180,32 +182,58 @@ void mockProgram() {
         .entryPoint = 0
     };
 
+    struct image backgroundHeader = {
+        255, 255
+    };
+    struct image spriteHeader = {
+        50, 50
+    };
+
     generatePatterns();
     drawLetters();
     uint8_t* data = (uint8_t*) programData;
+    // code
     memcpy(data, codeTemplate, sizeof codeTemplate);
     data += sizeof codeTemplate;
     data = ALIGN8(data);
+
+    // background image
+    memcpy(data, &backgroundHeader, sizeof backgroundHeader);
+    data += sizeof backgroundHeader;
     memcpy(data, pattern128, sizeof pattern128);
     data += sizeof pattern128; // no need for alignment in the image buffer
+
+
+    // sprite image
+    memcpy(data, &spriteHeader, sizeof spriteHeader);
+    data += sizeof spriteHeader;
     memcpy(data, pattern32, sizeof pattern32);
     data += sizeof pattern32;
     data = ALIGN8(data);
+
+    // stage
     memcpy(data, &stageTemplate, sizeof stageTemplate);
     data += sizeof stageTemplate;
     data = ALIGN8(data);
+
+    // thread
     memcpy(data, &threadTemplate1, sizeof threadTemplate1);
     data += sizeof threadTemplate1;
     data = ALIGN8(data);
+
+    // sprite
     memcpy(data, &spriteTemplate, sizeof spriteTemplate);
     data += sizeof spriteTemplate;
     data = ALIGN8(data);
+
+    // thread
     memcpy(data, &threadTemplate2, sizeof threadTemplate2);
     data += sizeof threadTemplate2;
     data = ALIGN8(data);
+
     header.spriteCount = 2;
     header.codeLength = (int)(uintptr_t)ALIGN8(sizeof codeTemplate);
-    header.imageLength = sizeof pattern128 + sizeof pattern32;
+    header.imageLength = sizeof pattern128 + sizeof backgroundHeader + sizeof pattern32 + sizeof spriteHeader;
 }
 
 void writeMock() {

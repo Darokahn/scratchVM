@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 uint8_t letters[] = 
 " 1 "
 "1 1"

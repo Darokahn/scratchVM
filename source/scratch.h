@@ -177,6 +177,11 @@ union SCRATCH_eventInput { // redundant union; meant for semantic labeling
     uint16_t message;
 };
 
+struct SCRATCH_event {
+    enum SCRATCH_EVENTTYPE type;
+    union SCRATCH_eventInput input;
+};
+
 union SCRATCH_stepSize {
     uint16_t value;
     uint8_t bytes[2];
@@ -207,8 +212,6 @@ struct SCRATCH_spriteHeader {
     bool visible;
     int8_t layer;
     uint16_t size; // number representing percent of original size
-    uint8_t widthRatio; // ratio of sprite width to screen width when unscaled, as a map from (0 -> 1) to (0 -> 255).
-    uint8_t heightRatio;
     bool rotationStyle;
     uint8_t costumeIndex;
     uint8_t costumeMax;

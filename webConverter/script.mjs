@@ -1,29 +1,30 @@
 import { unzipSync } from "https://unpkg.com/fflate/esm/browser.js";
 import mime from 'https://cdn.skypack.dev/mime'; 
 
+const SCRATCHWIDTH = 480;
+const SCRATCHHEIGHT = 360;
+
 const files = {};
 
 const offsets = {
     sprite: {
-        x: { offset: 0, size: 4 },
-        y: { offset: 4, size: 4 },
-        rotation: { offset: 8, size: 2 },
+        x: { offset: 0, size: 4 }, // scaledInt32 (high half is whole number, low half is fractional number)
+        y: { offset: 4, size: 4 }, // scaledInt32
+        rotation: { offset: 8, size: 2 }, // scaled rotation (0 -> 360 maps to 0 -> 655636)
         visible: { offset: 10, size: 1 },
         layer: { offset: 11, size: 1 },
         size: { offset: 12, size: 2 },
-        widthRatio: { offset: 14, size: 1 },
-        heightRatio: { offset: 15, size: 1 },
-        rotationStyle: { offset: 16, size: 1 },
-        costumeIndex: { offset: 17, size: 1 },
-        costumeMax: { offset: 18, size: 1 },
-        threadCount: { offset: 19, size: 1 },
-        variableCount: { offset: 20, size: 1 },
-        sizeof: 24
+        rotationStyle: { offset: 14, size: 1 }, // bool
+        costumeIndex: { offset: 15, size: 1 },
+        costumeMax: { offset: 16, size: 1 },
+        threadCount: { offset: 17, size: 1 },
+        variableCount: { offset: 18, size: 1 },
+        sizeof: 20
     },
     thread: {
-        eventCondition: { offset: 0, size: 2 },
+        eventCondition: { offset: 0, size: 2 }, // enum
         entryPoint: { offset: 2, size: 2 },
-        startEvent: { offset: 4, size: 2 },
+        startEvent: { offset: 4, size: 2 }, // enum
         sizeof: 6
     }
 };
@@ -46,8 +47,6 @@ function spriteTemplate() {
         visible: true,
         layer: 0,
         size: 128,
-        widthRatio: 20,
-        heightRatio: 20,
         rotationStyle: 0,
         costumeIndex: 0,
         costumeMax: 0,
@@ -66,6 +65,22 @@ function detailsTemplate() {
         spriteImages: [],
         code: []
     };
+}
+
+function toScaledInt32(x) {
+    // Clamp and convert to 16-bit signed
+    x = (x << 16) >> 16;
+    return x << 16;
+}
+
+function degreesToScaled16(degrees) {
+    // Normalize degrees to [0, 360)
+    degrees = ((degrees % 360) + 360) % 360;
+
+    // Scale to 0–65536 range (wraps naturally in 16-bit)
+    let scaled = Math.round((degrees / 360) * 65536) & 0xFFFF;
+
+    return scaled;
 }
 
 // get the sb3 file from the operation layer
@@ -105,16 +120,16 @@ function getDetails(project) {
         32,
         11,
         1,
-        30,
+        0,
+        0,
+        11,
+        1,
+        0,
         0,
         11,
         1,
         255,
         0,
-        11,
-        1,
-        255,
-        10,
         21,
         22,
         32,
@@ -128,13 +143,19 @@ function getDetails(project) {
 // adjust the sprite's parameters to match the quirks of my C representation
 
 function adjustSprite(sprite, isStage) {
-    for (let i = 0; i < sprite.threadCount; i++) {
-        sprite.threads.push(threadTemplate());
-    }
     if (isStage) {
-        console.log(sprite);
+        sprite.threads = [];
+        sprite.threads.push(threadTemplate());
+        sprite.threads[0].entryPoint = 18;
     }
-
+    else {
+        for (let i = 0; i < sprite.threadCount; i++) {
+            sprite.threads.push(threadTemplate());
+        }
+    }
+    sprite.x = toScaledInt32(sprite.x);
+    sprite.y = toScaledInt32(sprite.y);
+    sprite.rotation = degreesToScaled16(sprite.rotation);
 }
 
 // copy a sprite into the array's memory
@@ -154,12 +175,12 @@ function copyStruct(buffer, offset, struct, name) {
         if (field == "sizeof") continue;
         let offsetData = layout[field];
         let totalOffset = offset + offsetData.offset;
-        view[ "set" + sizes[offsetData.size]](totalOffset, struct[field], true);
-        let value = view["get" + sizes[offsetData.size]](totalOffset, true);
+        let setSize = "set" + sizes[offsetData.size];
+        view[setSize](totalOffset, struct[field], true);
     }
 }
 
-let PROJECTMAX = 4096 * 20;
+let PROJECTMAX = 4096 * 100;
 
 async function convertScratchProject() {
     let header = {
@@ -181,30 +202,37 @@ async function convertScratchProject() {
     index = (index + 7) & ~7;
     header.codeLength = index;
     for (let image of details.stageImages) {
-        let array = await getScaledImage(file, image, true);
-        let canvas = document.createElement('canvas');
-        drawScaledImageToCanvas(canvas, array);
+        let {scaledImage, width, height} = await getScaledImageFromFile(file, image, true);
+        let array = scaledImage;
+        array = RGB888to565(array);
+        let canvas = drawRGB565ToCanvas(array, 128, 128);
         document.body.appendChild(canvas);
-        buffer.set(array, index);
+        buffer.set(new Uint8Array([255, 255]), index);
+        index += 2;
+        buffer.set(new Uint8Array(array.buffer), index);
         index += array.byteLength;
     }
     for (let image of details.spriteImages) {
-        let array = await getScaledImage(file, image, false);
-        let canvas = document.createElement('canvas');
-        drawScaledImageToCanvas(canvas, array);
+        let {scaledImage, width, height} = await getScaledImageFromFile(file, image, false);
+        let array = scaledImage;
+        let widthRatio = 255 * width /SCRATCHWIDTH;
+        let heightRatio = 255 * height /SCRATCHHEIGHT;
+        array = RGB888to565(array);
+        let canvas = drawRGB565ToCanvas(array, 32, 32);
         document.body.appendChild(canvas);
-        buffer.set(array, index);
+        buffer.set(new Uint8Array([widthRatio, heightRatio]), index);
+        index += 2;
+        buffer.set(new Uint8Array(array.buffer), index);
         index += array.byteLength;
     }
     index = (index + 7) & ~7;
     header.imageLength = index - header.codeLength;
     for (let sprite of details.sprites) {
-        console.log("doing sprite");
+        console.log(sprite);
         copyStruct(buffer.buffer, index, sprite, "sprite");
         index += offsets.sprite.sizeof;
         index = (index + 7) & ~7;
         for (let thread of sprite.threads) {
-            console.log("doing thread");
             copyStruct(buffer.buffer, index, thread, "thread");
             index += offsets.thread.sizeof;
             index = (index + 7) & ~7;
@@ -265,50 +293,138 @@ async function drawAndGetPixels(uint8arr, mimeType) {
     }
 }
 
-async function getScaledImage(directory, filename, isStage) {
-    let resolution = isStage * 128 + !isStage * 32;
-    let file = directory[filename];
-    let type = mime.getType(filename);
-    let {pixels, width, height} = await drawAndGetPixels(file, type);
-    let scaledImage = new Uint16Array(resolution * resolution);
-    let xStride = (width / resolution);
-    let yStride = (height / resolution);
-    for (let y = 0; y < resolution * 3; y += 3) {
-        for (let x = 0; x < resolution * 3; x += 3) {
-            let index = Math.trunc(y * resolution * yStride) + Math.trunc(x * xStride);
-            let red = pixels[index];
-            let green = pixels[index + 1];
-            let blue = pixels[index + 2];
-            scaledImage[y / 3 * resolution + x / 3] = (red * 255/32 ) << 11 | (green  * 255/63) << 5 | (blue * 255/32);
+async function scaleImage(pixels, width, height, targetWidth, targetHeight) {
+    // pixels: RGBA8888
+    // result: RGB888
+    let scaledImage = new Uint8Array(targetWidth * targetHeight * 3);
+    let xStride = (width / targetWidth);
+    let yStride = (height / targetHeight);
+    let rowLengthSource = width;
+    let rowLengthScaled = targetWidth;
+    for (let y = 0; y < targetHeight; y++) {
+        for (let x = 0; x < targetWidth; x ++) {
+            let sourceIndex = Math.trunc(y * yStride) * rowLengthSource + Math.trunc(x * xStride);        // index into an RGBA array
+            let scaledIndex = y * rowLengthScaled + x;                               // index into an RGB array
+            sourceIndex *= 4;
+            scaledIndex *= 3;
+            let alpha = pixels[sourceIndex] + 3;
+            scaledImage[scaledIndex] = pixels[sourceIndex];
+            scaledImage[scaledIndex+1] = pixels[sourceIndex+1];
+            scaledImage[scaledIndex+2] = pixels[sourceIndex+2];
+
+            // replace (0, 0, 0) with (1, 1, 1) so (0, 0, 0) is reserved for transparency
+            let sum = (scaledImage[scaledIndex] + scaledImage[scaledIndex + 1] + scaledImage[scaledIndex + 2]);
+            let isBlack = sum == 0;
+            if (isBlack && alpha != 0) {
+                scaledImage[scaledIndex] = 1;
+                scaledImage[scaledIndex + 1] = 1;
+                scaledImage[scaledIndex + 2] = 1;
+            }
+            else if (alpha == 0) {
+                scaledImage[scaledIndex] = 0;
+                scaledImage[scaledIndex + 1] = 0;
+                scaledImage[scaledIndex + 2] = 0;
+            }
         }
     }
     return scaledImage;
 }
 
-function drawScaledImageToCanvas(canvas, scaledImage) {
-    const ctx = canvas.getContext('2d');
-    const resolution = Math.sqrt(scaledImage.length);
-    canvas.width = resolution;
-    canvas.height = resolution;
+function drawRGB888ToCanvas(rgbArray, width, height) {
+    if (rgbArray.length !== width * height * 3) {
+        throw new Error("Array length does not match width*height*3");
+    }
 
-    const imageData = ctx.createImageData(resolution, resolution);
+    // Create a canvas
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+
+    // Create an ImageData object (RGBA)
+    const imageData = ctx.createImageData(width, height);
     const data = imageData.data;
 
-    for (let i = 0, j = 0; i < scaledImage.length; i++, j += 4) {
-        const color = scaledImage[i];
-        const r = ((color >> 11) & 0x1F) * 255 / 31;
-        const g = ((color >> 5) & 0x3F) * 255 / 63;
-        const b = (color & 0x1F) * 255 / 31;
-
-        data[j]     = r;
-        data[j + 1] = g;
-        data[j + 2] = b;
-        data[j + 3] = 255; // opaque
+    // Convert RGB array to RGBA
+    for (let i = 0, j = 0; i < rgbArray.length; i += 3, j += 4) {
+        data[j] = rgbArray[i];       // R
+        data[j + 1] = rgbArray[i + 1]; // G
+        data[j + 2] = rgbArray[i + 2]; // B
+        data[j + 3] = 255;           // A
     }
+
+    // Put the image data on the canvas
     ctx.putImageData(imageData, 0, 0);
+
+    return canvas;
 }
 
-function main() {
+function RGB888to565(uint8Array) {
+    let result = new Uint16Array(uint8Array.length / 3);
+    for (let i = 0; i < result.length; i++) {
+        let sourceIndex = i * 3;
+        let red = uint8Array[sourceIndex];
+        let green = uint8Array[sourceIndex + 1];
+        let blue = uint8Array[sourceIndex + 2];
+        red = Math.floor(red * 31 / 255);
+        green = Math.floor(green * 63 / 255);
+        blue = Math.floor(blue * 31 / 255);
+        let finalColor = red << 11 | green << 5 | blue;
+        result[i] = finalColor;
+    }
+    return result;
+}
+
+function drawRGB565ToCanvas(rgb565Array, width, height) {
+    if (rgb565Array.length !== width * height) {
+        throw new Error("Array length does not match width*height");
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    const imageData = ctx.createImageData(width, height);
+    const data = imageData.data;
+
+    for (let i = 0; i < rgb565Array.length; i++) {
+        const value = rgb565Array[i];
+
+        // Extract R, G, B components
+        const r5 = (value >> 11) & 0x1F; // 5 bits red
+        const g6 = (value >> 5) & 0x3F;  // 6 bits green
+        const b5 = value & 0x1F;         // 5 bits blue
+
+        // Convert to 8-bit per channel
+        const r8 = (r5 << 3) | (r5 >> 2); // replicate high bits to low
+        const g8 = (g6 << 2) | (g6 >> 4);
+        const b8 = (b5 << 3) | (b5 >> 2);
+
+        const j = i * 4;
+        data[j] = r8;
+        data[j + 1] = g8;
+        data[j + 2] = b8;
+        data[j + 3] = 255; // fully opaque
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+}
+
+async function getScaledImageFromFile(directory, filename, isStage) {
+    let resolution = isStage * 128 + !isStage * 32;
+    let file = directory[filename];
+    let type = mime.getType(filename);
+    let {pixels, width, height} = await drawAndGetPixels(file, type);
+    let scaledImage = await scaleImage(pixels, width, height, resolution, resolution);
+    return {scaledImage, width, height};
+}
+
+function assert(condition, phrase) {
+    if (!condition) console.log("ERROR: " + phrase);
+}
+
+async function main() {
     const dropzone = document.getElementById("dropzone");
 
     dropzone.addEventListener("dragover", e => {
@@ -324,11 +440,6 @@ function main() {
       e.preventDefault();
       dropzone.style.background = "";
         
-        console.log("origin: ", location.origin);
-        console.log("referrer: ", document.referrer);
-        console.log("Security Policy: ", document.querySelector("meta[http-equiv='Content-Security-Policy']"));
-        console.log("dataTransfer [files, items]: ", e.dataTransfer.files, e.dataTransfer.items);
-
       const file = e.dataTransfer.files[0];
       if (file && file.name.endsWith(".sb3")) {
           addZipToFs(file);
