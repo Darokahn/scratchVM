@@ -85,6 +85,13 @@ extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, co
     }
 }
 
+int frameInterval = 1000 / FRAMESPERSEC;
+
+extern "C" const size_t stampSize = sizeof millis();
+
+extern "C" unsigned long getNow() {
+    return millis();
+}
 
 extern "C" int machineLog(const char* fmt, ...) {
     va_list args;
@@ -93,10 +100,10 @@ extern "C" int machineLog(const char* fmt, ...) {
     va_end(args);
     return n;
 }
+
 void loop() {}
 
 void setup() {
     Serial.begin(115200);
-
     main();
 }

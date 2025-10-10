@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "graphics.h"
 #include "scratch.h"
@@ -76,8 +77,8 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
         }
         else {
             imageResolution = 32;
-            baseX = sprite->base.x.halves.high + (SCRATCHWIDTH / 2) * WIDTHRATIO;
-            baseY = -sprite->base.y.halves.high + (SCRATCHHEIGHT / 2) * HEIGHTRATIO;
+            baseX = (sprite->base.x.halves.high + (SCRATCHWIDTH / 2)) * WIDTHRATIO;
+            baseY = (-sprite->base.y.halves.high + (SCRATCHHEIGHT / 2)) * HEIGHTRATIO;
             width = ((float)image->widthRatio / 255) * LCDWIDTH;
             height = ((float)image->heightRatio/ 255) * LCDHEIGHT;
             baseX -= (width / 2);
@@ -105,7 +106,7 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
 }
 
 void debugImage(pixel *img, int width, int height) {
-    uint16_t pixels[(width * height * 21) + (5 * 128) + 1];
+    uint8_t pixels[(width * height * 21) + (5 * 128) + 1];
     uint8_t* pixelPointer = (uint8_t*) &pixels;
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
@@ -126,3 +127,13 @@ void debugImage(pixel *img, int width, int height) {
     }
     puts(pixels);
 }
+
+int frameInterval = 1000 / FRAMESPERSEC;
+
+uint64_t getNow() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    uint64_t ms = ts.tv_sec * 1000ULL + ts.tv_nsec / 1000000;
+    return ms;
+}
+
