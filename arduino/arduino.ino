@@ -31,10 +31,10 @@ extern "C" void startGraphics() {
     tft.init();
     tft.setRotation(1);
     tftSprite.createSprite(LCDWIDTH, LCDHEIGHT);
-    tft.fillScreen(TFT_WHITE);
+    tft.fillScreen(TFT_BLACK);
 }
 extern "C" void updateGraphics(uint16_t* framebuffer) {
-    tftSprite.pushSprite(0, 0);
+    tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH) / 2, (FULLLCDHEIGHT - LCDHEIGHT) / 2);
 }
 extern "C" void* mallocDMA(size_t size) {
     return heap_caps_malloc(size, MALLOC_CAP_DMA);
@@ -42,30 +42,44 @@ extern "C" void* mallocDMA(size_t size) {
 extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable) {
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
-        const pixel* image = getImage(imageTable, i, sprite->base.costumeIndex);
+        struct image* image = getImage(imageTable, i, sprite->base.costumeIndex);
         int imageResolution;
-        if (i == 0) imageResolution = 128;
-        else imageResolution = 32;
-        int baseX = sprite->base.x.halves.high * WIDTHRATIO;
-        int baseY = sprite->base.y.halves.high * HEIGHTRATIO;
-        int width = ((float)sprite->base.widthRatio / 255) * LCDWIDTH;
-        int height = ((float)sprite->base.heightRatio / 255) * LCDHEIGHT;
+        int baseX;
+        int baseY;
+        int width;
+        int height;
+        if (i == 0) {
+            imageResolution = 128;
+            baseX = 0;
+            baseY = 0;
+            width = LCDWIDTH;
+            height = LCDHEIGHT;
+        }
+        else {
+            imageResolution = 32;
+            baseX = sprite->base.x.halves.high + (SCRATCHWIDTH / 2) * WIDTHRATIO;
+            baseY = -sprite->base.y.halves.high + (SCRATCHHEIGHT / 2) * HEIGHTRATIO;
+            width = ((float)image->widthRatio / 255) * LCDWIDTH;
+            height = ((float)image->heightRatio/ 255) * LCDHEIGHT;
+            baseX -= (width / 2);
+            baseY -= (height / 2);
+        }
+        // convert from inner scratch-centric coordinates to real screen coordinates
         float xStride = ((float)imageResolution) / width;
         float yStride = ((float)imageResolution) / height;
-        machineLog("WIDTHRATIO: %f, HEIGHTRATIO: %f\n", WIDTHRATIO, HEIGHTRATIO);
-        machineLog("x, y: %d, %d\n", sprite->base.x.halves.high, sprite->base.y.halves.high);
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
                 int row = (y * yStride);
                 int index = ((row * imageResolution) + (x * xStride));
-                pixel color = image[index];
+                pixel color = image->pixels[index];
+
                 // transparent pixels reveal white if they are on the background; do nothing if they are on a sprite.
                 if (color == 0) {
-                    if (i == 0) color = 0xff;
+                    if (i == 0) color = (pixel) 0xffff;
                     else continue;
                 }
-                tftSprite.drawPixel(x, y, color);
+                tftSprite.drawPixel(x + baseX, y + baseY, color);
             }
         }
     }
@@ -85,11 +99,4 @@ void setup() {
     Serial.begin(115200);
 
     main();
-    Serial.println("TFT_MISO = " + String(TFT_MISO));
-    Serial.println("TFT_MOSI = " + String(TFT_MOSI));
-    Serial.println("TFT_SCLK = " + String(TFT_SCLK));
-    Serial.println("TFT_CS   = " + String(TFT_CS));
-    Serial.println("TFT_DC   = " + String(TFT_DC));
-    Serial.println("TFT_RST  = " + String(TFT_RST));
-
 }

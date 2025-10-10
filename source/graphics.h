@@ -3,8 +3,11 @@
 
 #include "scratch.h"
 
-#define LCDWIDTH 405//320
-#define LCDHEIGHT 305//240
+#define LCDWIDTH 260//320
+#define LCDHEIGHT 200//240
+
+#define FULLLCDWIDTH 320
+#define FULLLCDHEIGHT 240
 
 #define SCRATCHWIDTH 480
 #define SCRATCHHEIGHT 360

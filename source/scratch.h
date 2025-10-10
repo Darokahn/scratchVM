@@ -7,7 +7,7 @@
 #define STACKMAX (128)
 #define STRINGREGISTERMAX (4096)
 #define MAXOPCODE (255)
-#define LOOPNESTMAX (8) // deepest nesting for `repeat x` loops before failure
+#define LOOPNESTMAX (16) // deepest nesting for `repeat x` loops before failure
 #define SPRITEMAX (8) // maximum spritecount
 #define IMAGEMAX (16)
 

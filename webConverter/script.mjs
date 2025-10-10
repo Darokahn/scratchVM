@@ -128,7 +128,7 @@ function getDetails(project) {
         0,
         11,
         1,
-        255,
+        10,
         0,
         21,
         22,
