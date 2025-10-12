@@ -1,6 +1,6 @@
 all: main
 
-main: source/scratch.c source/programData.c source/definitions.c source/main.c source/externalDefinitions.c
+main: source/*.c
 	gcc $^ -lm -lSDL2 -g -fsanitize=address
 
 # Rule to build definitions.c using the generator

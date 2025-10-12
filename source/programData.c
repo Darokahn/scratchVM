@@ -1,7 +1,15 @@
 #include <stdint.h>
 
 #include "programData.h"
+#include "externGlobals.h"
+#include "externFunctions.h"
 #include "scratch.h"
+
+int eventTypeOffsets[3] = {
+    0, 5, 0
+};
+
+bool inputState[5];
 
 struct image* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
     int imageResolution;
@@ -15,7 +23,16 @@ struct image* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int c
     return (struct image*) base;
 }
 
+bool getEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input) {
+    return events[eventTypeOffsets[type] + input.i];
+}
+
+void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool state) {
+    events[eventTypeOffsets[type] + input.i] = state;
+}
+
 void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]) {
+    eventTypeOffsets[2] = header.messageCount + eventTypeOffsets[1];
     code = (enum SCRATCH_opcode*) buffer;
     buffer += header.codeLength;
     buffer = ALIGN8(buffer);

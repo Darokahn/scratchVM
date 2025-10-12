@@ -4,7 +4,8 @@
 #include <string.h>
 #include "scratch.h"
 #include "programData.h"
-#include "externalDefinitions.h"
+#include "externFunctions.h"
+#include "externGlobals.h"
 
 #define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
 
@@ -13,6 +14,12 @@
 
 float degreeToRadian = PI / 32768.0f;
 float radianToDegree = 32768.0f / PI;
+
+extern const struct {
+    bool* keypresses;
+    bool* messages;
+    bool* backgroundChanges;
+} eventTable;
 
 SCRATCH_implementFunction(DEBUG) {
     machineLog("DEBUG\n");

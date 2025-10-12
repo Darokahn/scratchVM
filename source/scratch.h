@@ -175,6 +175,7 @@ union SCRATCH_eventInput { // redundant union; meant for semantic labeling
     uint16_t backdrop;
     uint16_t loudness;
     uint16_t message;
+    uint16_t i;
 };
 
 struct SCRATCH_event {
@@ -203,6 +204,7 @@ struct SCRATCH_header {
     uint32_t codeLength;
     uint32_t imageLength;
     uint32_t spriteCount;
+    uint32_t messageCount;
 };
 
 struct SCRATCH_spriteHeader {

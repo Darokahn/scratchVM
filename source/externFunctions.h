@@ -7,6 +7,7 @@
 #include "graphics.h"
 #include "scratch.h"
 #include "programData.h"
+#include "externGlobals.h"
 
 void startGraphics();
 void updateGraphics();
@@ -16,5 +17,7 @@ void* mallocDMA(size_t size);
 
 void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable);
 void debugImage(pixel *img, int width, int height);
+
+void applyInputs();
 
 #endif

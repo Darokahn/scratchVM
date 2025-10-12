@@ -6,7 +6,9 @@
 #include "graphics.h"
 #include "scratch.h"
 #include "programData.h"
-#include "externalDefinitions.h"
+#include "externFunctions.h"
+#include "externGlobals.h"
+#include "letters.h"
 
 SDL_Window* window;
 SDL_Renderer* renderer;
@@ -137,3 +139,13 @@ uint64_t getNow() {
     return ms;
 }
 
+const uint8_t *keyboardState;
+void applyInputs() {
+    int numkeys;
+    keyboardState = SDL_GetKeyboardState(&numkeys);
+    inputState[0] = keyboardState[SDL_SCANCODE_UP];
+    inputState[1] = keyboardState[SDL_SCANCODE_RIGHT];
+    inputState[2] = keyboardState[SDL_SCANCODE_DOWN];
+    inputState[3] = keyboardState[SDL_SCANCODE_LEFT];
+    inputState[4] = keyboardState[SDL_SCANCODE_SPACE];
+}

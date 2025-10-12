@@ -27,9 +27,8 @@
 // - An image map that can be given a sprite index and a costume index, returning a pointer into the image section of the data buffer
 // - An unordered sprite array
 
-extern const struct SCRATCH_header header;
-extern const uint8_t programData[];
-extern enum SCRATCH_opcode* code;
+bool getEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
+void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool state);
 
 struct image* getImage(const pixel* images[IMAGEMAX], int spriteIndex, int costumeIndex);
 
