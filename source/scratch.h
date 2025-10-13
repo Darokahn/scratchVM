@@ -5,7 +5,6 @@
 #include <stdio.h>
 
 #define STACKMAX (128)
-#define STRINGREGISTERMAX (4096)
 #define MAXOPCODE (255)
 #define LOOPNESTMAX (16) // deepest nesting for `repeat x` loops before failure
 #define SPRITEMAX (8) // maximum spritecount
@@ -15,6 +14,12 @@
 
 #define STAGERESOLUTION 128
 #define SPRITERESOLUTION 32
+
+#define PI 3.14159265358979323846264338279f
+
+#define halfRotation (32468.0f)
+#define degreeToRadian (PI / halfRotation)
+#define radianToDegree (halfRotation / PI)
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     typedef union {
@@ -84,14 +89,18 @@ enum SCRATCH_opcode : uint8_t {
     // Expression opcodes. May pop from the stack; always push to the stack.
 
     SCRATCH_fetch,           // Fetch some special value such as `x position`            @field which property to get
+    SCRATCH_fetchInput,      // Fetch an input property @field input
     SCRATCH_fetchFrom,       // Like above, but fetches from an aritrary sprite.         @input which sprite @field which property
     SCRATCH_loadVar,         // Load a variable                                          @field variable index
     SCRATCH_setVar,          // Set a variable                                           @field variable index @input data
+    SCRATCH_getVar,          // Set a variable                                           @field variable
+    SCRATCH_incVar,          // increment a variable    @field variable index @input amount
     SCRATCH_loadVarFrom,     // Like above, but from an arbitrary sprite.                @input which sprite @field variable index
     SCRATCH_loadArrayAt,     // Load from an array                                       @field array name @input array position
     SCRATCH_push,            // Push argument                                            @field value
 
     SCRATCH_add,             // Add two top-of-stack values                              @input op1 @input op2
+    SCRATCH_sub,             // Subtract two top-of-stack values                              @input op1 @input op2
 
 
     SCRATCH_DEBUGEXPRESSION,
@@ -106,6 +115,7 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_joinString,      // For string join operations                               @input string1 @input string2
     SCRATCH_clone,           // Treat cloning as a privileged primitive operation        @input sprite index
     SCRATCH_jumpIf,          // Jump if top of stack is truthy                           @input evaluand @field jump destination
+    SCRATCH_jumpIfNot,       // Jump if top of stack is not truthy      @input evaluand @field jump destination
     SCRATCH_jump,            // Unconditional jump
 
     SCRATCH_motionGoto,
@@ -120,6 +130,10 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_motionChangexby,
     SCRATCH_motionSety,
     SCRATCH_motionChangeyby,
+    SCRATCH_motionSetrotationstyle,
+
+    SCRATCH_looksSay,
+
     SCRATCH_DEBUGSTATEMENT,
 
     SCRATCH_stop,
@@ -155,19 +169,14 @@ typedef enum SCRATCH_continueStatus (*SCRATCH_function)(struct SCRATCH_sprite* s
 // that this block should yield and use the returned enumeration to set a new current task.
 
 
-struct SCRATCH_stringRegister {
-    char* base;
-    int length;
-    int capacity;
-};
-
 enum SCRATCH_EVENTTYPE : uint8_t {
-    ONFLAG,
     ONKEY,
-    ONCLICK, // ignored
-    ONBACKDROP,
-    ONLOUDNESS, // ignored
     ONMESSAGE,
+    ONBACKDROP,
+    ONCLONE,
+    ONFLAG,
+    ONCLICK, // ignored
+    ONLOUDNESS, // ignored
 };
 
 union SCRATCH_eventInput { // redundant union; meant for semantic labeling
@@ -252,4 +261,9 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, 
 void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount);
 struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header);
+void handleInputs();
+void clearEvents();
+bool SCRATCH_addSprite(struct SCRATCH_sprite* sprite);
+bool SCRATCH_wakeSprite(struct SCRATCH_sprite* sprite, enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
+void SCRATCH_wakeSprites();
 #endif

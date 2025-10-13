@@ -42,6 +42,7 @@ extern "C" void* mallocDMA(size_t size) {
 extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable) {
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
+        if (!sprite->base.visible) continue;
         struct image* image = getImage(imageTable, i, sprite->base.costumeIndex);
         int imageResolution;
         int baseX;
@@ -57,21 +58,35 @@ extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, co
         }
         else {
             imageResolution = 32;
-            baseX = sprite->base.x.halves.high + (SCRATCHWIDTH / 2) * WIDTHRATIO;
-            baseY = -sprite->base.y.halves.high + (SCRATCHHEIGHT / 2) * HEIGHTRATIO;
-            width = ((float)image->widthRatio / 255) * LCDWIDTH;
-            height = ((float)image->heightRatio/ 255) * LCDHEIGHT;
+            baseX = (sprite->base.x.halves.high + (SCRATCHWIDTH / 2)) * WIDTHRATIO;
+            baseY = (-sprite->base.y.halves.high + (SCRATCHHEIGHT / 2)) * HEIGHTRATIO;
+            width = (((float)image->widthRatio / 255) * LCDWIDTH) * sprite->base.size / 100;
+            height = (((float)image->heightRatio/ 255) * LCDHEIGHT) * sprite->base.size / 100;
             baseX -= (width / 2);
             baseY -= (height / 2);
         }
         // convert from inner scratch-centric coordinates to real screen coordinates
         float xStride = ((float)imageResolution) / width;
         float yStride = ((float)imageResolution) / height;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        int scanX;
+        int scanStep;
+        int scanStart;
+        if (sprite->base.rotation < halfRotation) {
+            scanStart = 0;
+            scanStep = 1;
+        }
+        else {
+            scanStart = width;
+            scanStep = -1;
+        }
+        int x;
+        int y;
+        for (y = 0; y < height; y++) {
+            scanX = scanStart;
+            for ((x = 0, scanX = scanStart); x < width; (x++, scanX += scanStep)) {
                 if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
                 int row = (y * yStride);
-                int index = ((row * imageResolution) + (x * xStride));
+                int index = ((row * imageResolution) + (scanX * xStride));
                 pixel color = image->pixels[index];
 
                 // transparent pixels reveal white if they are on the background; do nothing if they are on a sprite.
@@ -85,12 +100,42 @@ extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, co
     }
 }
 
+
 int frameInterval = 1000 / FRAMESPERSEC;
 
 extern "C" const size_t stampSize = sizeof millis();
 
 extern "C" unsigned long getNow() {
     return millis();
+}
+
+#define VRX_PIN 32
+#define VRY_PIN 33
+#define SW_PIN 25
+
+const int ADC_CENTER = 1024;       // Midpoint of 12-bit ADC
+const int DEADZONE  = 200;         // Joystick deadzone threshold
+
+extern "C" bool getInput(int index) {
+    int vrx = analogRead(VRX_PIN);
+    int vry = analogRead(VRY_PIN);
+    bool sw  = digitalRead(SW_PIN) == LOW;  // Active-low button
+
+    machineLog("%d, %d\n\r", vrx, vry);
+
+    switch (index) {
+        case 0: // UP
+            return vry < ADC_CENTER - DEADZONE;
+        case 1: // RIGHT
+            return vrx > ADC_CENTER + DEADZONE;
+        case 2: // DOWN
+            return vry > ADC_CENTER + DEADZONE;
+        case 3: // LEFT
+            return vrx < ADC_CENTER - DEADZONE;
+        case 4: // SPACE / action button
+            return sw;
+    }
+    return false;
 }
 
 extern "C" int machineLog(const char* fmt, ...) {

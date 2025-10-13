@@ -64,6 +64,7 @@ void* mallocDMA(size_t size) {
 void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable) {
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
+        if (!sprite->base.visible) continue;
         struct image* image = getImage(imageTable, i, sprite->base.costumeIndex);
         int imageResolution;
         int baseX;
@@ -81,19 +82,33 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
             imageResolution = 32;
             baseX = (sprite->base.x.halves.high + (SCRATCHWIDTH / 2)) * WIDTHRATIO;
             baseY = (-sprite->base.y.halves.high + (SCRATCHHEIGHT / 2)) * HEIGHTRATIO;
-            width = ((float)image->widthRatio / 255) * LCDWIDTH;
-            height = ((float)image->heightRatio/ 255) * LCDHEIGHT;
+            width = (((float)image->widthRatio / 255) * LCDWIDTH) * sprite->base.size / 100;
+            height = (((float)image->heightRatio/ 255) * LCDHEIGHT) * sprite->base.size / 100;
             baseX -= (width / 2);
             baseY -= (height / 2);
         }
         // convert from inner scratch-centric coordinates to real screen coordinates
         float xStride = ((float)imageResolution) / width;
         float yStride = ((float)imageResolution) / height;
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+        int scanX;
+        int scanStep;
+        int scanStart;
+        if (sprite->base.rotation < halfRotation) {
+            scanStart = 0;
+            scanStep = 1;
+        }
+        else {
+            scanStart = width;
+            scanStep = -1;
+        }
+        int x;
+        int y;
+        for (y = 0; y < height; y++) {
+            scanX = scanStart;
+            for ((x = 0, scanX = scanStart); x < width; (x++, scanX += scanStep)) {
                 if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
                 int row = (y * yStride);
-                int index = ((row * imageResolution) + (x * xStride));
+                int index = ((row * imageResolution) + (scanX * xStride));
                 pixel color = image->pixels[index];
 
                 // transparent pixels reveal white if they are on the background; do nothing if they are on a sprite.
@@ -140,12 +155,15 @@ uint64_t getNow() {
 }
 
 const uint8_t *keyboardState;
-void applyInputs() {
+bool getInput(int index) {
     int numkeys;
     keyboardState = SDL_GetKeyboardState(&numkeys);
-    inputState[0] = keyboardState[SDL_SCANCODE_UP];
-    inputState[1] = keyboardState[SDL_SCANCODE_RIGHT];
-    inputState[2] = keyboardState[SDL_SCANCODE_DOWN];
-    inputState[3] = keyboardState[SDL_SCANCODE_LEFT];
-    inputState[4] = keyboardState[SDL_SCANCODE_SPACE];
+    switch (index) {
+        case 0: return keyboardState[SDL_SCANCODE_UP];
+        case 1: return keyboardState[SDL_SCANCODE_RIGHT];
+        case 2: return keyboardState[SDL_SCANCODE_DOWN];
+        case 3: return keyboardState[SDL_SCANCODE_LEFT];
+        case 4: return keyboardState[SDL_SCANCODE_SPACE];
+    }
+    return 0;
 }

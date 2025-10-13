@@ -18,6 +18,6 @@ void* mallocDMA(size_t size);
 void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable);
 void debugImage(pixel *img, int width, int height);
 
-void applyInputs();
+bool getInput(int inputIndex);
 
 #endif

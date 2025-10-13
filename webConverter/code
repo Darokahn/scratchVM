@@ -1,0 +1,81 @@
+cat_event_start:
+    push -191
+    push 0
+    goto
+    push 10
+    setVar MOVEAMOUNT
+    push 0
+    setVar yPosition
+1:  fetchInput up
+    jumpIfNot 2
+    loadVar MOVEAMOUNT
+    incVar yPosition
+2:  fetchInput down
+    jumpIfNot 3
+    push 0
+    loadVar MOVEAMOUNT
+    sub
+    incVar yPosition
+3:  push -191
+    loadVar yPosition
+    goto
+    loopJump 1
+    stop
+
+cat_event_space:
+    clone ball              ##
+    push 0.1s
+    wait                    ##
+    stop
+
+ball_event_start:
+    hide                    ##
+    stop
+
+ball_event_clone:
+    push 50
+    setSize                 ##
+    gotoPOI cat             ##
+    show                    ##
+1:  fetchTouching robot     ##
+    push 200
+    fetch xPosition
+    greaterThan             ##
+    or                      ##
+    jumpIfNot 2
+    delete                  ##
+2:  push 20
+    move
+    loopJump 1
+    stop
+
+robot_event_start:
+    hide
+1:  push 1
+    push 2
+    random                  ##
+    push 212
+    push -150
+    push 150
+    random
+    glide
+    clone myself
+    loopJump 1
+    stop
+
+robot_event_clone
+    costume 0               ##
+    show
+    push 50
+    setSize
+1:  push 3
+    move
+    fetchTouching ball
+    jumpIfNot 2
+    push "Ouch!"
+    say
+    costume 1
+    push 0.2s
+    wait
+    delete
+2:  loopJump 1

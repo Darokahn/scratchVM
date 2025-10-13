@@ -10,16 +10,6 @@
 #define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
 
 #define INTERPRET_AS(type, value) *(type*)&(value)
-#define PI 3.14159265358979323846264338279f
-
-float degreeToRadian = PI / 32768.0f;
-float radianToDegree = 32768.0f / PI;
-
-extern const struct {
-    bool* keypresses;
-    bool* messages;
-    bool* backgroundChanges;
-} eventTable;
 
 SCRATCH_implementFunction(DEBUG) {
     machineLog("DEBUG\n");
@@ -34,6 +24,28 @@ SCRATCH_implementFunction(loopInit) {
 
 SCRATCH_implementFunction(loopIncrement) {
     thread->loopCounterStack[thread->loopCounterStackIndex-1] += 1;
+    return SCRATCH_continue;
+}
+
+SCRATCH_implementFunction(jumpIf) {
+    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof jumpTo;
+    struct SCRATCH_data evaluand = stack[*stackIndex-1];
+    (*stackIndex) -= 1;
+    if (evaluand.data.boolean) {
+        thread->programCounter = jumpTo;
+    }
+    return SCRATCH_continue;
+}
+
+SCRATCH_implementFunction(jumpIfNot) {
+    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof jumpTo;
+    struct SCRATCH_data evaluand = stack[*stackIndex-1];
+    (*stackIndex) -= 1;
+    if (!evaluand.data.boolean) {
+        thread->programCounter = jumpTo;
+    }
     return SCRATCH_continue;
 }
 
@@ -67,6 +79,40 @@ SCRATCH_implementFunction(fetch) {
     return SCRATCH_continue;
 }
 
+SCRATCH_implementFunction(fetchInput) {
+    uint16_t toFetch = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof(toFetch);
+    stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_BOOL, {.boolean = inputState[toFetch]}};
+    (*stackIndex) += 1;
+    return SCRATCH_continue;
+}
+
+SCRATCH_implementFunction(loadVar) {
+    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof varIndex;
+    stack[*stackIndex] = sprite->variables[varIndex];
+    (*stackIndex) += 1;
+    return SCRATCH_continue;
+}
+
+SCRATCH_implementFunction(setVar) {
+    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof varIndex;
+    struct SCRATCH_data value = stack[*stackIndex-1];
+    (*stackIndex) -= 1;
+    sprite->variables[varIndex] = value;
+    return SCRATCH_continue;
+}
+
+SCRATCH_implementFunction(incVar) {
+    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof varIndex;
+    struct SCRATCH_data value = stack[*stackIndex-1];
+    (*stackIndex) -= 1;
+    sprite->variables[varIndex].data.number += value.data.number;
+    return SCRATCH_continue;
+}
+
 SCRATCH_implementFunction(push) {
     enum SCRATCH_fieldType type = code[thread->programCounter];
     thread->programCounter += sizeof(type);
@@ -88,6 +134,16 @@ SCRATCH_implementFunction(add) {
     return SCRATCH_continue;
 }
 
+SCRATCH_implementFunction(sub) {
+    struct SCRATCH_data op2 = stack[*stackIndex-1];
+    (*stackIndex)--;
+    struct SCRATCH_data op1 = stack[*stackIndex-1];
+    (*stackIndex)--;
+    uint16_t result = op1.data.number - op2.data.number;
+    stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
+    (*stackIndex) += 1;
+    return SCRATCH_continue;
+}
 SCRATCH_implementFunction(motionGoto) {
     (*stackIndex)--;
     struct SCRATCH_data op2 = stack[*stackIndex];
@@ -238,9 +294,13 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_loopInit] = loopInit,
     [SCRATCH_loopIncrement] = loopIncrement,
     [SCRATCH_jumpIfRepeatDone] = jumpIfRepeatDone,
+    [SCRATCH_jumpIf] = jumpIf,
+    [SCRATCH_jumpIfNot] = jumpIfNot,
     [SCRATCH_fetch] = fetch,
+    [SCRATCH_fetchInput] = fetchInput,
     [SCRATCH_push] = push,
     [SCRATCH_add] = add,
+    [SCRATCH_sub] = sub,
     [SCRATCH_motionGoto] = motionGoto,
     [SCRATCH_motionTurnright] = motionTurnright,
     [SCRATCH_motionTurnleft] = motionTurnleft,
@@ -254,18 +314,36 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_motionChangeyby] = motionChangeyby,
     [SCRATCH_motionSety] = motionSety,
     [SCRATCH_loopJump] = loopJump,
+    [SCRATCH_motionSetrotationstyle] = motionSetrotationstyle,
     [SCRATCH_DEBUGEXPRESSION] = DEBUG,
     [SCRATCH_DEBUGSTATEMENT] = DEBUG,
     [SCRATCH_stop] = stop,
+    [SCRATCH_looksSay] = looksSay,
+    [SCRATCH_loadVar] = loadVar,
+    [SCRATCH_setVar] = setVar,
+    [SCRATCH_incVar] = incVar,
 };
+
+void handleInputs() {
+    for (int i = 0; i < 5; i++) {
+        bool prior = inputState[i];
+        bool new = getInput(i); 
+        inputState[i] = new;
+        if (new && new != prior) {
+            setEvent(ONKEY, (union SCRATCH_eventInput) {.key=i}, new);
+        }
+    }
+}
+
+void clearEvents() {
+    for (int i = 0; i < eventCount; i++) {
+        events[i] = false;
+    }
+}
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
     struct SCRATCH_data stack[STACKMAX];
     int stackIndex = 0;
-    char stringRegisterA[STRINGREGISTERMAX];
-    char stringRegisterB[STRINGREGISTERMAX];
-    int stringIndicesA[2] = {STRINGREGISTERMAX / 2, STRINGREGISTERMAX / 2}; // Each string register can grow on either side
-    int stringIndicesB[2] = {STRINGREGISTERMAX / 2, STRINGREGISTERMAX / 2}; // for quick joining
     enum SCRATCH_opcode operation;
     while (true) {
         operation = code[thread->programCounter++];
@@ -310,4 +388,36 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header)
     spriteChunk->base = header;
     spriteChunk->variables = (struct SCRATCH_data*) (firstChunkSize + (uint8_t*) spriteChunk);
     return spriteChunk;
+}
+
+bool SCRATCH_addSprite(struct SCRATCH_sprite* sprite) {
+    if (spriteCount >= SPRITEMAX) return false;
+    else {
+        sprites[spriteCount++] = sprite;
+        return true;
+    }
+}
+
+bool SCRATCH_wakeSprite(struct SCRATCH_sprite* sprite, enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input) {
+    bool woke = false;
+    for (int i = 0; i < sprite->base.threadCount; i++) {
+        struct SCRATCH_thread* t = &sprite->threads[i];
+        if (t->base.startEvent == type && t->base.eventCondition.i == input.i) {
+            t->active = true;
+            woke = true;
+        }
+    }
+    return woke;
+}
+
+void SCRATCH_wakeSprites() {
+    for (int i = 0; i < spriteCount; i++) {
+        struct SCRATCH_sprite* s = sprites[i];
+        for (int j = 0; j < s->base.threadCount; j++) {
+            struct SCRATCH_thread* t = &s->threads[i];
+            if (t->active) continue;
+            if (!getEvent(t->base.startEvent, t->base.eventCondition)) continue;
+            t->active = true;
+        }
+    }
 }

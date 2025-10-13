@@ -1,10 +1,10 @@
 # TODO
-- Code Compilation
-- Events
 - Speech
-- Many Blocks
 
 # DOING
+- Code Compilation
+- Many Blocks
 
 # DONE
+- Events
 - Sprite Adjusting

@@ -42,16 +42,31 @@ void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct 
     buffer = ALIGN8(buffer);
     for (int i = 0; i < header.spriteCount; i++) {
         struct SCRATCH_spriteHeader h = *(struct SCRATCH_spriteHeader*) buffer;
+        //
+        if (i == 1) {
+            h.threadCount = 1;
+            h.variableCount = 2;
+        }
+        //
         struct SCRATCH_sprite* s = SCRATCH_makeNewSprite(h);
         sprites[i] = s;
         buffer += sizeof h;
         buffer = ALIGN8(buffer);
+        //
+        if (i != 1)
+        //
         for (int j = 0; j < h.threadCount; j++) {
             s->threads[j].base = *(struct SCRATCH_threadHeader*) buffer;
             s->threads[j].programCounter = s->threads[j].base.entryPoint;
             buffer += sizeof(struct SCRATCH_threadHeader);
             buffer = ALIGN8(buffer);
         }
+        //
+        else {
+            s->threads[0].base.entryPoint = 0;
+            s->threads[0].programCounter = 0;
+        }
+        //
         int imageSize;
         if (i == 0) imageSize = STAGERESOLUTION * STAGERESOLUTION * sizeof(pixel) + sizeof (struct image);
         else imageSize = SPRITERESOLUTION * SPRITERESOLUTION * sizeof(pixel) + sizeof (struct image);

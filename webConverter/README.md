@@ -1,1 +1,0 @@
-/home/andrew/C/scratchVM/README.md

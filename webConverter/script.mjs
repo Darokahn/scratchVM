@@ -1,6 +1,51 @@
 import { unzipSync } from "https://unpkg.com/fflate/esm/browser.js";
 import mime from 'https://cdn.skypack.dev/mime'; 
 
+const opcodes = {
+  "PARTITION_BEGINLOOPCONTROL": { dataTransformers: [] },
+  "loopInit": { dataTransformers: [] },
+  "loopIncrement": { dataTransformers: [] },
+  "jumpIfRepeatDone": { dataTransformers: [] },
+  "PARTITION_BEGINEXPRESSIONS": { dataTransformers: [] },
+  "fetch": { dataTransformers: [] },
+  "fetchFrom": { dataTransformers: [] },
+  "loadVar": { dataTransformers: [] },
+  "setVar": { dataTransformers: [] },
+  "loadVarFrom": { dataTransformers: [] },
+  "loadArrayAt": { dataTransformers: [] },
+  "push": { dataTransformers: [] },
+  "add": { dataTransformers: [] },
+  "DEBUGEXPRESSION": { dataTransformers: [] },
+  "PARTITION_BEGINSTATEMENTS": { dataTransformers: [] },
+  "loopJump": { dataTransformers: [] },
+  "joinString": { dataTransformers: [] },
+  "clone": { dataTransformers: [] },
+  "jumpIf": { dataTransformers: [] },
+  "jump": { dataTransformers: [] },
+  "motionGoto": { dataTransformers: [] },
+  "motionGlideto": { dataTransformers: [] },
+  "motion_glideIteration": { dataTransformers: [] },
+  "motionTurnright": { dataTransformers: [] },
+  "motionTurnleft": { dataTransformers: [] },
+  "motionMovesteps": { dataTransformers: [] },
+  "motionPointindirection": { dataTransformers: [] },
+  "motionPointtowards": { dataTransformers: [] },
+  "motionSetx": { dataTransformers: [] },
+  "motionChangexby": { dataTransformers: [] },
+  "motionSety": { dataTransformers: [] },
+  "motionChangeyby": { dataTransformers: [] },
+  "DEBUGSTATEMENT": { dataTransformers: [] },
+  "stop": { dataTransformers: [] }
+};
+
+/*
+ * Populate sequential `.index` fields on SCRATCH_OPCODES
+ * so the object remains order-independent for editing.
+ */
+Object.keys(opcodes).forEach((key, i) => {
+  opcodes[key].index = i;
+});
+
 const SCRATCHWIDTH = 480;
 const SCRATCHHEIGHT = 360;
 
@@ -38,28 +83,36 @@ function threadTemplate() {
     };
 }
 
+
 // template for the object representing each game object
 function spriteTemplate() {
     return {
-        x: 0,
-        y: 0,
-        rotation: 0,
-        visible: true,
-        layer: 0,
-        size: 128,
-        rotationStyle: 0,
-        costumeIndex: 0,
-        costumeMax: 0,
-        threadCount: 1,
-        variableCount: 0,
-        threads: []
-    };
+        id: "",
+        index: 0,
+        tempThreads: [],
+        struct: {
+            x: 0,
+            y: 0,
+            rotation: 0,
+            visible: true,
+            layer: 0,
+            size: 128,
+            rotationStyle: 0,
+            costumeIndex: 0,
+            costumeMax: 0,
+            threadCount: 0,
+            variableCount: 0,
+            threads: []
+        },
+    }
 }
 
 // template for the object representing a whole game
 function detailsTemplate() {
     return {
         unzippedFile: null,
+        messages: {},
+        backdropCount: 0,
         sprites: [],
         stageImages: [],
         spriteImages: [],
@@ -99,66 +152,80 @@ function getDetails(project) {
     let details = detailsTemplate();
     details.unzippedFile = project;
     let projectJson = JSON.parse(new TextDecoder("utf-8").decode(project["project.json"])); // I hate javascript
-    for (let target of projectJson.targets) {
+    for (let [index, target] of projectJson.targets.entries()) {
+        let key = target.name;
         let sprite = spriteTemplate();
-        sprite.x = target.x;
-        sprite.y = target.y;
-        sprite.size = target.size;
-        sprite.rotation = target.direction;
-        sprite.visible = target.visible;
-        sprite.costumeIndex = target.currentCostume;
-        sprite.costumeMax = target.costumes.length;
-        sprite.rotationStyle = target.rotationStyle;
+        sprite.name = key;
+        sprite.index = index;
+        sprite.struct.x = target.x;
+        sprite.struct.y = target.y;
+        sprite.struct.size = target.size;
+        sprite.struct.rotation = target.direction;
+        sprite.struct.visible = target.visible;
+        sprite.struct.costumeIndex = target.currentCostume;
+        sprite.struct.costumeMax = target.costumes.length;
+        sprite.struct.rotationStyle = target.rotationStyle;
         for (let costume of target.costumes) {
             let filename = costume.assetId + "." + costume.dataFormat;
             if (target.isStage) details.stageImages.push(filename);
             else details.spriteImages.push(filename);
         }
+        adjustSprite(sprite, target.isStage);
         details.sprites.push(sprite);
     }
-    details.code = [
-        32,
-        11,
-        1,
-        0,
-        0,
-        11,
-        1,
-        0,
-        0,
-        11,
-        1,
-        10,
-        0,
-        21,
-        22,
-        32,
-        33,
-        32,
-        33,
-    ];
+    details.code = compileSprites(details.sprites, projectJson);
+    //details.code = linkSprites(details.sprites, projectJson);
     return details;
 }
 
-// adjust the sprite's parameters to match the quirks of my C representation
-
-function adjustSprite(sprite, isStage) {
-    if (isStage) {
-        sprite.threads = [];
-        sprite.threads.push(threadTemplate());
-        sprite.threads[0].entryPoint = 18;
-    }
-    else {
-        for (let i = 0; i < sprite.threadCount; i++) {
-            sprite.threads.push(threadTemplate());
+// Initialize the threads with every block 
+function indexThreads(blocks) {
+    let ids = [];
+    for (let [id, block] of Object.entries(blocks)) {
+        if (block.topLevel) {
+            ids.push(id);
         }
     }
-    sprite.x = toScaledInt32(sprite.x);
-    sprite.y = toScaledInt32(sprite.y);
-    sprite.rotation = degreesToScaled16(sprite.rotation);
+    return ids;
 }
 
-// copy a sprite into the array's memory
+function compileThread(code, blocks, threadId) {
+    let newCode = {references: {}, code: []};
+    let block = blocks[threadId];
+    while (block.next != null) {
+        block = block.next;
+    }
+    code.push(newCode);
+}
+
+function compileSprite(code, sprite, blocks) {
+    let threadIds = indexThreads(blocks);
+    for (let threadId of threadIds) {
+        compileThread(code, blocks, threadId);
+    }
+}
+
+function compileSprites(sprites, projectJson) {
+    let code = [];
+    for (let sprite of sprites) {
+        let blocks = projectJson["targets"][sprite.index]["blocks"]
+        compileSprite(code, sprite, blocks);
+    }
+    console.log(code);
+    return code;
+}
+
+// adjust the sprite's parameters to match the quirks of my C representation
+function adjustSprite(sprite, isStage) {
+    if (isStage) {
+        sprite.struct.visible = true;
+    }
+    sprite.struct.x = toScaledInt32(sprite.struct.x);
+    sprite.struct.y = toScaledInt32(sprite.struct.y);
+    sprite.struct.rotation = degreesToScaled16(sprite.struct.rotation);
+}
+
+// copy a sprite into the array's memory the way it will be represented in the memory of the processor
 function copyStruct(buffer, offset, struct, name) {
     const view = new DataView(buffer);
 
@@ -191,11 +258,6 @@ async function convertScratchProject() {
     const file = getFsEntry("project");
     const buffer = new Uint8Array(PROJECTMAX);
     let details = getDetails(file);
-    let isStage = true;
-    for (let sprite of details.sprites) {
-        adjustSprite(sprite, isStage);
-        isStage = false;
-    }
     let index = 0;
     buffer.set(new Uint8Array(details.code), index);
     index += details.code.length;
@@ -228,11 +290,10 @@ async function convertScratchProject() {
     index = (index + 7) & ~7;
     header.imageLength = index - header.codeLength;
     for (let sprite of details.sprites) {
-        console.log(sprite);
-        copyStruct(buffer.buffer, index, sprite, "sprite");
+        copyStruct(buffer.buffer, index, sprite.struct, "sprite");
         index += offsets.sprite.sizeof;
         index = (index + 7) & ~7;
-        for (let thread of sprite.threads) {
+        for (let thread of sprite.struct.threads) {
             copyStruct(buffer.buffer, index, thread, "thread");
             index += offsets.thread.sizeof;
             index = (index + 7) & ~7;
@@ -252,6 +313,13 @@ function printAsCfile(details, header, buffer) {
         ", .codeLength = " + header.codeLength + 
         ", .imageLength = " + header.imageLength +
         "};\n"
+    );
+    totalString += (
+        "bool events[" +
+        (5 + Object.keys(details.messages).length + details.backdropCount) +
+        "];\n" +
+        "int eventCount = sizeof events" +
+        ";\n"
     );
     totalString += ("const uint8_t programData[] = {");
     for (let i = 0; i < PROJECTMAX; i++) {
