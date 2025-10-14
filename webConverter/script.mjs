@@ -159,6 +159,8 @@ function getDetails(project) {
         let sprite = spriteTemplate();
         sprite.name = key;
         sprite.index = index;
+        sprite.struct.id = index;
+        sprite.struct.variableCount = Object.entries(target.variables).length;
         sprite.struct.x = target.x;
         sprite.struct.y = target.y;
         sprite.struct.size = target.size;
@@ -167,7 +169,6 @@ function getDetails(project) {
         sprite.struct.costumeIndex = target.currentCostume;
         sprite.struct.costumeMax = target.costumes.length;
         sprite.struct.rotationStyle = target.rotationStyle;
-        sprite.struct.id = index;
         for (let costume of target.costumes) {
             let filename = costume.assetId + "." + costume.dataFormat;
             if (target.isStage) details.stageImages.push(filename);

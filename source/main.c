@@ -19,15 +19,16 @@ int drawRate = 2;
 unsigned long interval = 1000 / FRAMESPERSEC;
 
 enum SCRATCH_opcode insertedCode[] = {
-    /*
+    SCRATCH_fetchPosition, -1, -1,
+    SCRATCH_motionGoto,
+    SCRATCH_stop,
     SCRATCH_DEBUGEXPRESSION,
     SCRATCH_DEBUGEXPRESSION,
     SCRATCH_DEBUGEXPRESSION,
-    */
+    // SCRATCH_clone, -1, -1,
     SCRATCH_push, 1, 0x41, 0xff,
     SCRATCH_push, 1, 0x0, 0x0,
     SCRATCH_motionGoto,
-    SCRATCH_clone, -1, -1,
     SCRATCH_push, 1, 0xa, 0x0,
     SCRATCH_setVar, 0x0, 0x0,
     SCRATCH_push, 0x1, 0x0, 0x0,
@@ -71,5 +72,8 @@ int main() {
         }
         SCRATCH_wakeSprites();
         clearEvents();
+        for (int i = 0; i < spriteCount; i++) {
+            machineLog("sprite %d's position: %d, %d\n\r", sprites[i]->base.id, sprites[i]->base.x.halves.high, sprites[i]->base.y.halves.high);
+        }
     }
 }

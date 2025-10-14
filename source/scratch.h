@@ -56,8 +56,8 @@ struct SCRATCH_sprite;
 struct SCRATCH_thread;
 
 union SCRATCH_field {
-    bool boolean;
     uint16_t number;
+    bool boolean;
     char* string;
     uint8_t spriteID;
     uint8_t color;
@@ -89,19 +89,31 @@ enum SCRATCH_opcode : uint8_t {
     // Expression opcodes. May pop from the stack; always push to the stack.
 
     SCRATCH_fetch,           // Fetch some special value such as `x position`            @field which property to get
-    SCRATCH_fetchInput,      // Fetch an input property @field input
+    SCRATCH_fetchInput,      // Fetch an input property                                  @field input
     SCRATCH_fetchFrom,       // Like above, but fetches from an aritrary sprite.         @input which sprite @field which property
+    SCRATCH_fetchPosition,   // Fetches a special position                               @field which position
+
+    SCRATCH_random,
     SCRATCH_loadVar,         // Load a variable                                          @field variable index
     SCRATCH_setVar,          // Set a variable                                           @field variable index @input data
-    SCRATCH_getVar,          // Set a variable                                           @field variable
-    SCRATCH_incVar,          // increment a variable    @field variable index @input amount
+    SCRATCH_incVar,          // increment a variable                                     @field variable index @input amount
+    SCRATCH_setVarLocal,     // Set a local variable                                     @field variable index @input data
+    SCRATCH_loadVarLocal,    // Get a local variable                                     @field variable
+    SCRATCH_incVarLocal,     // increment a local variable                               @field variable index @input amount
     SCRATCH_loadVarFrom,     // Like above, but from an arbitrary sprite.                @input which sprite @field variable index
     SCRATCH_loadArrayAt,     // Load from an array                                       @field array name @input array position
     SCRATCH_push,            // Push argument                                            @field value
 
     SCRATCH_add,             // Add two top-of-stack values                              @input op1 @input op2
     SCRATCH_sub,             // Subtract two top-of-stack values                              @input op1 @input op2
-
+    SCRATCH_mul,             // Subtract two top-of-stack values                              @input op1 @input op2
+    SCRATCH_div,             // Subtract two top-of-stack values                              @input op1 @input op2
+    SCRATCH_greaterThan,             // compare top-of-stack values                              @input op1 @input op2
+    SCRATCH_equal,             // compare top-of-stack values                              @input op1 @input op2
+    SCRATCH_lessThan,             // compare top-of-stack values                              @input op1 @input op2
+    SCRATCH_lessEqual,             // compare top-of-stack values                              @input op1 @input op2
+    SCRATCH_greaterEqual,             // compare top-of-stack values                              @input op1 @input op2
+    SCRATCH_or,
 
     SCRATCH_DEBUGEXPRESSION,
 
@@ -133,6 +145,14 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_motionSetrotationstyle,
 
     SCRATCH_looksSay,
+    SCRATCH_hide,
+    SCRATCH_show,
+    SCRATCH_setSize,
+    SCRATCH_setCostume,
+    SCRATCH_nextCostume,
+
+    SCRATCH_wait,
+    SCRATCH__waitIteration,
 
     SCRATCH_DEBUGSTATEMENT,
 

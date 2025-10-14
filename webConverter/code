@@ -23,20 +23,21 @@ cat_event_start:
     stop
 
 cat_event_space:
-    clone ball              ##
+    clone ball
     push 0.1s
-    wait                    ##
+    wait
     stop
 
 ball_event_start:
-    hide                    ##
+    hide
     stop
 
 ball_event_clone:
     push 50
-    setSize                 ##
-    gotoPOI cat             ##
-    show                    ##
+    setSize
+    fetchPosition cat
+    goto
+    show
 1:  fetchTouching robot     ##
     push 200
     fetch xPosition
