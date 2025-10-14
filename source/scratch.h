@@ -177,6 +177,7 @@ enum SCRATCH_EVENTTYPE : uint8_t {
     ONFLAG,
     ONCLICK, // ignored
     ONLOUDNESS, // ignored
+    __EVENTCOUNT
 };
 
 union SCRATCH_eventInput { // redundant union; meant for semantic labeling
@@ -214,6 +215,7 @@ struct SCRATCH_header {
     uint32_t imageLength;
     uint32_t spriteCount;
     uint32_t messageCount;
+    uint32_t backdropCount;
 };
 
 struct SCRATCH_spriteHeader {
@@ -228,6 +230,7 @@ struct SCRATCH_spriteHeader {
     uint8_t costumeMax;
     uint8_t threadCount;
     uint8_t variableCount;
+    uint8_t id;
 };
 
 struct SCRATCH_threadHeader {
@@ -261,6 +264,7 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, 
 void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
 int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount);
 struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header);
+void SCRATCH_initThread(struct SCRATCH_thread*, struct SCRATCH_threadHeader);
 void handleInputs();
 void clearEvents();
 bool SCRATCH_addSprite(struct SCRATCH_sprite* sprite);

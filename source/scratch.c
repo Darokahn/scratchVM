@@ -287,6 +287,35 @@ SCRATCH_implementFunction(stop) {
     return SCRATCH_yieldGeneric;
 }
 
+SCRATCH_implementFunction(clone) {
+    int16_t field = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof field;
+    struct SCRATCH_spriteHeader h;
+    struct SCRATCH_sprite* template;
+    if (field == -1) {
+        h = sprite->base;
+        template = sprite;
+    }
+    else {
+        h = sprites[field]->base;
+        template = sprites[field];
+    }
+    struct SCRATCH_sprite* newSprite = SCRATCH_makeNewSprite(h);
+    for (int i = 0; i < h.threadCount; i++) {
+        newSprite->threads[i].base = template->threads[i].base;
+        newSprite->threads[i].active = false;
+        newSprite->threads[i].programCounter = template->threads[i].base.entryPoint;
+    }
+    for (int i = 0; i < h.variableCount; i++) {
+        // variables need to be handled specially because they can hold allocated strings that need to be copied. TODO
+    }
+    SCRATCH_wakeSprite(newSprite, SCRATCH_clone, (union SCRATCH_eventInput) {0});
+    if (!SCRATCH_addSprite(newSprite)) {
+        free(newSprite);
+    }
+    return SCRATCH_yieldGeneric;
+}
+
 SCRATCH_implementFunction(looksSay) {
 }
 
@@ -322,6 +351,7 @@ SCRATCH_function operations[MAXOPCODE] = {
     [SCRATCH_loadVar] = loadVar,
     [SCRATCH_setVar] = setVar,
     [SCRATCH_incVar] = incVar,
+    [SCRATCH_clone] = clone,
 };
 
 void handleInputs() {
@@ -390,6 +420,13 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header)
     return spriteChunk;
 }
 
+void SCRATCH_initThread(struct SCRATCH_thread* thread, struct SCRATCH_threadHeader h) {
+    thread->programCounter = h.entryPoint;
+    thread->active = false;
+    thread->loopCounterStackIndex = 0;
+    thread->base = h;
+}
+
 bool SCRATCH_addSprite(struct SCRATCH_sprite* sprite) {
     if (spriteCount >= SPRITEMAX) return false;
     else {
@@ -414,8 +451,10 @@ void SCRATCH_wakeSprites() {
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* s = sprites[i];
         for (int j = 0; j < s->base.threadCount; j++) {
-            struct SCRATCH_thread* t = &s->threads[i];
-            if (t->active) continue;
+            struct SCRATCH_thread* t = &s->threads[j];
+            if (t->active) {
+                continue;
+            }
             if (!getEvent(t->base.startEvent, t->base.eventCondition)) continue;
             t->active = true;
         }

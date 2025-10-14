@@ -1,4 +1,4 @@
-#include "scratch.h"
+#include "../scratch.h"
 #include <stddef.h>
 
 int main(void) {
@@ -14,6 +14,7 @@ int main(void) {
     printf("costumeMax    = %zu\n", offsetof(struct SCRATCH_spriteHeader, costumeMax));
     printf("threadCount   = %zu\n", offsetof(struct SCRATCH_spriteHeader, threadCount));
     printf("variableCount = %zu\n", offsetof(struct SCRATCH_spriteHeader, variableCount));
+    printf("id = %zu\n", offsetof(struct SCRATCH_spriteHeader, id));
     printf("sizeof        = %zu\n", sizeof(struct SCRATCH_spriteHeader));
 
     printf("\nOffsets in SCRATCH_threadHeader:\n");

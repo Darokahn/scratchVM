@@ -36,9 +36,11 @@ extern "C" void startGraphics() {
 extern "C" void updateGraphics(uint16_t* framebuffer) {
     tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH) / 2, (FULLLCDHEIGHT - LCDHEIGHT) / 2);
 }
+
 extern "C" void* mallocDMA(size_t size) {
     return heap_caps_malloc(size, MALLOC_CAP_DMA);
 }
+
 extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable) {
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
@@ -113,7 +115,7 @@ extern "C" unsigned long getNow() {
 #define VRY_PIN 33
 #define SW_PIN 25
 
-const int ADC_CENTER = 1024;       // Midpoint of 12-bit ADC
+const int ADC_CENTER = 1880;       // Midpoint of 12-bit ADC
 const int DEADZONE  = 200;         // Joystick deadzone threshold
 
 extern "C" bool getInput(int index) {
@@ -121,7 +123,7 @@ extern "C" bool getInput(int index) {
     int vry = analogRead(VRY_PIN);
     bool sw  = digitalRead(SW_PIN) == LOW;  // Active-low button
 
-    machineLog("%d, %d\n\r", vrx, vry);
+    //machineLog("%d, %d\r\n", vrx, vry);
 
     switch (index) {
         case 0: // UP

@@ -19,21 +19,27 @@ int drawRate = 2;
 unsigned long interval = 1000 / FRAMESPERSEC;
 
 enum SCRATCH_opcode insertedCode[] = {
+    /*
+    SCRATCH_DEBUGEXPRESSION,
+    SCRATCH_DEBUGEXPRESSION,
+    SCRATCH_DEBUGEXPRESSION,
+    */
     SCRATCH_push, 1, 0x41, 0xff,
     SCRATCH_push, 1, 0x0, 0x0,
     SCRATCH_motionGoto,
+    SCRATCH_clone, -1, -1,
     SCRATCH_push, 1, 0xa, 0x0,
     SCRATCH_setVar, 0x0, 0x0,
     SCRATCH_push, 0x1, 0x0, 0x0,
     SCRATCH_setVar, 0x1, 0x0,
     // 1:
     SCRATCH_fetchInput, 0x0, 0x0,
-    SCRATCH_jumpIfNot, 35, 0x0,
+    SCRATCH_jumpIfNot, 38, 0x0,
     SCRATCH_loadVar, 0x0, 0x0,
     SCRATCH_incVar, 0x1, 0x0,
     // 2:
     SCRATCH_fetchInput, 0x2, 0x0,
-    SCRATCH_jumpIfNot, 52, 0x0,
+    SCRATCH_jumpIfNot, 55, 0x0,
     SCRATCH_push, 1, 0x0, 0x0,
     SCRATCH_loadVar, 0x0, 0x0,
     SCRATCH_sub,
@@ -42,7 +48,7 @@ enum SCRATCH_opcode insertedCode[] = {
     SCRATCH_push, 1, 0x41, 0xff,
     SCRATCH_loadVar, 0x1, 0x0,
     SCRATCH_motionGoto,
-    SCRATCH_loopJump, 23, 0x0,
+    SCRATCH_loopJump, 26, 0x0,
 };
 
 int main() {
@@ -54,12 +60,13 @@ int main() {
     startGraphics();
     drawSprites(sprites, header.spriteCount, imageTable);
     updateGraphics();
+    setEvent(ONFLAG, (union SCRATCH_eventInput) {0}, true);
     while (true) {
         do handleInputs(); while (getNow() < next);
         next += interval;
         SCRATCH_visitAllThreads(sprites, header.spriteCount);
         if (count++ % drawRate == 0) {
-            drawSprites(sprites, header.spriteCount, imageTable);
+            drawSprites(sprites, spriteCount, imageTable);
             updateGraphics();
         }
         SCRATCH_wakeSprites();

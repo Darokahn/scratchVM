@@ -65,7 +65,7 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
         if (!sprite->base.visible) continue;
-        struct image* image = getImage(imageTable, i, sprite->base.costumeIndex);
+        struct image* image = getImage(imageTable, sprite->base.id, sprite->base.costumeIndex);
         int imageResolution;
         int baseX;
         int baseY;

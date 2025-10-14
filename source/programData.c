@@ -5,10 +5,7 @@
 #include "externFunctions.h"
 #include "scratch.h"
 
-int eventTypeOffsets[3] = {
-    0, 5, 0
-};
-
+int eventTypeOffsets[__EVENTCOUNT];
 bool inputState[5];
 
 struct image* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
@@ -24,7 +21,9 @@ struct image* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int c
 }
 
 bool getEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input) {
-    return events[eventTypeOffsets[type] + input.i];
+    int index = eventTypeOffsets[type] + input.i;
+    if (index == -1) return false;
+    return events[index];
 }
 
 void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool state) {
@@ -32,7 +31,22 @@ void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool 
 }
 
 void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]) {
-    eventTypeOffsets[2] = header.messageCount + eventTypeOffsets[1];
+    int offsetTotal = 0;
+    eventTypeOffsets[ONKEY] = offsetTotal;
+    offsetTotal += 5;
+    eventTypeOffsets[ONMESSAGE] = offsetTotal;
+    offsetTotal += header.messageCount;
+    eventTypeOffsets[ONBACKDROP] = offsetTotal;
+    offsetTotal += header.backdropCount;
+    eventTypeOffsets[ONCLONE] = -1; // ONCLONE is an event, but it is not triggered globally so takes no space in the events array
+    offsetTotal += 0;
+    eventTypeOffsets[ONFLAG] = offsetTotal;
+    offsetTotal += 1;
+    eventTypeOffsets[ONCLICK] = -1;
+    offsetTotal += 0;
+    eventTypeOffsets[ONLOUDNESS] = -1;
+    offsetTotal += 0;
+
     code = (enum SCRATCH_opcode*) buffer;
     buffer += header.codeLength;
     buffer = ALIGN8(buffer);
@@ -42,31 +56,16 @@ void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct 
     buffer = ALIGN8(buffer);
     for (int i = 0; i < header.spriteCount; i++) {
         struct SCRATCH_spriteHeader h = *(struct SCRATCH_spriteHeader*) buffer;
-        //
-        if (i == 1) {
-            h.threadCount = 1;
-            h.variableCount = 2;
-        }
-        //
         struct SCRATCH_sprite* s = SCRATCH_makeNewSprite(h);
         sprites[i] = s;
         buffer += sizeof h;
         buffer = ALIGN8(buffer);
-        //
-        if (i != 1)
-        //
         for (int j = 0; j < h.threadCount; j++) {
-            s->threads[j].base = *(struct SCRATCH_threadHeader*) buffer;
+            SCRATCH_initThread(&s->threads[j], *(struct SCRATCH_threadHeader*) buffer);
             s->threads[j].programCounter = s->threads[j].base.entryPoint;
             buffer += sizeof(struct SCRATCH_threadHeader);
             buffer = ALIGN8(buffer);
         }
-        //
-        else {
-            s->threads[0].base.entryPoint = 0;
-            s->threads[0].programCounter = 0;
-        }
-        //
         int imageSize;
         if (i == 0) imageSize = STAGERESOLUTION * STAGERESOLUTION * sizeof(pixel) + sizeof (struct image);
         else imageSize = SPRITERESOLUTION * SPRITERESOLUTION * sizeof(pixel) + sizeof (struct image);
@@ -76,4 +75,5 @@ void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct 
             imageBase += imageSize;
         }
     }
+    spriteCount = header.spriteCount;
 }

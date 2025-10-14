@@ -64,6 +64,7 @@ const offsets = {
         costumeMax: { offset: 16, size: 1 },
         threadCount: { offset: 17, size: 1 },
         variableCount: { offset: 18, size: 1 },
+        id: {offset: 19, size: 1},
         sizeof: 20
     },
     thread: {
@@ -102,6 +103,7 @@ function spriteTemplate() {
             costumeMax: 0,
             threadCount: 0,
             variableCount: 0,
+            id: 0,
             threads: []
         },
     }
@@ -165,6 +167,7 @@ function getDetails(project) {
         sprite.struct.costumeIndex = target.currentCostume;
         sprite.struct.costumeMax = target.costumes.length;
         sprite.struct.rotationStyle = target.rotationStyle;
+        sprite.struct.id = index;
         for (let costume of target.costumes) {
             let filename = costume.assetId + "." + costume.dataFormat;
             if (target.isStage) details.stageImages.push(filename);
@@ -178,11 +181,21 @@ function getDetails(project) {
     return details;
 }
 
+const events = [
+    "event_whenkeypressed",
+    "event_whenbroadcastreceived",
+    "event_whenbackdropswitchesto",
+    "control_start_as_clone",
+    "event_whenflagclicked",
+    "event_whenthisspriteclicked",
+    "event_whengreaterthan",
+];
+
 // Initialize the threads with every block 
 function indexThreads(blocks) {
     let ids = [];
     for (let [id, block] of Object.entries(blocks)) {
-        if (block.topLevel) {
+        if (block.topLevel && events.includes(block.opcode)) {
             ids.push(id);
         }
     }
@@ -190,18 +203,21 @@ function indexThreads(blocks) {
 }
 
 function compileThread(code, blocks, threadId) {
-    let newCode = {references: {}, code: []};
+    let newCode = {references: {}, code: [], threadObject: threadTemplate()};
     let block = blocks[threadId];
+    newCode.threadObject.startEvent = events.indexOf(block.opcode);
     while (block.next != null) {
         block = block.next;
     }
     code.push(newCode);
+    return newCode.threadObject;
 }
 
 function compileSprite(code, sprite, blocks) {
     let threadIds = indexThreads(blocks);
     for (let threadId of threadIds) {
-        compileThread(code, blocks, threadId);
+        sprite.struct.threads.push(compileThread(code, blocks, threadId));
+        sprite.struct.threadCount += 1;
     }
 }
 
@@ -253,11 +269,14 @@ async function convertScratchProject() {
     let header = {
         codeLength: 0,
         imageLength: 0,
-        spriteCount: 0
+        spriteCount: 0,
+        messageCount: 0,
+        backdropCount: 0,
     };
     const file = getFsEntry("project");
     const buffer = new Uint8Array(PROJECTMAX);
     let details = getDetails(file);
+    header.backdropCount = details.stageImages.length;
     let index = 0;
     buffer.set(new Uint8Array(details.code), index);
     index += details.code.length;
@@ -312,6 +331,8 @@ function printAsCfile(details, header, buffer) {
         "const struct SCRATCH_header header = {.spriteCount = " + header.spriteCount + 
         ", .codeLength = " + header.codeLength + 
         ", .imageLength = " + header.imageLength +
+        ", .messageCount = " + header.messageCount +
+        ", .backdropCount = " + header.backdropCount +
         "};\n"
     );
     totalString += (

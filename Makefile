@@ -1,7 +1,7 @@
 all: main
 
 main: source/*.c
-	gcc $^ -lm -lSDL2 -g -fsanitize=address
+	gcc $^ -lm -lSDL2 -g -fsanitize=address -O0
 
 # Rule to build definitions.c using the generator
 #source/definitions.c: source/gdef
