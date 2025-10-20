@@ -19,37 +19,9 @@ int drawRate = 2;
 unsigned long interval = 1000 / FRAMESPERSEC;
 
 enum SCRATCH_opcode insertedCode[] = {
-    SCRATCH_fetchPosition, -1, -1,
-    SCRATCH_motionGoto,
+    SCRATCH_push, 1, 0xa, 0,
+    SCRATCH_movesteps,
     SCRATCH_stop,
-    SCRATCH_DEBUGEXPRESSION,
-    SCRATCH_DEBUGEXPRESSION,
-    SCRATCH_DEBUGEXPRESSION,
-    // SCRATCH_clone, -1, -1,
-    SCRATCH_push, 1, 0x41, 0xff,
-    SCRATCH_push, 1, 0x0, 0x0,
-    SCRATCH_motionGoto,
-    SCRATCH_push, 1, 0xa, 0x0,
-    SCRATCH_setVar, 0x0, 0x0,
-    SCRATCH_push, 0x1, 0x0, 0x0,
-    SCRATCH_setVar, 0x1, 0x0,
-    // 1:
-    SCRATCH_fetchInput, 0x0, 0x0,
-    SCRATCH_jumpIfNot, 38, 0x0,
-    SCRATCH_loadVar, 0x0, 0x0,
-    SCRATCH_incVar, 0x1, 0x0,
-    // 2:
-    SCRATCH_fetchInput, 0x2, 0x0,
-    SCRATCH_jumpIfNot, 55, 0x0,
-    SCRATCH_push, 1, 0x0, 0x0,
-    SCRATCH_loadVar, 0x0, 0x0,
-    SCRATCH_sub,
-    SCRATCH_incVar, 0x1, 0x0,
-    // 3:
-    SCRATCH_push, 1, 0x41, 0xff,
-    SCRATCH_loadVar, 0x1, 0x0,
-    SCRATCH_motionGoto,
-    SCRATCH_loopJump, 26, 0x0,
 };
 
 int main() {
@@ -67,13 +39,10 @@ int main() {
         next += interval;
         SCRATCH_visitAllThreads(sprites, header.spriteCount);
         if (count++ % drawRate == 0) {
-            drawSprites(sprites, spriteCount, imageTable);
+            drawSprites(sprites, 2, imageTable);
             updateGraphics();
         }
         SCRATCH_wakeSprites();
         clearEvents();
-        for (int i = 0; i < spriteCount; i++) {
-            machineLog("sprite %d's position: %d, %d\n\r", sprites[i]->base.id, sprites[i]->base.x.halves.high, sprites[i]->base.y.halves.high);
-        }
     }
 }

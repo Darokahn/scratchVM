@@ -10,7 +10,7 @@
 #define SPRITEMAX (8) // maximum spritecount
 #define IMAGEMAX (16)
 
-#define FRAMESPERSEC 30
+#define FRAMESPERSEC 50
 
 #define STAGERESOLUTION 128
 #define SPRITERESOLUTION 32
@@ -41,12 +41,11 @@
     #error "Unknown endianness"
 #endif
 
-typedef uint16_t halfStringPointer; // used to represent the bottom half of a pointer; safe to use with some static buffers.
-
 // using GNU typed enum extension
 enum SCRATCH_fieldType : uint8_t {
     SCRATCH_BOOL,
     SCRATCH_NUMBER,
+    SCRATCH_FRACTION,
     SCRATCH_STRING,
     SCRATCH_SPRITE,
     SCRATCH_COLOR,
@@ -56,7 +55,8 @@ struct SCRATCH_sprite;
 struct SCRATCH_thread;
 
 union SCRATCH_field {
-    uint16_t number;
+    int number;
+    float fraction;
     bool boolean;
     char* string;
     uint8_t spriteID;
@@ -80,69 +80,76 @@ enum SCRATCH_opcode : uint8_t {
 
     // Loop opcodes. 
 
-    SCRATCH_loopInit,        // Push loop counter to loop stack
-    SCRATCH_loopIncrement,   // Increment the top of stack loop counter
-    SCRATCH_jumpIfRepeatDone,// Jump if the top of the loop stack has reached a value   @field loop value @field jump location
+    INNER_LOOPINIT,        // Push loop counter to loop stack
+    INNER_LOOPINCREMENT,   // Increment the top of stack loop counter
+    INNER_JUMPIFREPEATDONE,// Jump if the top of the loop stack has reached a value   @field loop value @field jump location
 
-    SCRATCH_PARTITION_BEGINEXPRESSIONS, // Semantic partition.
+    INNER_PARTITION_BEGINEXPRESSIONS, // Semantic partition.
 
     // Expression opcodes. May pop from the stack; always push to the stack.
 
-    SCRATCH_fetch,           // Fetch some special value such as `x position`            @field which property to get
-    SCRATCH_fetchInput,      // Fetch an input property                                  @field input
-    SCRATCH_fetchFrom,       // Like above, but fetches from an aritrary sprite.         @input which sprite @field which property
-    SCRATCH_fetchPosition,   // Fetches a special position                               @field which position
+    INNER_FETCH,           // Fetch some special value such as `x position`            @field which property to get
+    INNER_FETCHINPUT,      // Fetch an input property                                  @field input
+    INNER_FETCHFROM,       // Like above, but fetches from an aritrary sprite.         @input which sprite @field which property
+    INNER_FETCHPOSITION,   // Fetches a special position                               @field which position
 
-    SCRATCH_random,
-    SCRATCH_loadVar,         // Load a variable                                          @field variable index
-    SCRATCH_setVar,          // Set a variable                                           @field variable index @input data
-    SCRATCH_incVar,          // increment a variable                                     @field variable index @input amount
-    SCRATCH_setVarLocal,     // Set a local variable                                     @field variable index @input data
-    SCRATCH_loadVarLocal,    // Get a local variable                                     @field variable
-    SCRATCH_incVarLocal,     // increment a local variable                               @field variable index @input amount
-    SCRATCH_loadVarFrom,     // Like above, but from an arbitrary sprite.                @input which sprite @field variable index
-    SCRATCH_loadArrayAt,     // Load from an array                                       @field array name @input array position
-    SCRATCH_push,            // Push argument                                            @field value
+    INNER_FETCHTOUCHING,
+    INNER_LOADVAR,         // Load a variable                                          @field variable index
+    INNER_push,            // Push argument                                            @field value
 
-    SCRATCH_add,             // Add two top-of-stack values                              @input op1 @input op2
-    SCRATCH_sub,             // Subtract two top-of-stack values                              @input op1 @input op2
-    SCRATCH_mul,             // Subtract two top-of-stack values                              @input op1 @input op2
-    SCRATCH_div,             // Subtract two top-of-stack values                              @input op1 @input op2
-    SCRATCH_greaterThan,             // compare top-of-stack values                              @input op1 @input op2
-    SCRATCH_equal,             // compare top-of-stack values                              @input op1 @input op2
-    SCRATCH_lessThan,             // compare top-of-stack values                              @input op1 @input op2
-    SCRATCH_lessEqual,             // compare top-of-stack values                              @input op1 @input op2
-    SCRATCH_greaterEqual,             // compare top-of-stack values                              @input op1 @input op2
-    SCRATCH_or,
+    OPERATOR_ADD,             // Add two top-of-stack values                              @input op1 @input op2
+    OPERATOR_SUBTRACT,             // Subtract two top-of-stack values                              @input op1 @input op2
+    OPERATOR_MULTIPLY,        // Subtract two top-of-stack values                              @input op1 @input op2
+    OPERATOR_DIVIDE,          // Subtract two top-of-stack values                              @input op1 @input op2
+    OPERATOR_RANDOM,
+    OPERATOR_GT,             // compare top-of-stack values                              @input op1 @input op2
+    OPERATOR_LT,             // compare top-of-stack values                              @input op1 @input op2
+    OPERATOR_EQUALS,             // compare top-of-stack values                              @input op1 @input op2 SCRATCH_lessThan,             // compare top-of-stack values                              @input op1 @input op2 SCRATCH_lessEqual,             // compare top-of-stack values                              @input op1 @input op2
+    OPERATOR_GE,             // compare top-of-stack values                              @input op1 @input op2
+    OPERATOR_AND,
+    OPERATOR_OR,
+    OPERATOR_NOT,
+    OPERATOR_JOIN,
+    OPERATOR_LETTER_OF,
+    OPERATOR_LENGTH,
+    OPERATOR_CONTAINS,
+    OPERATOR_MOD,
+    OPERATOR_ROUND,
+    OPERATOR_MATHOP,
+    DATA_SETVARIABLETO,          // Set a variable                                           @field variable index @input data
+    DATA_CHANGEVARIABLEBY,          // increment a variable                                     @field variable index @input amount
+    DATA_LOADVAR,    // Get a local variable                                     @field variable
+    DATA_LOADARRAYAT,     // Load from an array                                       @field array name @input array position
 
-    SCRATCH_DEBUGEXPRESSION,
 
-    SCRATCH_PARTITION_BEGINSTATEMENTS, // Semantic partition.
+    INNER_DEBUGEXPRESSION,
+
+    INNER_PARTITION_BEGINSTATEMENTS, // Semantic partition.
     // Only statement opcodes need to mind their return value. Still, for predictability, expression opcodes should return
     // SCRATCH_continue.
 
     // Statement opcodes. Statements always leave the stack empty, unless there has been an error in compilation or implementation.
 
-    SCRATCH_loopJump,        // Signal a loop iteration to interpreter                   @field jump destination
-    SCRATCH_joinString,      // For string join operations                               @input string1 @input string2
-    SCRATCH_clone,           // Treat cloning as a privileged primitive operation        @input sprite index
-    SCRATCH_jumpIf,          // Jump if top of stack is truthy                           @input evaluand @field jump destination
-    SCRATCH_jumpIfNot,       // Jump if top of stack is not truthy      @input evaluand @field jump destination
-    SCRATCH_jump,            // Unconditional jump
+    INNER_LOOPJUMP,        // Signal a loop iteration to interpreter                   @field jump destination
+    CONTROL_CREATE_CLONE_OF,           // Treat cloning as a privileged primitive operation        @input sprite index
+    CONTROL_DELETE_THIS_CLONE,          // Delete a sprite
+    INNER_JUMPIF,          // Jump if top of stack is truthy                           @input evaluand @field jump destination
+    INNER_JUMPIFNOT,       // Jump if top of stack is not truthy      @input evaluand @field jump destination
+    INNER_JUMP,            // Unconditional jump
 
-    SCRATCH_motionGoto,
-    SCRATCH_motionGlideto,
-    SCRATCH_motion_glideIteration,
-    SCRATCH_motionTurnright,
-    SCRATCH_motionTurnleft,
-    SCRATCH_motionMovesteps,
-    SCRATCH_motionPointindirection,
-    SCRATCH_motionPointtowards,
-    SCRATCH_motionSetx,
-    SCRATCH_motionChangexby,
-    SCRATCH_motionSety,
-    SCRATCH_motionChangeyby,
-    SCRATCH_motionSetrotationstyle,
+    MOTION_GOTOXY,
+    MOTION_GLIDETO,
+    MOTION__GLIDEITERATION,
+    MOTION_TURNRIGHT,
+    MOTION_TURNLEFT,
+    MOTION_MOVESTEPS,
+    MOTION_POINTINDIRECTION,
+    MOTION_POINTTOWARDS,
+    MOTION_SETX,
+    MOTION_CHANGEXBY,
+    MOTION_SETY,
+    MOTION_CHANGEYBY,
+    MOTION_SETROTATIONSTYLE,
 
     SCRATCH_looksSay,
     SCRATCH_hide,
@@ -151,12 +158,12 @@ enum SCRATCH_opcode : uint8_t {
     SCRATCH_setCostume,
     SCRATCH_nextCostume,
 
-    SCRATCH_wait,
-    SCRATCH__waitIteration,
+    CONTROL_WAIT,
+    INNER__WAITITERATION,
 
-    SCRATCH_DEBUGSTATEMENT,
+    INNER_DEBUGSTATEMENT,
 
-    SCRATCH_stop,
+    CONTROL_stop,
 };
 
 // values indicating which dynamic value to fetch
@@ -197,7 +204,7 @@ enum SCRATCH_EVENTTYPE : uint8_t {
     ONFLAG,
     ONCLICK, // ignored
     ONLOUDNESS, // ignored
-    __EVENTCOUNT
+    __EVENTTYPECOUNT
 };
 
 union SCRATCH_eventInput { // redundant union; meant for semantic labeling
@@ -259,7 +266,6 @@ struct SCRATCH_threadHeader {
     enum SCRATCH_EVENTTYPE startEvent;
 };
 
-
 struct SCRATCH_thread {
     struct SCRATCH_threadHeader base;
     uint16_t programCounter;
@@ -290,4 +296,6 @@ void clearEvents();
 bool SCRATCH_addSprite(struct SCRATCH_sprite* sprite);
 bool SCRATCH_wakeSprite(struct SCRATCH_sprite* sprite, enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
 void SCRATCH_wakeSprites();
+
+
 #endif

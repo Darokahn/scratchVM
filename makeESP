@@ -3,7 +3,7 @@
 arduino-cli compile --fqbn esp32:esp32:esp32 arduino/ --verbose
 
 # Upload
-arduino-cli upload -p /dev/ttyUSB1 --fqbn esp32:esp32:esp32 arduino/
+arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 arduino/
 
 # Monitor
-screen /dev/ttyUSB1 115200
+screen /dev/ttyUSB0 115200

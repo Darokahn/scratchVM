@@ -1,53 +1,16 @@
 import { unzipSync } from "https://unpkg.com/fflate/esm/browser.js";
 import mime from 'https://cdn.skypack.dev/mime'; 
 
-const opcodes = {
-  "PARTITION_BEGINLOOPCONTROL": { dataTransformers: [] },
-  "loopInit": { dataTransformers: [] },
-  "loopIncrement": { dataTransformers: [] },
-  "jumpIfRepeatDone": { dataTransformers: [] },
-  "PARTITION_BEGINEXPRESSIONS": { dataTransformers: [] },
-  "fetch": { dataTransformers: [] },
-  "fetchFrom": { dataTransformers: [] },
-  "loadVar": { dataTransformers: [] },
-  "setVar": { dataTransformers: [] },
-  "loadVarFrom": { dataTransformers: [] },
-  "loadArrayAt": { dataTransformers: [] },
-  "push": { dataTransformers: [] },
-  "add": { dataTransformers: [] },
-  "DEBUGEXPRESSION": { dataTransformers: [] },
-  "PARTITION_BEGINSTATEMENTS": { dataTransformers: [] },
-  "loopJump": { dataTransformers: [] },
-  "joinString": { dataTransformers: [] },
-  "clone": { dataTransformers: [] },
-  "jumpIf": { dataTransformers: [] },
-  "jump": { dataTransformers: [] },
-  "motionGoto": { dataTransformers: [] },
-  "motionGlideto": { dataTransformers: [] },
-  "motion_glideIteration": { dataTransformers: [] },
-  "motionTurnright": { dataTransformers: [] },
-  "motionTurnleft": { dataTransformers: [] },
-  "motionMovesteps": { dataTransformers: [] },
-  "motionPointindirection": { dataTransformers: [] },
-  "motionPointtowards": { dataTransformers: [] },
-  "motionSetx": { dataTransformers: [] },
-  "motionChangexby": { dataTransformers: [] },
-  "motionSety": { dataTransformers: [] },
-  "motionChangeyby": { dataTransformers: [] },
-  "DEBUGSTATEMENT": { dataTransformers: [] },
-  "stop": { dataTransformers: [] }
-};
-
-/*
- * Populate sequential `.index` fields on SCRATCH_OPCODES
- * so the object remains order-independent for editing.
- */
-Object.keys(opcodes).forEach((key, i) => {
-  opcodes[key].index = i;
-});
-
 const SCRATCHWIDTH = 480;
 const SCRATCHHEIGHT = 360;
+
+const inputMap = {
+    "up arrow": 0,
+    "right arrow": 1,
+    "down arrow": 2,
+    "left arrow": 3,
+    "space": 4,
+};
 
 const files = {};
 
@@ -338,7 +301,7 @@ function printAsCfile(details, header, buffer) {
     );
     totalString += (
         "bool events[" +
-        (5 + Object.keys(details.messages).length + details.backdropCount) +
+        (Object.entries(inputMap).length + Object.keys(details.messages).length + header.backdropCount + 1) +
         "];\n" +
         "int eventCount = sizeof events" +
         ";\n"

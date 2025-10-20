@@ -8,7 +8,7 @@ extern const uint8_t programData[];
 extern enum SCRATCH_opcode* code;
 extern bool events[];
 extern int eventCount;
-extern int eventTypeOffsets[__EVENTCOUNT];
+extern int eventTypeOffsets[__EVENTTYPECOUNT];
 extern bool inputState[5];
 
 extern struct SCRATCH_sprite* sprites[SPRITEMAX];

@@ -5,7 +5,7 @@
 #include "externFunctions.h"
 #include "scratch.h"
 
-int eventTypeOffsets[__EVENTCOUNT];
+int eventTypeOffsets[__EVENTTYPECOUNT];
 bool inputState[5];
 
 struct image* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
