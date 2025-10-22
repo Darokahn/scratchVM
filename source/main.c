@@ -19,9 +19,8 @@ int drawRate = 2;
 unsigned long interval = 1000 / FRAMESPERSEC;
 
 enum SCRATCH_opcode insertedCode[] = {
-    SCRATCH_push, 1, 0xa, 0,
-    SCRATCH_movesteps,
-    SCRATCH_stop,
+    INNER_DEBUGEXPRESSION,
+    CONTROL_STOP,
 };
 
 int main() {

@@ -9,615 +9,124 @@
 
 #define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
 
-#define INTERPRET_AS(type, value) *(type*)&(value)
-
-SCRATCH_implementFunction(DEBUG) {
-    machineLog("DEBUG\n");
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(loopInit) {
-    thread->loopCounterStack[thread->loopCounterStackIndex] = 0;
-    thread->loopCounterStackIndex++;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(loopIncrement) {
-    thread->loopCounterStack[thread->loopCounterStackIndex-1] += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(jumpIf) {
-    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof jumpTo;
-    struct SCRATCH_data evaluand = stack[*stackIndex-1];
-    (*stackIndex) -= 1;
-    if (evaluand.data.boolean) {
-        thread->programCounter = jumpTo;
-    }
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(jumpIfNot) {
-    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof jumpTo;
-    struct SCRATCH_data evaluand = stack[*stackIndex-1];
-    (*stackIndex) -= 1;
-    if (!evaluand.data.boolean) {
-        thread->programCounter = jumpTo;
-    }
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(jumpIfRepeatDone) {
-    uint16_t toMatch = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof(toMatch);
-    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof(jumpTo);
-    if (thread->loopCounterStack[thread->loopCounterStackIndex-1] >= toMatch) {
-        thread->programCounter = jumpTo;
-    }
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(loopJump) {
-    uint16_t to = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter = to;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(fetch) {
-    enum SCRATCH_fetchValue toFetch = INTERPRET_AS(enum SCRATCH_fetchValue, code[thread->programCounter]);
-    thread->programCounter += sizeof(toFetch);
-    uint16_t fetchedValue;
-    switch (toFetch) {
-        case SCRATCH_xPosition:
-            fetchedValue = sprite->base.x.halves.high; break;
-    }
-    stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = fetchedValue}};
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(fetchInput) {
-    uint16_t toFetch = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof(toFetch);
-    stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_BOOL, {.boolean = inputState[toFetch]}};
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(loadVar) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    stack[*stackIndex] = sprites[0]->variables[varIndex];
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(setVar) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = stack[*stackIndex-1];
-    (*stackIndex) -= 1;
-    sprites[0]->variables[varIndex] = value;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(incVar) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = stack[*stackIndex-1];
-    (*stackIndex) -= 1;
-    sprites[0]->variables[varIndex].data.number += value.data.number;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(loadVarLocal) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    stack[*stackIndex] = sprite->variables[varIndex];
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(setVarLocal) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = stack[*stackIndex-1];
-    (*stackIndex) -= 1;
-    sprite->variables[varIndex] = value;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(incVarLocal) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = stack[*stackIndex-1];
-    (*stackIndex) -= 1;
-    sprite->variables[varIndex].data.number += value.data.number;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(push) {
-    enum SCRATCH_fieldType type = code[thread->programCounter];
-    thread->programCounter += sizeof(type);
-    uint16_t field = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof(field);
-    stack[*stackIndex] = (struct SCRATCH_data) {type, {.number = field}};
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(add) {
-    struct SCRATCH_data op2 = stack[*stackIndex-1];
-    (*stackIndex)--;
-    struct SCRATCH_data op1 = stack[*stackIndex-1];
-    (*stackIndex)--;
-    uint16_t result = op1.data.number + op2.data.number;
-    stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(sub) {
-    struct SCRATCH_data op2 = stack[*stackIndex-1];
-    (*stackIndex)--;
-    struct SCRATCH_data op1 = stack[*stackIndex-1];
-    (*stackIndex)--;
-    uint16_t result = op1.data.number - op2.data.number;
-    stack[*stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-SCRATCH_implementFunction(gotoxy) {
-    (*stackIndex)--;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    (*stackIndex)--;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    int x;
-    int y;
-    if (op1.type == SCRATCH_NUMBER) {
-        x = op1.data.number;
-    } else return SCRATCH_yieldGeneric;
-    if (op2.type == SCRATCH_NUMBER) {
-        y = op2.data.number;
-    } else return SCRATCH_yieldGeneric;
-    sprite->base.x.halves.high = x;
-    sprite->base.y.halves.high = y;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(movesteps) {
-    (*stackIndex)--;
-    struct SCRATCH_data steps = stack[*stackIndex];
-    float rotation = sprite->base.rotation * degreeToRadian;
-
-    int x = sin(rotation) * steps.data.number;
-    int y = cos(rotation) * steps.data.number;
-    sprite->base.x.halves.high += x;
-    sprite->base.y.halves.high += y;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(turnright) {
-    (*stackIndex)--;
-    struct SCRATCH_data degrees = stack[*stackIndex];
-    sprite->base.rotation += degrees.data.number;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(turnleft) {
-    (*stackIndex)--;
-    struct SCRATCH_data degrees = stack[*stackIndex];
-    sprite->base.rotation -= degrees.data.number;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(glideto) {
-    (*stackIndex)--;
-    struct SCRATCH_data scaledSecs = stack[*stackIndex]; // seconds scaled so that the larger 11 bits is seconds and the smaller 5 are seconds / 32
-    (*stackIndex)--;
-    struct SCRATCH_data x = stack[*stackIndex];
-    (*stackIndex)--;
-    struct SCRATCH_data y = stack[*stackIndex];
-    int32_t xDiff = (x.data.number - sprite->base.x.halves.high) << 16;
-    int32_t yDiff = (y.data.number - sprite->base.y.halves.high) << 16;
-    uint16_t iterations = (scaledSecs.data.number * FRAMESPERSEC) >> 5;
-    if (iterations == 0) {
-        sprite->base.x.halves.high = x.data.number;
-        sprite->base.y.halves.high = y.data.number;
-        thread->operationData.glideData.remainingIterations = 0;
-        return SCRATCH_continue;
-    }
-    thread->operationData.glideData = (struct SCRATCH_glideData) {
-        .stepX = xDiff / iterations,
-        .stepY = yDiff / iterations,
-        .remainingIterations = iterations,
-        .targetX = x.data.number,
-        .targetY = y.data.number,
-    };
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(_glideIteration) {
-    sprite->base.x.i += thread->operationData.glideData.stepX;
-    sprite->base.y.i += thread->operationData.glideData.stepY;
-    thread->operationData.glideData.remainingIterations--;
-    if (thread->operationData.glideData.remainingIterations <= 0) {
-        sprite->base.x.halves.high = thread->operationData.glideData.targetX;
-        sprite->base.y.halves.high = thread->operationData.glideData.targetY;
-        sprite->base.x.halves.low = 0;
-        sprite->base.y.halves.low = 0;
-        return SCRATCH_yieldGeneric;
-    }
-    thread->programCounter--; // re-align program counter with this instruction so it runs again
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(pointindirection) {
-    (*stackIndex)--;
-    struct SCRATCH_data degrees = stack[*stackIndex];
-    sprite->base.rotation = degrees.data.number;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(pointtowards) {
-    (*stackIndex)--;
-    struct SCRATCH_data x = stack[*stackIndex];
-    (*stackIndex)--;
-    struct SCRATCH_data y = stack[*stackIndex];
-    float direction = atan2(y.data.number, x.data.number);
-    direction *= radianToDegree;
-    sprite->base.rotation = (uint16_t) direction;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(setx) {
-    (*stackIndex)--;
-    struct SCRATCH_data x = stack[*stackIndex];
-    sprite->base.x.halves.high = x.data.number;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(changexby) {
-    (*stackIndex)--;
-    struct SCRATCH_data x = stack[*stackIndex];
-    sprite->base.x.halves.high += x.data.number;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(sety) {
-    (*stackIndex)--;
-    struct SCRATCH_data y = stack[*stackIndex];
-    sprite->base.y.halves.high = y.data.number;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(changeyby) {
-    (*stackIndex)--;
-    struct SCRATCH_data y = stack[*stackIndex];
-    sprite->base.y.halves.high += y.data.number;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(setrotationstyle) {
-    (*stackIndex)--;
-    struct SCRATCH_data style = stack[*stackIndex];
-    sprite->base.rotationStyle = style.data.boolean;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(stop) {
-    thread->active = false;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(clone) {
-    int16_t field = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof field;
-    struct SCRATCH_spriteHeader h;
-    struct SCRATCH_sprite* template;
-    if (field == -1) {
-        h = sprite->base;
-        template = sprite;
-    }
-    else {
-        h = sprites[field]->base;
-        template = sprites[field];
-    }
-    struct SCRATCH_sprite* newSprite = SCRATCH_makeNewSprite(h);
-    for (int i = 0; i < h.threadCount; i++) {
-        newSprite->threads[i].base = template->threads[i].base;
-        newSprite->threads[i].active = false;
-        newSprite->threads[i].programCounter = template->threads[i].base.entryPoint;
-    }
-    for (int i = 0; i < h.variableCount; i++) {
-        // variables need to be handled specially because they can hold allocated strings that need to be copied. TODO
-    }
-    SCRATCH_wakeSprite(newSprite, SCRATCH_clone, (union SCRATCH_eventInput) {0});
-    if (!SCRATCH_addSprite(newSprite)) {
-        free(newSprite);
-    }
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(delete) {
-    if (sprite == sprites[sprite->base.id]) {
-        // This is not a clone, it is the original. Scratch does nothing in this case.
-        return SCRATCH_yieldGeneric;
-    }
-}
-
-SCRATCH_implementFunction(wait) {
-    (*stackIndex)--;
-    struct SCRATCH_data scaledSecs = stack[*stackIndex]; // seconds scaled so that the larger 11 bits is seconds and the smaller 5 are seconds / 32
-    uint16_t iterations = (scaledSecs.data.number * FRAMESPERSEC) >> 5;
-    thread->operationData.waitData = (struct SCRATCH_waitData) {
-        .remainingIterations = iterations
-    };
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(_waitIteration) {
-    if (thread->operationData.waitData.remainingIterations <= 0) {
-        return SCRATCH_yieldGeneric;
-    }
-    thread->operationData.waitData.remainingIterations--;
-    thread->programCounter--;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(hide) {
-    sprite->base.visible = false;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(show) {
-    sprite->base.visible = true;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(setSize) {
-    (*stackIndex)--;
-    struct SCRATCH_data size = stack[*stackIndex];
-    sprite->base.size = size.data.number;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(fetchPosition) {
-    int16_t value = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof value;
-    if (value == -1) { // random position
-        stack[*stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = (rand() % 500) - 250},
-        };
-        (*stackIndex)++;
-        stack[*stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = (rand() % 400) - 200},
-        };
-        (*stackIndex)++;
-    }
-    else if (value == -2) { // mouse position (not handled for this VM)
-        stack[*stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = 0},
-        };
-        (*stackIndex)++;
-        stack[*stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = 0},
-        };
-        (*stackIndex)++;
-    }
-    else { // a sprite's position
-        struct SCRATCH_sprite* s = sprites[value];
-        stack[*stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = s->base.y.halves.high},
-        };
-        (*stackIndex)++;
-        stack[*stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = s->base.x.halves.high},
-        };
-        (*stackIndex)++;
-    }
-}
-
-SCRATCH_implementFunction(fetchRandom) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data low = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data high = stack[*stackIndex];
-    int lowValue = low.data.number;
-    int highValue = high.data.number;
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = (rand() % highValue + lowValue) + lowValue}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(multiply) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = op1.data.number / op2.data.number}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(divide) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = op1.data.number / op2.data.number}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(setCostume) {
-    int16_t index = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof index;
-    sprite->base.costumeIndex = index;
-    return SCRATCH_yieldGeneric;
-
-}
-
-SCRATCH_implementFunction(nextCostume) {
-    sprite->base.costumeIndex += 1;
-    sprite->base.costumeIndex %= sprite->base.costumeMax;
-    return SCRATCH_yieldGeneric;
-}
-
-SCRATCH_implementFunction(greaterThan) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number > op2.data.number}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(equal) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number == op2.data.number}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(lessThan) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number < op2.data.number}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(greaterEqual) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number >= op2.data.number}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(lessEqual) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number <= op2.data.number}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(or) {
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[*stackIndex];
-    (*stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[*stackIndex];
-    stack[*stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number || op2.data.number}
-    };
-    (*stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(looksSay) {
-}
-
+/*
 SCRATCH_function operations[MAXOPCODE] = {
-    [SCRATCH_loopInit] = loopInit,
-    [SCRATCH_loopIncrement] = loopIncrement,
-    [SCRATCH_jumpIfRepeatDone] = jumpIfRepeatDone,
-    [SCRATCH_jumpIf] = jumpIf,
-    [SCRATCH_jumpIfNot] = jumpIfNot,
-    [SCRATCH_fetch] = fetch,
-    [SCRATCH_fetchInput] = fetchInput,
-    [SCRATCH_push] = push,
-    [SCRATCH_add] = add,
-    [SCRATCH_sub] = sub,
-    [SCRATCH_gotoxy] = gotoxy,
-    [SCRATCH_turnright] = turnright,
-    [SCRATCH_turnleft] = turnleft,
-    [SCRATCH_movesteps] = movesteps,
-    [SCRATCH_glideto] = glideto,
-    [SCRATCH__glideIteration] = _glideIteration,
-    [SCRATCH_pointindirection] = pointindirection,
-    [SCRATCH_pointtowards] = pointtowards,
-    [SCRATCH_changexby] = changexby,
-    [SCRATCH_setx] = setx,
-    [SCRATCH_changeyby] = changeyby,
-    [SCRATCH_sety] = sety,
-    [SCRATCH_loopJump] = loopJump,
-    [SCRATCH_setrotationstyle] = setrotationstyle,
-    [SCRATCH_DEBUGEXPRESSION] = DEBUG,
-    [SCRATCH_DEBUGSTATEMENT] = DEBUG,
-    [SCRATCH_stop] = stop,
-    [SCRATCH_looksSay] = looksSay,
-    [SCRATCH_loadVar] = loadVar,
-    [SCRATCH_setVar] = setVar,
-    [SCRATCH_incVar] = incVar,
-    [SCRATCH_loadVarLocal] = loadVarLocal,
-    [SCRATCH_setVarLocal] = setVarLocal,
-    [SCRATCH_incVarLocal] = incVarLocal,
-    [SCRATCH_clone] = clone,
-    [SCRATCH_delete] = delete,
-    [SCRATCH_wait] = wait,
-    [SCRATCH__waitIteration] = _waitIteration,
-    [SCRATCH_hide] = hide,
-    [SCRATCH_show] = show,
-    [SCRATCH_setSize] = setSize,
-    [SCRATCH_fetchPosition] = fetchPosition,
-    [SCRATCH_setCostume] = setCostume,
-    [SCRATCH_nextCostume] = nextCostume,
-    [SCRATCH_multiply] = multiply,
-    [SCRATCH_divide] = divide,
-    [SCRATCH_greaterThan] = greaterThan,
-    [SCRATCH_equal] = equal,
-    [SCRATCH_lessThan] = lessThan,
-    [SCRATCH_lessEqual] = lessEqual,
-    [SCRATCH_greaterEqual] = greaterEqual,
-    [SCRATCH_or] = or,
-    [SCRATCH_fetchRandom] = fetchRandom,
+    STOP,
+    PARTITION_BEGINLOOPCONTROL,
+    LOOPINIT,
+    LOOPINCREMENT,
+    JUMPIFREPEATDONE,
+    PARTITION_BEGINEXPRESSIONS,
+    ANSWER,
+    MOUSEDOWN,
+    MOUSEX,
+    MOUSEY,
+    KEYPRESSED,
+    LOUDNESS,
+    TIMER,
+    CURRENT,
+    DAYSSINCE2000,
+    USERNAME,
+    FETCHINPUT,
+    FETCHVAR,
+    XPOSITION,
+    YPOSITION,
+    DIRECTION,
+    COSTUME,
+    SIZE,
+    COSTUMENUMBERNAME,
+    BACKDROPNUMBERNAME,
+    TOUCHINGOBJECT,
+    TOUCHINGOBJECTMENU,
+    TOUCHINGCOLOR,
+    COLORISTOUCHINGCOLOR,
+    DISTANCETO,
+    DISTANCETOMENU,
+    ASKANDWAIT,
+    KEYOPTIONS,
+    SETDRAGMODE,
+    RESETTIMER,
+    OF,
+    OF_OBJECT_MENU,
+    PUSH,
+    ADD,
+    SUBTRACT,
+    MULTIPLY,
+    DIVIDE,
+    RANDOM,
+    GT,
+    LT,
+    EQUALS,
+    GE,
+    AND,
+    OR,
+    NOT,
+    JOIN,
+    LETTER_OF,
+    LENGTH,
+    CONTAINS,
+    MOD,
+    ROUND,
+    MATHOP,
+    DEBUGEXPRESSION,
+    PARTITION_BEGINSTATEMENTS,
+    SETVARIABLETO,
+    CHANGEVARIABLEBY,
+    SHOWVARIABLE,
+    HIDEVARIABLE,
+    LOOPJUMP,
+    CREATE_CLONE_OF,
+    WAIT,
+    REPEAT,
+    FOREVER,
+    IF,
+    IF_ELSE,
+    WAIT_UNTIL,
+    REPEAT_UNTIL,
+    CREATE_CLONE_OF_MENU,
+    DELETE_THIS_CLONE,
+    JUMPIF,
+    JUMPIFNOT,
+    JUMP,
+    _GLIDEITERATION,
+    MOVESTEPS,
+    TURNRIGHT,
+    GOTO,
+    GOTO_MENU,
+    GOTOXY,
+    GLIDETO,
+    GLIDETO_MENU,
+    GLIDESECSTOXY,
+    POINTINDIRECTION,
+    POINTTOWARDS,
+    POINTTOWARDS_MENU,
+    CHANGEXBY,
+    SETX,
+    CHANGEYBY,
+    SETY,
+    IFONEDGEBOUNCE,
+    SETROTATIONSTYLE,
+    SAY,
+    THINKFORSECS,
+    THINK,
+    SWITCHCOSTUMETO,
+    NEXTCOSTUME,
+    SWITCHBACKDROPTO,
+    BACKDROPS,
+    NEXTBACKDROP,
+    CHANGESIZEBY,
+    SETSIZETO,
+    CHANGEEFFECTBY,
+    SETEFFECTTO,
+    CLEARGRAPHICEFFECTS,
+    SHOW,
+    HIDE,
+    GOTOFRONTBACK,
+    GOFORWARDBACKWARDLAYERS,
+    _WAITITERATION,
+    DEBUGSTATEMENT,
 };
+*/
 
 void handleInputs() {
     for (int i = 0; i < 5; i++) {
@@ -641,12 +150,17 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, 
     int stackIndex = 0;
     enum SCRATCH_opcode operation;
     while (true) {
-        printf("programCounter: %d\n", thread->programCounter);
         operation = code[thread->programCounter++];
-        printf("opcode: ");
-        SCRATCH_printOpcodeName(operation);
+        // new proposed:
+        enum SCRATCH_continueStatus status;
+        switch (operation) {
+            #include "opcodeImpl.inc"
+        }
+        if (operation > INNER_PARTITION_BEGINSTATEMENTS) return status; // A block has completed
+        /* old:
         enum SCRATCH_continueStatus status = operations[operation](sprite, (struct SCRATCH_data*) stack, &stackIndex, thread);
         if (operation > SCRATCH_PARTITION_BEGINSTATEMENTS) return status; // A block has completed
+        */
     }
 }
 
