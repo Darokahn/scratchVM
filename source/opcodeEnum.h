@@ -25,6 +25,7 @@ enum SCRATCH_opcode : uint8_t {
     SENSING_DAYSSINCE2000,          // RETURNS FOR JAN 1ST 2025
     SENSING_USERNAME,
     INNER_FETCHINPUT,
+    INNER_FETCHPOSITION,
     INNER_FETCHVAR,
     MOTION_XPOSITION,
     MOTION_YPOSITION,
@@ -47,7 +48,7 @@ enum SCRATCH_opcode : uint8_t {
     SENSING_OF,                     // IMPLEMENTED VIA FETCH SERIES OF OPCODES
     SENSING_OF_OBJECT_MENU,         // UNUSED
 
-    INNER_PUSH,
+    INNER_PUSHNUMBER,
 
     OPERATOR_ADD,
     OPERATOR_SUBTRACT,
@@ -77,6 +78,7 @@ enum SCRATCH_opcode : uint8_t {
     // Statement opcodes. Statements always leave the stack empty, unless there has been an error in compilation or implementation.
     DATA_SETVARIABLETO,          // Set a variable                                           @field variable index @input data
     DATA_CHANGEVARIABLEBY,          // increment a variable                                     @field variable index @input amount
+    INNER_CHANGEVARIABLEBYLOCAL,          // increment a variable                                     @field variable index @input amount
     DATA_SHOWVARIABLE,
     DATA_HIDEVARIABLE,
 
@@ -100,6 +102,7 @@ enum SCRATCH_opcode : uint8_t {
 
     MOTION_MOVESTEPS,
     MOTION_TURNRIGHT,
+    MOTION_TURNLEFT,
     MOTION_GOTO,
     MOTION_GOTO_MENU,
     MOTION_GOTOXY,
