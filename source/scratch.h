@@ -57,8 +57,7 @@ struct SCRATCH_sprite;
 struct SCRATCH_thread;
 
 union SCRATCH_field {
-    int number;
-    float fraction;
+    scaledInt32 number;
     bool boolean;
     char* string;
     uint8_t spriteID;

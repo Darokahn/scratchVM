@@ -80,12 +80,12 @@ case INNER_FETCHPOSITION: {
     if (value == -1) { // random position
         stack[stackIndex] = (struct SCRATCH_data) {
             .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = (rand() % 500) - 250},
+            .data = (union SCRATCH_field) {.number = ((rand() % 500) - 250) << 16},
         };
         (stackIndex)++;
         stack[stackIndex] = (struct SCRATCH_data) {
             .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = (rand() % 400) - 200},
+            .data = (union SCRATCH_field) {.number = ((rand() % 400) - 200) << 16},
         };
         (stackIndex)++;
     }
@@ -105,12 +105,12 @@ case INNER_FETCHPOSITION: {
         struct SCRATCH_sprite* s = sprites[value];
         stack[stackIndex] = (struct SCRATCH_data) {
             .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = s->base.y.halves.high},
+            .data = (union SCRATCH_field) {.number = s->base.y},
         };
         (stackIndex)++;
         stack[stackIndex] = (struct SCRATCH_data) {
             .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = s->base.x.halves.high},
+            .data = (union SCRATCH_field) {.number = s->base.x},
         };
         (stackIndex)++;
     }
@@ -182,7 +182,7 @@ case INNER_PUSHNUMBER: {
     thread->programCounter += sizeof(type);
     uint16_t field = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof(field);
-    stack[stackIndex] = (struct SCRATCH_data) {type, {.number = field}};
+    stack[stackIndex] = (struct SCRATCH_data) {type, {.number = field << 16}};
     (stackIndex) += 1;
     status = SCRATCH_continue;
     break;
@@ -192,7 +192,7 @@ case OPERATOR_ADD: {
     (stackIndex)--;
     struct SCRATCH_data op1 = stack[stackIndex-1];
     (stackIndex)--;
-    int16_t result = op1.data.number + op2.data.number;
+    scaledInt32 result = op1.data.number.i + op2.data.number.i;
     stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
     (stackIndex) += 1;
     status = SCRATCH_continue;
@@ -203,8 +203,8 @@ case OPERATOR_SUBTRACT: {
     (stackIndex)--;
     struct SCRATCH_data op1 = stack[stackIndex-1];
     (stackIndex)--;
-    int16_t result = op1.data.number - op2.data.number;
-    stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
+    int32_t result = op1.data.number.i - op2.data.number.i;
+    stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.data.i = result}};
     (stackIndex) += 1;
     status = SCRATCH_continue;
     break;
@@ -216,7 +216,7 @@ case OPERATOR_MULTIPLY: {
     struct SCRATCH_data op2 = stack[stackIndex];
     stack[stackIndex] = (struct SCRATCH_data) {
         .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = op1.data.number * op2.data.number}
+        .data = (union SCRATCH_field) {.number = op1.data.number.i * op2.data.number.i}
     };
     (stackIndex) += 1;
     status = SCRATCH_continue;
@@ -229,7 +229,7 @@ case OPERATOR_DIVIDE: {
     struct SCRATCH_data op2 = stack[stackIndex];
     stack[stackIndex] = (struct SCRATCH_data) {
         .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = op1.data.number / op2.data.number}
+        .data = (union SCRATCH_field) {.number = op1.data.number.i / op2.data.number.i}
     };
     (stackIndex) += 1;
     status = SCRATCH_continue;
@@ -240,11 +240,11 @@ case OPERATOR_RANDOM: {
     struct SCRATCH_data low = stack[stackIndex];
     (stackIndex) -= 1;
     struct SCRATCH_data high = stack[stackIndex];
-    int lowValue = low.data.number;
-    int highValue = high.data.number;
+    scaledInt32 lowValue = low.data.number;
+    scaledInt32 highValue = high.data.number;
     stack[stackIndex] = (struct SCRATCH_data) {
         .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = (rand() % (highValue - lowValue)) + lowValue}
+        .data = (union SCRATCH_field) {.number = (rand() % (highValue.halves.high - lowValue.halves.high)) + lowValue.halves.high}
     };
     (stackIndex) += 1;
     status = SCRATCH_continue;
