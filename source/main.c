@@ -32,7 +32,7 @@ int main() {
     unsigned long next = getNow() + interval;
     initData(header, programData, sprites, imageTable);
     //
-    code = insertedCode;
+    //code = insertedCode;
     //
     startGraphics();
     drawSprites(sprites, header.spriteCount, imageTable);
