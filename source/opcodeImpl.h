@@ -2,9 +2,14 @@
 
 #define ERROR() // Nothing for now
 #define INTERPRET_AS(type, value) *(type*)&(value)
-#define POP() stack[--stackIndex]
-#define PUSH(value) stack[stackIndex++] = value;
-#define CAST(value, SCRATCHTYPE)
+#define POPNUMBER() stack[--stackIndex]
+#define POPBOOL() stack[--stackIndex]
+#define POPID() stack[--stackIndex]
+#define POPDEGREES() stack[--stackIndex]
+#define PUSHNUMBER(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.halves.high=value}};
+#define PUSHFRACTION(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.i=value}};
+#define PUSHBOOL(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_BOOL, {.boolean=value}};
+#define PUSHDATA(value) stack[stackIndex++] = value;
 
 case INNER_PARTITION_BEGINLOOPCONTROL: {
     ERROR();
@@ -33,6 +38,7 @@ case INNER_JUMPIFREPEATDONE: {
     break;
 }
 case INNER_PARTITION_BEGINEXPRESSIONS: {
+    // Not to be implemented
     ERROR();
     break;
 }
@@ -42,36 +48,43 @@ case SENSING_ANSWER: {
     break;
 }
 case SENSING_MOUSEDOWN: {
+    PUSHBOOL(false);
+    status = SCRATCH_continue;
     break;
 }
 case SENSING_MOUSEX: {
+    PUSHNUMBER(0);
+    status = SCRATCH_continue;
     break;
 }
 case SENSING_MOUSEY: {
-    break;
+    PUSHNUMBER(0);
+    status = SCRATCH_continue;
 }
 case SENSING_KEYPRESSED: {
+    // return a value from the inputs array, with an int16 index gotten from the next few bytes of instructions
     break;
 }
 case SENSING_LOUDNESS: {
-    break;
+    PUSHNUMBER(0);
+    status = SCRATCH_continue;
 }
 case SENSING_TIMER: {
-    break;
+    // push the value of the global timer
 }
 case SENSING_CURRENT: {
-    break;
+    // Get enumerated request type from (uint16_t) code; push 2025 for year, (whichever day that was) for day, and 0 for rest
 }
 case SENSING_DAYSSINCE2000: {
-    break;
+    // push however many days it was from jan 1 2000 to jan 1 2025
 }
 case SENSING_USERNAME: {
-    break;
+    // push global username string
 }
 case INNER_FETCHINPUT: {
     uint16_t toFetch = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof(toFetch);
-    PUSH( ((struct SCRATCH_data) {SCRATCH_BOOL, {.boolean = inputState[toFetch]}}));
+    PUSHBOOL(inputState[toFetch]);
     status = SCRATCH_continue;
     break;
 }
@@ -79,256 +92,210 @@ case INNER_FETCHPOSITION: {
     uint16_t value = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof value;
     if (value == -1) { // random position
-        stack[stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = ((rand() % 500) - 250) << 16},
-        };
-        (stackIndex)++;
-        stack[stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = ((rand() % 400) - 200) << 16},
-        };
-        (stackIndex)++;
+        PUSHNUMBER(rand() % 500 - 250);
+        PUSHNUMBER(rand() % 400 - 200);
     }
     else if (value == -2) { // mouse position (not handled for this VM)
-        stack[stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = 0},
-        };
-        (stackIndex)++;
-        stack[stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = 0},
-        };
-        (stackIndex)++;
+        PUSHNUMBER(0);
+        PUSHNUMBER(0);
     }
     else { // a sprite's position
         struct SCRATCH_sprite* s = sprites[value];
-        stack[stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = s->base.y},
-        };
-        (stackIndex)++;
-        stack[stackIndex] = (struct SCRATCH_data) {
-            .type = SCRATCH_NUMBER,
-            .data = (union SCRATCH_field) {.number = s->base.x},
-        };
-        (stackIndex)++;
+        PUSHFRACTION(s->base.y.i);
+        PUSHFRACTION(s->base.x.i);
     }
     status = SCRATCH_continue;
     break;
 }
 case INNER_FETCHVAR: {
-    break;
+    // push a variable specified by (uint16_t) code of the sprite specified by (uint16_t) code
 }
 case MOTION_XPOSITION: {
-    break;
+    // push the x position of the sprite specified by (uint16_6) code
 }
 case MOTION_YPOSITION: {
-    break;
+    // push the y position of the sprite specified by (uint16_6) code
 }
 case MOTION_DIRECTION: {
-    break;
+    // push the direction of the sprite specified by (uint16_6) code
 }
 case LOOKS_COSTUME: {
-    break;
+    // push the costume of the sprite specified by (uint16_6) code
 }
 case LOOKS_SIZE: {
-    break;
+    // push the size of the sprite specified by (uint16_6) code
 }
 case LOOKS_COSTUMENUMBERNAME: {
-    break;
+    break; // I need to look into this one
 }
 case LOOKS_BACKDROPNUMBERNAME: {
-    break;
+    break; // I need to look into this one
 }
 case SENSING_TOUCHINGOBJECT: {
-    break;
+    // push whether the current sprite is touching the sprite specified by (uint16_t) code
 }
 case SENSING_TOUCHINGOBJECTMENU: {
+    ERROR(); // unused
     break;
 }
 case SENSING_TOUCHINGCOLOR: {
+    ERROR(); // unused
     break;
 }
 case SENSING_COLORISTOUCHINGCOLOR: {
+    ERROR() // unused
     break;
 }
 case SENSING_DISTANCETO: {
-    break;
+    // push the distance to the sprite specified by (uint16_6) code
 }
 case SENSING_DISTANCETOMENU: {
+    ERROR(); // unused
     break;
 }
 case SENSING_ASKANDWAIT: {
-    break;
+    // set the talking string (variable 0) of the current sprite to the string specified by the top of stack
+    // immediately push empty string
 }
 case SENSING_KEYOPTIONS: {
-    break;
+    // I have to look into this one
 }
 case SENSING_SETDRAGMODE: {
+    ERROR(); // unused
     break;
 }
 case SENSING_RESETTIMER: {
-    break;
+    // set the value of the global timer to 0
 }
 case SENSING_OF: {
+    ERROR(); // unused
     break;
 }
 case SENSING_OF_OBJECT_MENU: {
+    ERROR(); // unused
     break;
 }
 case INNER_PUSHNUMBER: {
     scaledInt32 field = INTERPRET_AS(scaledInt32, code[thread->programCounter]);
     thread->programCounter += sizeof(field);
-    stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = field}};
-    (stackIndex) += 1;
+    PUSHFRACTION(field.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_ADD: {
-    struct SCRATCH_data op2 = stack[stackIndex-1];
-    (stackIndex)--;
-    struct SCRATCH_data op1 = stack[stackIndex-1];
-    (stackIndex)--;
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
     scaledInt32 result = {.i =op1.data.number.i + op2.data.number.i};
-    stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
-    (stackIndex) += 1;
+    PUSHFRACTION(result.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_SUBTRACT: {
-    struct SCRATCH_data op2 = stack[stackIndex-1];
-    (stackIndex)--;
-    struct SCRATCH_data op1 = stack[stackIndex-1];
-    (stackIndex)--;
-    int32_t result = op1.data.number.i - op2.data.number.i;
-    stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.i = result}};
-    (stackIndex) += 1;
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
+    scaledInt32 result = {.i = op1.data.number.i - op2.data.number.i};
+    PUSHFRACTION(result.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_MULTIPLY: {
-    (stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[stackIndex];
-    (stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[stackIndex];
-    stack[stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = op1.data.number.i * op2.data.number.i}
-    };
-    (stackIndex) += 1;
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
+    PUSHFRACTION(op1.data.number.i * op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_DIVIDE: {
-    (stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[stackIndex];
-    (stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[stackIndex];
-    stack[stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = op1.data.number.i / op2.data.number.i}
-    };
-    (stackIndex) += 1;
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
+    PUSHFRACTION(op1.data.number.i / op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_RANDOM: {
-    (stackIndex) -= 1;
-    struct SCRATCH_data low = stack[stackIndex];
-    (stackIndex) -= 1;
-    struct SCRATCH_data high = stack[stackIndex];
+    struct SCRATCH_data high = POPNUMBER();
+    struct SCRATCH_data low = POPNUMBER();
     scaledInt32 lowValue = low.data.number;
     scaledInt32 highValue = high.data.number;
-    stack[stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.number = (rand() % (highValue.halves.high - lowValue.halves.high)) + lowValue.halves.high}
-    };
-    (stackIndex) += 1;
+    PUSHNUMBER(rand() % highValue.halves.high + lowValue.halves.high);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_GT: {
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
+    PUSHBOOL(op1.data.number.i > op2.data.number.i);
+    status = SCRATCH_continue;
     break;
 }
 case OPERATOR_LT: {
-    (stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[stackIndex];
-    (stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[stackIndex];
-    stack[stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number.i < op2.data.number.i}
-    };
-    (stackIndex) += 1;
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
+    PUSHBOOL(op1.data.number.i < op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_EQUALS: {
-    (stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[stackIndex];
-    (stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[stackIndex];
-    stack[stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number.i == op2.data.number.i}
-    };
-    (stackIndex) += 1;
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
+    PUSHBOOL(op1.data.number.i == op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
-case OPERATOR_GE: {
-    (stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[stackIndex];
-    (stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[stackIndex];
-    stack[stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number.i > op2.data.number.i}
-    };
-    (stackIndex) += 1;
+case INNER_GE: {
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
+    PUSHBOOL(op1.data.number.i >= op2.data.number.i);
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_LE: {
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
+    PUSHBOOL(op1.data.number.i <= op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_AND: {
+    struct SCRATCH_data op2 = POPBOOL();
+    struct SCRATCH_data op1 = POPBOOL();
+    PUSHBOOL(op1.data.boolean && op2.data.boolean);
+    status = SCRATCH_continue;
     break;
 }
 case OPERATOR_OR: {
-    (stackIndex) -= 1;
-    struct SCRATCH_data op1 = stack[stackIndex];
-    (stackIndex) -= 1;
-    struct SCRATCH_data op2 = stack[stackIndex];
-    stack[stackIndex] = (struct SCRATCH_data) {
-        .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.boolean || op2.data.boolean}
-    };
-    (stackIndex) += 1;
+    struct SCRATCH_data op2 = POPBOOL();
+    struct SCRATCH_data op1 = POPBOOL();
+    PUSHBOOL(op1.data.boolean || op2.data.boolean);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_NOT: {
+    struct SCRATCH_data op1 = POPBOOL();
+    PUSHBOOL(!op1.data.boolean);
+    status = SCRATCH_continue;
     break;
 }
 case OPERATOR_JOIN: {
-    break;
+    // pop two strings and join them
 }
 case OPERATOR_LETTER_OF: {
-    break;
+    // pop string, pop index, push string[index]
 }
 case OPERATOR_LENGTH: {
-    break;
+    // pop string, push length
 }
 case OPERATOR_CONTAINS: {
-    break;
+    // pop string, pop substring, push `substring in string`
 }
 case OPERATOR_MOD: {
-    break;
+    break; // I need to look into this (default number in scratch is float, so I need to figure out what the behavior is)
 }
 case OPERATOR_ROUND: {
-    break;
+    // pop number, push rounded (not banker's rounding)
 }
 case OPERATOR_MATHOP: {
+    ERROR(); // unused
     break;
 }
 case INNER_DEBUGEXPRESSION: {
@@ -337,6 +304,7 @@ case INNER_DEBUGEXPRESSION: {
     break;
 }
 case INNER_PARTITION_BEGINSTATEMENTS: {
+    ERROR(); // unused
     break;
 }
 case DATA_SETVARIABLETO: {
@@ -358,8 +326,7 @@ case DATA_CHANGEVARIABLEBY: {
 case INNER_CHANGEVARIABLEBYLOCAL: {
     uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = stack[stackIndex-1];
-    (stackIndex) -= 1;
+    struct SCRATCH_data value = POPNUMBER();
     sprite->variables[varIndex].data.number.i += value.data.number.i;
     status = SCRATCH_continue;
     break;
@@ -406,8 +373,7 @@ case CONTROL_CREATE_CLONE_OF: {
     break;
 }
 case CONTROL_WAIT: {
-    (stackIndex)--;
-    struct SCRATCH_data scaledSecs = stack[stackIndex];
+    struct SCRATCH_data scaledSecs = POPNUMBER();
     uint16_t iterations = ((scaledSecs.data.number.i * FRAMESPERSEC) >> 16);
     thread->operationData.waitData = (struct SCRATCH_waitData) {
         .remainingIterations = iterations
@@ -453,8 +419,7 @@ case CONTROL_STOP: {
 case INNER_JUMPIF: {
     uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof jumpTo;
-    struct SCRATCH_data evaluand = stack[stackIndex-1];
-    (stackIndex) -= 1;
+    struct SCRATCH_data evaluand = POPBOOL();
     if (evaluand.data.boolean) {
         thread->programCounter = jumpTo;
     }
@@ -464,8 +429,7 @@ case INNER_JUMPIF: {
 case INNER_JUMPIFNOT: {
     uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof jumpTo;
-    struct SCRATCH_data evaluand = stack[stackIndex-1];
-    stackIndex -= 1;
+    struct SCRATCH_data evaluand = POPBOOL();
     if (!evaluand.data.boolean) {
         thread->programCounter = jumpTo;
     }
@@ -473,10 +437,12 @@ case INNER_JUMPIFNOT: {
     break;
 }
 case INNER_JUMP: {
+    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof jumpTo;
+    thread->programCounter = jumpTo;
     break;
 }
 case INNER__GLIDEITERATION: {
-    machineLog("test\n");
     sprite->base.x.i += thread->operationData.glideData.stepX.i;
     sprite->base.y.i += thread->operationData.glideData.stepY.i;
     thread->operationData.glideData.remainingIterations--;
@@ -490,8 +456,7 @@ case INNER__GLIDEITERATION: {
     break;
 }
 case MOTION_MOVESTEPS: {
-    (stackIndex)--;
-    struct SCRATCH_data steps = stack[stackIndex];
+    struct SCRATCH_data steps = POPNUMBER();
     float rotation = sprite->base.rotation * degreeToRadian;
 
     int x = sin(rotation) * steps.data.number.halves.high;
@@ -502,42 +467,45 @@ case MOTION_MOVESTEPS: {
     break;
 }
 case MOTION_TURNRIGHT: {
-    (stackIndex)--;
-    struct SCRATCH_data degrees = stack[stackIndex];
+    struct SCRATCH_data degrees = POPDEGREES();
     sprite->base.rotation += degrees.data.degrees;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_TURNLEFT: {
-    (stackIndex)--;
-    struct SCRATCH_data degrees = stack[stackIndex];
+    struct SCRATCH_data degrees = POPDEGREES();
     sprite->base.rotation -= degrees.data.degrees;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_GOTO: {
+    ERROR(); // unused
     break;
 }
 case MOTION_GOTO_MENU: {
+    ERROR(); // unused
     break;
 }
 case MOTION_GOTOXY: {
-    (stackIndex)--;
-    struct SCRATCH_data op2 = stack[stackIndex];
-    (stackIndex)--;
-    struct SCRATCH_data op1 = stack[stackIndex];
+    struct SCRATCH_data op2 = POPNUMBER();
+    struct SCRATCH_data op1 = POPNUMBER();
     sprite->base.x = op1.data.number;
     sprite->base.y = op2.data.number;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_GLIDETO: {
-    (stackIndex)--;
-    struct SCRATCH_data scaledSecs = stack[stackIndex];
-    (stackIndex)--;
-    struct SCRATCH_data x = stack[stackIndex];
-    (stackIndex)--;
-    struct SCRATCH_data y = stack[stackIndex];
+    ERROR(); // unused
+    break;
+}
+case MOTION_GLIDETO_MENU: {
+    ERROR(); // unused
+    break;
+}
+case MOTION_GLIDESECSTOXY: {
+    struct SCRATCH_data scaledSecs = POPNUMBER();
+    struct SCRATCH_data x = POPNUMBER();
+    struct SCRATCH_data y = POPNUMBER();
     scaledInt32 xDiff = {.i = x.data.number.i - sprite->base.x.i};
     scaledInt32 yDiff = {.i = y.data.number.i - sprite->base.y.i};
     uint16_t iterations = (scaledSecs.data.number.i * FRAMESPERSEC) >> 16;
@@ -557,24 +525,15 @@ case MOTION_GLIDETO: {
     status = SCRATCH_continue;
     break;
 }
-case MOTION_GLIDETO_MENU: {
-    break;
-}
-case MOTION_GLIDESECSTOXY: {
-    break;
-}
 case MOTION_POINTINDIRECTION: {
-    (stackIndex)--;
-    struct SCRATCH_data degrees = stack[stackIndex];
+    struct SCRATCH_data degrees = POPDEGREES();
     sprite->base.rotation = degrees.data.degrees;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_POINTTOWARDS: {
-    (stackIndex)--;
-    struct SCRATCH_data x = stack[stackIndex];
-    (stackIndex)--;
-    struct SCRATCH_data y = stack[stackIndex];
+    struct SCRATCH_data x = POPNUMBER();
+    struct SCRATCH_data y = POPNUMBER();
     float direction = atan2(y.data.number.halves.high, x.data.number.halves.high);
     direction *= radianToDegree;
     sprite->base.rotation = (uint16_t) direction;
@@ -582,54 +541,51 @@ case MOTION_POINTTOWARDS: {
     break;
 }
 case MOTION_POINTTOWARDS_MENU: {
+    ERROR(); // unused
     break;
 }
 case MOTION_CHANGEXBY: {
-    (stackIndex)--;
-    struct SCRATCH_data x = stack[stackIndex];
+    struct SCRATCH_data x = POPNUMBER();
     sprite->base.x.i += x.data.number.i;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_SETX: {
-    (stackIndex)--;
-    struct SCRATCH_data x = stack[stackIndex];
+    struct SCRATCH_data x = POPNUMBER();
     sprite->base.x = x.data.number;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_CHANGEYBY: {
-    (stackIndex)--;
-    struct SCRATCH_data y = stack[stackIndex];
+    struct SCRATCH_data y = POPNUMBER();
     sprite->base.y.i += y.data.number.i;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_SETY: {
-    (stackIndex)--;
-    struct SCRATCH_data y = stack[stackIndex];
+    struct SCRATCH_data y = POPNUMBER();
     sprite->base.y = y.data.number;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_IFONEDGEBOUNCE: {
-    break;
+    // detect whether any amount of sprite is off edge, then if so flip the sprite's angle
 }
 case MOTION_SETROTATIONSTYLE: {
-    (stackIndex)--;
-    struct SCRATCH_data style = stack[stackIndex];
-    sprite->base.rotationStyle = style.data.boolean;
+    struct SCRATCH_data style = POPID();
+    sprite->base.rotationStyle = style.data.id;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case LOOKS_SAY: {
-    break;
+    // set the sprite's first variable to the string popped from the stack
 }
 case LOOKS_THINKFORSECS: {
+    ERROR(); // unused
     break;
 }
 case LOOKS_THINK: {
-    break;
+    // set the sprite's first variable to the string popped from the stack
 }
 case LOOKS_SWITCHCOSTUMETO: {
     int16_t index = INTERPRET_AS(uint16_t, code[thread->programCounter]);
@@ -657,19 +613,21 @@ case LOOKS_CHANGESIZEBY: {
     break;
 }
 case LOOKS_SETSIZETO: {
-    (stackIndex)--;
-    struct SCRATCH_data size = stack[stackIndex];
+    struct SCRATCH_data size = POPNUMBER();
     sprite->base.size = size.data.number.halves.high;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case LOOKS_CHANGEEFFECTBY: {
+    ERROR(); // unused
     break;
 }
 case LOOKS_SETEFFECTTO: {
+    ERROR(); // unused
     break;
 }
 case LOOKS_CLEARGRAPHICEFFECTS: {
+    ERROR(); // unused
     break;
 }
 case LOOKS_SHOW: {
@@ -683,9 +641,11 @@ case LOOKS_HIDE: {
     break;
 }
 case LOOKS_GOTOFRONTBACK: {
+    ERROR(); // unused
     break;
 }
 case LOOKS_GOFORWARDBACKWARDLAYERS: {
+    ERROR(); // unused
     break;
 }
 case INNER__WAITITERATION: {
@@ -702,46 +662,3 @@ case INNER_DEBUGSTATEMENT: {
     status = SCRATCH_yieldGeneric;
     break;
 }
-
-
-/*
-SCRATCH_implementFunction(loadVar) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    stack[stackIndex] = sprites[0]->variables[varIndex];
-    (stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(setVar) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = stack[stackIndex-1];
-    (stackIndex) -= 1;
-    sprites[0]->variables[varIndex] = value;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(loadVarLocal) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    stack[stackIndex] = sprite->variables[varIndex];
-    (stackIndex) += 1;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(setVarLocal) {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = stack[stackIndex-1];
-    (stackIndex) -= 1;
-    sprite->variables[varIndex] = value;
-    return SCRATCH_continue;
-}
-
-SCRATCH_implementFunction(looksSay) {
-}
-
-*/
-#undef ERROR
-#undef INTERPRET_AS

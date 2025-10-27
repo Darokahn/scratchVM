@@ -23,7 +23,7 @@ enum SCRATCH_opcode insertedCode[] = {
     INNER_PUSHNUMBER, 0x0, 0x0, 0xf0, 0xff,
     INNER_PUSHNUMBER, 0x0, 0x0, 0xf0, 0xff,
     INNER_PUSHNUMBER, 0x0, 0x0, 0x2, 0x00,
-    MOTION_GLIDETO,
+    MOTION_GLIDESECSTOXY,
     INNER__GLIDEITERATION,
     CONTROL_STOP,
 };

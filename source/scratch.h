@@ -52,8 +52,7 @@ enum SCRATCH_fieldType : uint8_t {
     SCRATCH_NUMBER,
     SCRATCH_DEGREES,
     SCRATCH_STRING,
-    SCRATCH_SPRITE,
-    SCRATCH_COLOR,
+    SCRATCH_ID,
 };
 
 union SCRATCH_field {
@@ -61,8 +60,7 @@ union SCRATCH_field {
     uint16_t degrees;
     bool boolean;
     char* string;
-    uint8_t spriteID;
-    uint8_t color;
+    uint8_t id;
 };
 
 struct SCRATCH_data {

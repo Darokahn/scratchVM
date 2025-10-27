@@ -53,6 +53,7 @@ export function processField(field) {
 }
 
 export function processBlock(block) {
+    // stripped version of the block that contains everything we need
     let processed = {
         opcode: block.opcode,
         next: block.next,
@@ -64,7 +65,7 @@ export function processBlock(block) {
         processed.inputs[key] = processInput(value);
     }
     for (let [key, value] of Object.entries(block.fields)) {
-        processed.inputs[key] = processField(value);
+        processed.fields[key] = processField(value);
     }
     return processed;
 }
@@ -73,4 +74,7 @@ export function processBlocks(blocks) {
     for (let [key, value] of Object.entries(blocks)) {
         blocks[key] = processBlock(value);
     }
+}
+
+export function compileBlock(block, code) {
 }

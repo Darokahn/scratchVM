@@ -31,10 +31,11 @@ extern "C" void startGraphics() {
     tft.init();
     tft.setRotation(1);
     tftSprite.createSprite(LCDWIDTH, LCDHEIGHT);
-    tft.fillScreen(TFT_BLACK);
+    tft.fillScreen(TFT_WHITE);
 }
 extern "C" void updateGraphics(uint16_t* framebuffer) {
-    tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH), (FULLLCDHEIGHT - LCDHEIGHT) / 2); // draw right-aligned so the lip at the right edge of the screen balances the black zone to the left of the active area
+    //tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH), (FULLLCDHEIGHT - LCDHEIGHT) / 2); // draw right-aligned so the lip at the right edge of the screen balances the black zone to the left of the active area
+    tftSprite.pushSprite(0, 0);
 }
 
 extern "C" void* mallocDMA(size_t size) {
@@ -96,7 +97,7 @@ extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, co
                     if (i == 0) color = (pixel) 0xffff;
                     else continue;
                 }
-                tft.drawPixel(x + baseX, y + baseY, color);
+                tftSprite.drawPixel(x + baseX, y + baseY, color);
             }
         }
     }
