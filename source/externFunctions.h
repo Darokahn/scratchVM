@@ -16,7 +16,7 @@ int machineLog(const char* fmt, ...);
 void* mallocDMA(size_t size);
 
 void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable);
-void debugImage(pixel *img, int width, int height);
+void debugImage(struct image *img, int width, int height);
 
 bool getInput(int inputIndex);
 

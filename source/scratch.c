@@ -154,7 +154,7 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, 
         // new proposed:
         enum SCRATCH_continueStatus status;
         switch (operation) {
-            #include "opcodeImpl.inc"
+            #include "opcodeImpl.h"
         }
         if (operation > INNER_PARTITION_BEGINSTATEMENTS) return status; // A block has completed
         /* old:

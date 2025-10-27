@@ -4,6 +4,7 @@
 #define INTERPRET_AS(type, value) *(type*)&(value)
 #define POP() stack[--stackIndex]
 #define PUSH(value) stack[stackIndex++] = value;
+#define CAST(value, SCRATCHTYPE)
 
 case INNER_PARTITION_BEGINLOOPCONTROL: {
     ERROR();
@@ -178,11 +179,9 @@ case SENSING_OF_OBJECT_MENU: {
     break;
 }
 case INNER_PUSHNUMBER: {
-    enum SCRATCH_fieldType type = code[thread->programCounter];
-    thread->programCounter += sizeof(type);
-    uint16_t field = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    scaledInt32 field = INTERPRET_AS(scaledInt32, code[thread->programCounter]);
     thread->programCounter += sizeof(field);
-    stack[stackIndex] = (struct SCRATCH_data) {type, {.number = field << 16}};
+    stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = field}};
     (stackIndex) += 1;
     status = SCRATCH_continue;
     break;
@@ -192,7 +191,7 @@ case OPERATOR_ADD: {
     (stackIndex)--;
     struct SCRATCH_data op1 = stack[stackIndex-1];
     (stackIndex)--;
-    scaledInt32 result = op1.data.number.i + op2.data.number.i;
+    scaledInt32 result = {.i =op1.data.number.i + op2.data.number.i};
     stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number = result}};
     (stackIndex) += 1;
     status = SCRATCH_continue;
@@ -204,7 +203,7 @@ case OPERATOR_SUBTRACT: {
     struct SCRATCH_data op1 = stack[stackIndex-1];
     (stackIndex)--;
     int32_t result = op1.data.number.i - op2.data.number.i;
-    stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.data.i = result}};
+    stack[stackIndex] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.i = result}};
     (stackIndex) += 1;
     status = SCRATCH_continue;
     break;
@@ -260,7 +259,7 @@ case OPERATOR_LT: {
     struct SCRATCH_data op2 = stack[stackIndex];
     stack[stackIndex] = (struct SCRATCH_data) {
         .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number < op2.data.number}
+        .data = (union SCRATCH_field) {.boolean = op1.data.number.i < op2.data.number.i}
     };
     (stackIndex) += 1;
     status = SCRATCH_continue;
@@ -273,7 +272,7 @@ case OPERATOR_EQUALS: {
     struct SCRATCH_data op2 = stack[stackIndex];
     stack[stackIndex] = (struct SCRATCH_data) {
         .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number == op2.data.number}
+        .data = (union SCRATCH_field) {.boolean = op1.data.number.i == op2.data.number.i}
     };
     (stackIndex) += 1;
     status = SCRATCH_continue;
@@ -286,7 +285,7 @@ case OPERATOR_GE: {
     struct SCRATCH_data op2 = stack[stackIndex];
     stack[stackIndex] = (struct SCRATCH_data) {
         .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number > op2.data.number}
+        .data = (union SCRATCH_field) {.boolean = op1.data.number.i > op2.data.number.i}
     };
     (stackIndex) += 1;
     status = SCRATCH_continue;
@@ -302,7 +301,7 @@ case OPERATOR_OR: {
     struct SCRATCH_data op2 = stack[stackIndex];
     stack[stackIndex] = (struct SCRATCH_data) {
         .type = SCRATCH_NUMBER,
-        .data = (union SCRATCH_field) {.boolean = op1.data.number || op2.data.number}
+        .data = (union SCRATCH_field) {.boolean = op1.data.boolean || op2.data.boolean}
     };
     (stackIndex) += 1;
     status = SCRATCH_continue;
@@ -361,7 +360,7 @@ case INNER_CHANGEVARIABLEBYLOCAL: {
     thread->programCounter += sizeof varIndex;
     struct SCRATCH_data value = stack[stackIndex-1];
     (stackIndex) -= 1;
-    sprite->variables[varIndex].data.number += value.data.number;
+    sprite->variables[varIndex].data.number.i += value.data.number.i;
     status = SCRATCH_continue;
     break;
 }
@@ -408,8 +407,8 @@ case CONTROL_CREATE_CLONE_OF: {
 }
 case CONTROL_WAIT: {
     (stackIndex)--;
-    struct SCRATCH_data scaledSecs = stack[stackIndex]; // seconds scaled so that the larger 11 bits is seconds and the smaller 5 are seconds / 32
-    uint16_t iterations = (scaledSecs.data.number * FRAMESPERSEC) >> 5;
+    struct SCRATCH_data scaledSecs = stack[stackIndex];
+    uint16_t iterations = ((scaledSecs.data.number.i * FRAMESPERSEC) >> 16);
     thread->operationData.waitData = (struct SCRATCH_waitData) {
         .remainingIterations = iterations
     };
@@ -477,14 +476,13 @@ case INNER_JUMP: {
     break;
 }
 case INNER__GLIDEITERATION: {
-    sprite->base.x.i += thread->operationData.glideData.stepX;
-    sprite->base.y.i += thread->operationData.glideData.stepY;
+    machineLog("test\n");
+    sprite->base.x.i += thread->operationData.glideData.stepX.i;
+    sprite->base.y.i += thread->operationData.glideData.stepY.i;
     thread->operationData.glideData.remainingIterations--;
     if (thread->operationData.glideData.remainingIterations <= 0) {
         sprite->base.x.halves.high = thread->operationData.glideData.targetX;
         sprite->base.y.halves.high = thread->operationData.glideData.targetY;
-        sprite->base.x.halves.low = 0;
-        sprite->base.y.halves.low = 0;
         return SCRATCH_yieldGeneric;
     }
     thread->programCounter--; // re-align program counter with this instruction so it runs again
@@ -496,8 +494,8 @@ case MOTION_MOVESTEPS: {
     struct SCRATCH_data steps = stack[stackIndex];
     float rotation = sprite->base.rotation * degreeToRadian;
 
-    int x = sin(rotation) * steps.data.number;
-    int y = cos(rotation) * steps.data.number;
+    int x = sin(rotation) * steps.data.number.halves.high;
+    int y = cos(rotation) * steps.data.number.halves.high;
     sprite->base.x.halves.high += x;
     sprite->base.y.halves.high += y;
     status = SCRATCH_yieldGeneric;
@@ -506,14 +504,14 @@ case MOTION_MOVESTEPS: {
 case MOTION_TURNRIGHT: {
     (stackIndex)--;
     struct SCRATCH_data degrees = stack[stackIndex];
-    sprite->base.rotation += degrees.data.number;
+    sprite->base.rotation += degrees.data.degrees;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_TURNLEFT: {
     (stackIndex)--;
     struct SCRATCH_data degrees = stack[stackIndex];
-    sprite->base.rotation -= degrees.data.number;
+    sprite->base.rotation -= degrees.data.degrees;
     status = SCRATCH_yieldGeneric;
     break;
 }
@@ -528,41 +526,33 @@ case MOTION_GOTOXY: {
     struct SCRATCH_data op2 = stack[stackIndex];
     (stackIndex)--;
     struct SCRATCH_data op1 = stack[stackIndex];
-    int x;
-    int y;
-    if (op1.type == SCRATCH_NUMBER) {
-        x = op1.data.number;
-    } else return SCRATCH_yieldGeneric;
-    if (op2.type == SCRATCH_NUMBER) {
-        y = op2.data.number;
-    } else return SCRATCH_yieldGeneric;
-    sprite->base.x.halves.high = x;
-    sprite->base.y.halves.high = y;
+    sprite->base.x = op1.data.number;
+    sprite->base.y = op2.data.number;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_GLIDETO: {
     (stackIndex)--;
-    struct SCRATCH_data scaledSecs = stack[stackIndex]; // seconds scaled so that the larger 11 bits is seconds and the smaller 5 are seconds / 32
+    struct SCRATCH_data scaledSecs = stack[stackIndex];
     (stackIndex)--;
     struct SCRATCH_data x = stack[stackIndex];
     (stackIndex)--;
     struct SCRATCH_data y = stack[stackIndex];
-    int32_t xDiff = (x.data.number - sprite->base.x.halves.high) << 16;
-    int32_t yDiff = (y.data.number - sprite->base.y.halves.high) << 16;
-    uint16_t iterations = (scaledSecs.data.number * FRAMESPERSEC) >> 5;
+    scaledInt32 xDiff = {.i = x.data.number.i - sprite->base.x.i};
+    scaledInt32 yDiff = {.i = y.data.number.i - sprite->base.y.i};
+    uint16_t iterations = (scaledSecs.data.number.i * FRAMESPERSEC) >> 16;
     if (iterations == 0) {
-        sprite->base.x.halves.high = x.data.number;
-        sprite->base.y.halves.high = y.data.number;
+        sprite->base.x = x.data.number;
+        sprite->base.y = y.data.number;
         thread->operationData.glideData.remainingIterations = 0;
         return SCRATCH_continue;
     }
     thread->operationData.glideData = (struct SCRATCH_glideData) {
-        .stepX = xDiff / iterations,
-        .stepY = yDiff / iterations,
+        .stepX = {.i = xDiff.i / iterations},
+        .stepY = {.i = yDiff.i / iterations},
         .remainingIterations = iterations,
-        .targetX = x.data.number,
-        .targetY = y.data.number,
+        .targetX = x.data.number.halves.high,
+        .targetY = y.data.number.halves.high,
     };
     status = SCRATCH_continue;
     break;
@@ -576,7 +566,7 @@ case MOTION_GLIDESECSTOXY: {
 case MOTION_POINTINDIRECTION: {
     (stackIndex)--;
     struct SCRATCH_data degrees = stack[stackIndex];
-    sprite->base.rotation = degrees.data.number;
+    sprite->base.rotation = degrees.data.degrees;
     status = SCRATCH_yieldGeneric;
     break;
 }
@@ -585,7 +575,7 @@ case MOTION_POINTTOWARDS: {
     struct SCRATCH_data x = stack[stackIndex];
     (stackIndex)--;
     struct SCRATCH_data y = stack[stackIndex];
-    float direction = atan2(y.data.number, x.data.number);
+    float direction = atan2(y.data.number.halves.high, x.data.number.halves.high);
     direction *= radianToDegree;
     sprite->base.rotation = (uint16_t) direction;
     status = SCRATCH_yieldGeneric;
@@ -597,28 +587,28 @@ case MOTION_POINTTOWARDS_MENU: {
 case MOTION_CHANGEXBY: {
     (stackIndex)--;
     struct SCRATCH_data x = stack[stackIndex];
-    sprite->base.x.halves.high += x.data.number;
+    sprite->base.x.i += x.data.number.i;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_SETX: {
     (stackIndex)--;
     struct SCRATCH_data x = stack[stackIndex];
-    sprite->base.x.halves.high = x.data.number;
+    sprite->base.x = x.data.number;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_CHANGEYBY: {
     (stackIndex)--;
     struct SCRATCH_data y = stack[stackIndex];
-    sprite->base.y.halves.high += y.data.number;
+    sprite->base.y.i += y.data.number.i;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case MOTION_SETY: {
     (stackIndex)--;
     struct SCRATCH_data y = stack[stackIndex];
-    sprite->base.y.halves.high = y.data.number;
+    sprite->base.y = y.data.number;
     status = SCRATCH_yieldGeneric;
     break;
 }
@@ -669,7 +659,7 @@ case LOOKS_CHANGESIZEBY: {
 case LOOKS_SETSIZETO: {
     (stackIndex)--;
     struct SCRATCH_data size = stack[stackIndex];
-    sprite->base.size = size.data.number;
+    sprite->base.size = size.data.number.halves.high;
     status = SCRATCH_yieldGeneric;
     break;
 }

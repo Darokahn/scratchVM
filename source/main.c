@@ -9,17 +9,22 @@
 
 unsigned long getNow();
 
+const pixel* imageTable[IMAGEMAX];
 struct SCRATCH_sprite* sprites[SPRITEMAX];
 int spriteCount;
-const pixel* imageTable[IMAGEMAX];
 
-int count;
+int count = 0;
 int drawRate = 2;
 
 unsigned long interval = 1000 / FRAMESPERSEC;
 
 enum SCRATCH_opcode insertedCode[] = {
     INNER_DEBUGEXPRESSION,
+    INNER_PUSHNUMBER, 0x0, 0x0, 0xf0, 0xff,
+    INNER_PUSHNUMBER, 0x0, 0x0, 0xf0, 0xff,
+    INNER_PUSHNUMBER, 0x0, 0x0, 0x2, 0x00,
+    MOTION_GLIDETO,
+    INNER__GLIDEITERATION,
     CONTROL_STOP,
 };
 

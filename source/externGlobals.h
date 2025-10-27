@@ -5,6 +5,7 @@
 
 extern const struct SCRATCH_header header;
 extern const uint8_t programData[];
+
 extern enum SCRATCH_opcode* code;
 extern bool events[];
 extern int eventCount;

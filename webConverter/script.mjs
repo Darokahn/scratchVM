@@ -1,5 +1,6 @@
 import { unzipSync } from "https://unpkg.com/fflate/esm/browser.js";
 import mime from 'https://cdn.skypack.dev/mime'; 
+import * as opcode from "./utils/opcode.js";
 
 const SCRATCHWIDTH = 480;
 const SCRATCHHEIGHT = 360;
@@ -41,8 +42,8 @@ const offsets = {
 // template for the object representing the runtime of a stack of blocks
 function threadTemplate() {
     return {
-        startEvent: "", // The triggering event
-        eventCondition: "", // The parameter that must match for the triggering event to follow through
+        startEvent: 0, // The triggering event
+        eventCondition: 0, // The parameter that must match for the triggering event to follow through
         entryPoint: 0,
     };
 }
@@ -179,6 +180,8 @@ function compileThread(code, blocks, threadId) {
 
 function compileSprite(code, sprite, blocks) {
     let threadIds = indexThreads(blocks);
+    opcode.processBlocks(blocks);
+    console.log(Object.values(blocks));
     for (let threadId of threadIds) {
         sprite.struct.threads.push(compileThread(code, blocks, threadId));
         sprite.struct.threadCount += 1;
@@ -203,6 +206,8 @@ function adjustSprite(sprite, isStage) {
     sprite.struct.x = toScaledInt32(sprite.struct.x);
     sprite.struct.y = toScaledInt32(sprite.struct.y);
     sprite.struct.rotation = degreesToScaled16(sprite.struct.rotation);
+    sprite.struct.rotationStyle = ["left-right", "don't rotate", "all around"].indexOf(sprite.struct.rotationStyle);
+    sprite.struct.size = Number(+sprite.struct.size || 0);
 }
 
 // copy a sprite into the array's memory the way it will be represented in the memory of the processor

@@ -8,6 +8,7 @@
 int eventTypeOffsets[__EVENTTYPECOUNT];
 bool inputState[5];
 
+
 struct image* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
     int imageResolution;
     // The first sprite is implicitly the stage
@@ -46,7 +47,6 @@ void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct 
     offsetTotal += 0;
     eventTypeOffsets[ONLOUDNESS] = -1;
     offsetTotal += 0;
-
     code = (enum SCRATCH_opcode*) buffer;
     buffer += header.codeLength;
     buffer = ALIGN8(buffer);

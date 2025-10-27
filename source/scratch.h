@@ -12,7 +12,7 @@
 #define SPRITEMAX (8) // maximum spritecount
 #define IMAGEMAX (16)
 
-#define FRAMESPERSEC 50
+#define FRAMESPERSEC 30
 
 #define STAGERESOLUTION 128
 #define SPRITERESOLUTION 32
@@ -43,21 +43,22 @@
     #error "Unknown endianness"
 #endif
 
+struct SCRATCH_sprite;
+struct SCRATCH_thread;
+
 // using GNU typed enum extension
 enum SCRATCH_fieldType : uint8_t {
     SCRATCH_BOOL,
     SCRATCH_NUMBER,
-    SCRATCH_FRACTION,
+    SCRATCH_DEGREES,
     SCRATCH_STRING,
     SCRATCH_SPRITE,
     SCRATCH_COLOR,
 };
 
-struct SCRATCH_sprite;
-struct SCRATCH_thread;
-
 union SCRATCH_field {
     scaledInt32 number;
+    uint16_t degrees;
     bool boolean;
     char* string;
     uint8_t spriteID;
@@ -135,11 +136,11 @@ union SCRATCH_stepSize {
 };
 
 struct SCRATCH_glideData {
-    int32_t stepX;
-    int32_t stepY;
+    scaledInt32 stepX;
+    scaledInt32 stepY;
     uint16_t remainingIterations; // how many times to iterate
-    uint16_t targetX; // what to set position to when done (assume slight error due to rounding)
-    uint16_t targetY;
+    int16_t targetX; // what to set position to when done (assume slight error due to rounding)
+    int16_t targetY;
 };
 
 struct SCRATCH_waitData {
