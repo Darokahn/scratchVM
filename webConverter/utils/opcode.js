@@ -77,4 +77,6 @@ export function processBlocks(blocks) {
 }
 
 export function compileBlock(block, code) {
+    for (let input of block.inputs) {
+    }
 }
