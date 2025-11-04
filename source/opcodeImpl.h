@@ -6,10 +6,12 @@
 #define POPBOOL() stack[--stackIndex]
 #define POPID() stack[--stackIndex]
 #define POPDEGREES() stack[--stackIndex]
+#define POPDATA() stack[--stackIndex]
 #define PUSHNUMBER(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.halves.high=value}};
 #define PUSHFRACTION(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.i=value}};
 #define PUSHBOOL(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_BOOL, {.boolean=value}};
 #define PUSHDATA(value) stack[stackIndex++] = value;
+#define PUSHDEGREES(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_DEGREES, {.degrees=value}};
 
 case INNER_PARTITION_BEGINLOOPCONTROL: {
     ERROR();
@@ -43,6 +45,7 @@ case INNER_PARTITION_BEGINEXPRESSIONS: {
     break;
 }
 case SENSING_ANSWER: {
+    // TODO
     // push a string to the stack
     status = SCRATCH_continue;
     break;
@@ -62,6 +65,7 @@ case SENSING_MOUSEY: {
     status = SCRATCH_continue;
 }
 case SENSING_KEYPRESSED: {
+    // TODO
     // return a value from the inputs array, with an int16 index gotten from the next few bytes of instructions
     break;
 }
@@ -70,15 +74,19 @@ case SENSING_LOUDNESS: {
     status = SCRATCH_continue;
 }
 case SENSING_TIMER: {
+    // TODO
     // push the value of the global timer
 }
 case SENSING_CURRENT: {
+    // TODO
     // Get enumerated request type from (uint16_t) code; push 2025 for year, (whichever day that was) for day, and 0 for rest
 }
 case SENSING_DAYSSINCE2000: {
+    // TODO
     // push however many days it was from jan 1 2000 to jan 1 2025
 }
 case SENSING_USERNAME: {
+    // TODO
     // push global username string
 }
 case INNER_FETCHINPUT: {
@@ -89,7 +97,7 @@ case INNER_FETCHINPUT: {
     break;
 }
 case INNER_FETCHPOSITION: {
-    uint16_t value = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    int16_t value = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof value;
     if (value == -1) { // random position
         PUSHNUMBER(rand() % 500 - 250);
@@ -108,30 +116,91 @@ case INNER_FETCHPOSITION: {
     break;
 }
 case INNER_FETCHVAR: {
-    // push a variable specified by (uint16_t) code of the sprite specified by (uint16_t) code
+    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t varIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    struct SCRATCH_sprite* spriteOperand;
+    if (spriteOperandIndex == -1) {
+        spriteOperand = sprite;
+    }
+    else {
+        spriteOperand = sprites[spriteOperandIndex];
+    }
+    PUSHDATA(spriteOperand->variables[varIndex]);
+    status = SCRATCH_continue;
+    break;
 }
 case MOTION_XPOSITION: {
-    // push the x position of the sprite specified by (uint16_6) code
+    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    struct SCRATCH_sprite* spriteOperand;
+    if (spriteOperandIndex == -1) {
+        spriteOperand = sprite;
+    }
+    else {
+        spriteOperand = sprites[spriteOperandIndex];
+    }
+    PUSHFRACTION(spriteOperand->base.x.i);
+    status = SCRATCH_continue;
+    break;
 }
 case MOTION_YPOSITION: {
-    // push the y position of the sprite specified by (uint16_6) code
+    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    struct SCRATCH_sprite* spriteOperand;
+    if (spriteOperandIndex == -1) {
+        spriteOperand = sprite;
+    }
+    else {
+        spriteOperand = sprites[spriteOperandIndex];
+    }
+    PUSHFRACTION(spriteOperand->base.y.i);
+    status = SCRATCH_continue;
+    break;
 }
 case MOTION_DIRECTION: {
-    // push the direction of the sprite specified by (uint16_6) code
+    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    struct SCRATCH_sprite* spriteOperand;
+    if (spriteOperandIndex == -1) {
+        spriteOperand = sprite;
+    }
+    else {
+        spriteOperand = sprites[spriteOperandIndex];
+    }
+    PUSHDEGREES(spriteOperand->base.rotation);
+    status = SCRATCH_continue;
+    break;
 }
 case LOOKS_COSTUME: {
-    // push the costume of the sprite specified by (uint16_6) code
+    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    struct SCRATCH_sprite* spriteOperand;
+    if (spriteOperandIndex == -1) {
+        spriteOperand = sprite;
+    }
+    else {
+        spriteOperand = sprites[spriteOperandIndex];
+    }
+    PUSHDEGREES(spriteOperand->base.rotation);
+    status = SCRATCH_continue;
+    break;
 }
 case LOOKS_SIZE: {
+    // TODO
     // push the size of the sprite specified by (uint16_6) code
 }
 case LOOKS_COSTUMENUMBERNAME: {
+    // TODO
     break; // I need to look into this one
 }
 case LOOKS_BACKDROPNUMBERNAME: {
+    // TODO
     break; // I need to look into this one
 }
 case SENSING_TOUCHINGOBJECT: {
+    // TODO
     // push whether the current sprite is touching the sprite specified by (uint16_t) code
 }
 case SENSING_TOUCHINGOBJECTMENU: {
@@ -147,6 +216,7 @@ case SENSING_COLORISTOUCHINGCOLOR: {
     break;
 }
 case SENSING_DISTANCETO: {
+    // TODO
     // push the distance to the sprite specified by (uint16_6) code
 }
 case SENSING_DISTANCETOMENU: {
@@ -154,10 +224,12 @@ case SENSING_DISTANCETOMENU: {
     break;
 }
 case SENSING_ASKANDWAIT: {
+    // TODO
     // set the talking string (variable 0) of the current sprite to the string specified by the top of stack
     // immediately push empty string
 }
 case SENSING_KEYOPTIONS: {
+    // TODO
     // I have to look into this one
 }
 case SENSING_SETDRAGMODE: {
@@ -165,6 +237,7 @@ case SENSING_SETDRAGMODE: {
     break;
 }
 case SENSING_RESETTIMER: {
+    // TODO
     // set the value of the global timer to 0
 }
 case SENSING_OF: {
@@ -277,25 +350,31 @@ case OPERATOR_NOT: {
     break;
 }
 case OPERATOR_JOIN: {
+    // TODO
     // pop two strings and join them
 }
 case OPERATOR_LETTER_OF: {
+    // TODO
     // pop string, pop index, push string[index]
 }
 case OPERATOR_LENGTH: {
+    // TODO
     // pop string, push length
 }
 case OPERATOR_CONTAINS: {
+    // TODO
     // pop string, pop substring, push `substring in string`
 }
 case OPERATOR_MOD: {
+    // TODO
     break; // I need to look into this (default number in scratch is float, so I need to figure out what the behavior is)
 }
 case OPERATOR_ROUND: {
+    // TODO
     // pop number, push rounded (not banker's rounding)
 }
 case OPERATOR_MATHOP: {
-    ERROR(); // unused
+    // TODO
     break;
 }
 case INNER_DEBUGEXPRESSION: {
@@ -308,19 +387,37 @@ case INNER_PARTITION_BEGINSTATEMENTS: {
     break;
 }
 case DATA_SETVARIABLETO: {
+    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t varIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    struct SCRATCH_sprite* spriteOperand;
+    if (spriteOperandIndex == -1) {
+        spriteOperand = sprite;
+    }
+    else {
+        spriteOperand = sprites[spriteOperandIndex];
+    }
+    struct SCRATCH_data x = POPDATA();
+    sprite->variables[varIndex] = x;
+    status = SCRATCH_continue;
     break;
 }
 case DATA_CHANGEVARIABLEBY: {
-    /*
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    uint16_t targetSprite = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = stack[stackIndex-1];
-    (stackIndex) -= 1;
-    sprites[targetSprite.data.number]->variables[varIndex].data.number += value.data.number;
+    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t varIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof spriteOperandIndex;
+    struct SCRATCH_sprite* spriteOperand;
+    if (spriteOperandIndex == -1) {
+        spriteOperand = sprite;
+    }
+    else {
+        spriteOperand = sprites[spriteOperandIndex];
+    }
+    struct SCRATCH_data x = POPDATA();
+    sprite->variables[varIndex].data.number.i = x.data.number.i;
     status = SCRATCH_continue;
-    */
     break;
 }
 case INNER_CHANGEVARIABLEBYLOCAL: {
@@ -332,9 +429,11 @@ case INNER_CHANGEVARIABLEBYLOCAL: {
     break;
 }
 case DATA_SHOWVARIABLE: {
+    // TODO
     break;
 }
 case DATA_HIDEVARIABLE: {
+    // TODO
     break;
 }
 case INNER_LOOPJUMP: {
@@ -379,31 +478,38 @@ case CONTROL_WAIT: {
         .remainingIterations = iterations
     };
     status = SCRATCH_yieldGeneric;
-
     break;
 }
 case CONTROL_REPEAT: {
+    // TODO
     break;
 }
 case CONTROL_FOREVER: {
+    // TODO
     break;
 }
 case CONTROL_IF: {
+    // TODO
     break;
 }
 case CONTROL_IF_ELSE: {
+    // TODO
     break;
 }
 case CONTROL_WAIT_UNTIL: {
+    // TODO
     break;
 }
 case CONTROL_REPEAT_UNTIL: {
+    // TODO
     break;
 }
 case CONTROL_CREATE_CLONE_OF_MENU: {
+    // TODO
     break;
 }
 case CONTROL_DELETE_THIS_CLONE: {
+    // TODO
     status = SCRATCH_yieldGeneric;
     if (sprite == sprites[sprite->base.id]) {
         // This is not a clone, it is the original. Scratch does nothing in this case.
@@ -503,9 +609,9 @@ case MOTION_GLIDETO_MENU: {
     break;
 }
 case MOTION_GLIDESECSTOXY: {
-    struct SCRATCH_data scaledSecs = POPNUMBER();
-    struct SCRATCH_data x = POPNUMBER();
     struct SCRATCH_data y = POPNUMBER();
+    struct SCRATCH_data x = POPNUMBER();
+    struct SCRATCH_data scaledSecs = POPNUMBER();
     scaledInt32 xDiff = {.i = x.data.number.i - sprite->base.x.i};
     scaledInt32 yDiff = {.i = y.data.number.i - sprite->base.y.i};
     uint16_t iterations = (scaledSecs.data.number.i * FRAMESPERSEC) >> 16;
@@ -569,6 +675,7 @@ case MOTION_SETY: {
     break;
 }
 case MOTION_IFONEDGEBOUNCE: {
+    // TODO
     // detect whether any amount of sprite is off edge, then if so flip the sprite's angle
 }
 case MOTION_SETROTATIONSTYLE: {
@@ -578,6 +685,7 @@ case MOTION_SETROTATIONSTYLE: {
     break;
 }
 case LOOKS_SAY: {
+    // TODO
     // set the sprite's first variable to the string popped from the stack
 }
 case LOOKS_THINKFORSECS: {
@@ -585,6 +693,7 @@ case LOOKS_THINKFORSECS: {
     break;
 }
 case LOOKS_THINK: {
+    // TODO
     // set the sprite's first variable to the string popped from the stack
 }
 case LOOKS_SWITCHCOSTUMETO: {
@@ -601,15 +710,19 @@ case LOOKS_NEXTCOSTUME: {
     break;
 }
 case LOOKS_SWITCHBACKDROPTO: {
+    // TODO
     break;
 }
 case LOOKS_BACKDROPS: {
+    // TODO
     break;
 }
 case LOOKS_NEXTBACKDROP: {
+    // TODO
     break;
 }
 case LOOKS_CHANGESIZEBY: {
+    // TODO
     break;
 }
 case LOOKS_SETSIZETO: {

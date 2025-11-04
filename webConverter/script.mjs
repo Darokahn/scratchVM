@@ -5,14 +5,6 @@ import * as opcode from "./utils/opcode.js";
 const SCRATCHWIDTH = 480;
 const SCRATCHHEIGHT = 360;
 
-const inputMap = {
-    "up arrow": 0,
-    "right arrow": 1,
-    "down arrow": 2,
-    "left arrow": 3,
-    "space": 4,
-};
-
 const files = {};
 
 const offsets = {
@@ -146,46 +138,27 @@ function getDetails(project) {
     return details;
 }
 
-const events = [
-    "event_whenkeypressed",
-    "event_whenbroadcastreceived",
-    "event_whenbackdropswitchesto",
-    "control_start_as_clone",
-    "event_whenflagclicked",
-    "event_whenthisspriteclicked",
-    "event_whengreaterthan",
-];
-
 // Initialize the threads with every block 
 function indexThreads(blocks) {
     let ids = [];
     for (let [id, block] of Object.entries(blocks)) {
-        if (block.topLevel && events.includes(block.opcode)) {
+        if (block.topLevel && opcode.events.includes(block.opcode)) {
             ids.push(id);
         }
     }
     return ids;
 }
 
-function compileThread(code, blocks, threadId) {
-    let newCode = {references: {}, code: [], threadObject: threadTemplate()};
-    let block = blocks[threadId];
-    newCode.threadObject.startEvent = events.indexOf(block.opcode);
-    while (block.next != null) {
-        block = block.next;
-    }
-    code.push(newCode);
-    return newCode.threadObject;
-}
-
 function compileSprite(code, sprite, blocks) {
-    let threadIds = indexThreads(blocks);
     opcode.processBlocks(blocks);
-    console.log(Object.values(blocks));
+    let threadIds = indexThreads(blocks);
     for (let threadId of threadIds) {
-        sprite.struct.threads.push(compileThread(code, blocks, threadId));
-        sprite.struct.threadCount += 1;
+        let hat = blocks[threadId];
+        let thread = opcode.compileBlocks(hat, blocks, code);
+        console.log(thread);
+        sprite.struct.threads.push(thread);
     }
+    sprite.struct.threadCount = sprite.struct.threads.length;
 }
 
 function compileSprites(sprites, projectJson) {
@@ -194,7 +167,6 @@ function compileSprites(sprites, projectJson) {
         let blocks = projectJson["targets"][sprite.index]["blocks"]
         compileSprite(code, sprite, blocks);
     }
-    console.log(code);
     return code;
 }
 
@@ -306,7 +278,7 @@ function printAsCfile(details, header, buffer) {
     );
     totalString += (
         "bool events[" +
-        (Object.entries(inputMap).length + Object.keys(details.messages).length + header.backdropCount + 1) +
+        (Object.entries(opcode.inputMap).length + Object.keys(details.messages).length + header.backdropCount + 1) +
         "];\n" +
         "int eventCount = sizeof events" +
         ";\n"
