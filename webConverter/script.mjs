@@ -322,7 +322,7 @@ async function drawAndGetPixels(uint8arr, mimeType) {
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0);
 
-        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        const pixels = ctx.getImageData(0, 0, Math.max(canvas.width, 1), Math.max(canvas.height, 1)).data;
 
         return { pixels, width: canvas.width, height: canvas.height };
     } finally {
@@ -452,6 +452,7 @@ async function getScaledImageFromFile(directory, filename, isStage) {
     let resolution = isStage * 128 + !isStage * 32;
     let file = directory[filename];
     let type = mime.getType(filename);
+    console.log(filename);
     let {pixels, width, height} = await drawAndGetPixels(file, type);
     let scaledImage = await scaleImage(pixels, width, height, resolution, resolution);
     return {scaledImage, width, height};

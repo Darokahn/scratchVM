@@ -121,6 +121,9 @@ const pushFuncs = {
         console.log("COLOR");
     },
     TEXT: (input, code) => {
+        if (Number(input.value[0]) !== NaN) {
+            return pushFuncs.NUM(input, code);
+        }
         code.push("INNER_PUSHTEXT");
         code.push(...toBytes(input.value[0]));
         code.push(0);
@@ -164,6 +167,7 @@ export function processInput(input) {
         valueAnnotation.value = value;
         return valueAnnotation;
     }
+    if (!value) return null;
     valueAnnotation.type = definitions[value[0]];
     valueAnnotation.value = value.slice(1);
     return valueAnnotation;
@@ -185,6 +189,7 @@ export function processBlock(block) {
         inputs: {},
         fields: {},
     };
+    console.log(block);
     for (let [key, value] of Object.entries(block.inputs)) {
         processed.inputs[key] = processInput(value);
     }
@@ -218,7 +223,6 @@ function pushField(field, code) {
 
 let specialFunctions = {
     MOTION_GOTO_MENU: (block, code) => {
-        console.log("got to goto_menu");
         let to = block.fields.TO[0];
         if (to === undefined) {
             console.error("incorrect assumption about the definite shape of motion_goto_menu. block is", block);

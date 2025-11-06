@@ -15,7 +15,7 @@ def serve_file(filename):
 # Handle file uploads
 @app.route('/upload/<path:filename>', methods=['POST'])
 def upload_file(filename):
-    filepath = os.path.join(UPLOAD_DIR, filename)
+    filepath = os.path.join(UPLOAD_DIR, "definitions.c")
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, 'wb') as f:
         f.write(request.data)
