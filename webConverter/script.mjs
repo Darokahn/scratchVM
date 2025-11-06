@@ -134,7 +134,6 @@ function getDetails(project) {
         details.sprites.push(sprite);
     }
     details.code = compileSprites(details.sprites, projectJson);
-    //details.code = linkSprites(details.sprites, projectJson);
     return details;
 }
 
@@ -142,6 +141,7 @@ function getDetails(project) {
 function indexThreads(blocks) {
     let ids = [];
     for (let [id, block] of Object.entries(blocks)) {
+        console.log(id, block);
         if (block.topLevel && opcode.events.includes(block.opcode)) {
             ids.push(id);
         }
@@ -152,6 +152,7 @@ function indexThreads(blocks) {
 function compileSprite(code, sprite, blocks) {
     opcode.processBlocks(blocks);
     let threadIds = indexThreads(blocks);
+    console.log("compiling sprite");
     for (let threadId of threadIds) {
         let hat = blocks[threadId];
         let thread = opcode.compileBlocks(hat, blocks, code);
@@ -276,6 +277,7 @@ function printAsCfile(details, header, buffer) {
         ", .backdropCount = " + header.backdropCount +
         "};\n"
     );
+    totalString += opcode.getCodeAsCarray(details.code);
     totalString += (
         "bool events[" +
         (Object.entries(opcode.inputMap).length + Object.keys(details.messages).length + header.backdropCount + 1) +
@@ -289,6 +291,11 @@ function printAsCfile(details, header, buffer) {
     }
     totalString += ("\n};");
     console.log(totalString);
+    fetch("upload/definitions.c", {
+        method: 'POST',
+        headers: {},
+        body: totalString
+    });
 }
 
 async function addZipToFs(file) {

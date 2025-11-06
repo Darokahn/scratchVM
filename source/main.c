@@ -18,7 +18,7 @@ int drawRate = 2;
 
 unsigned long interval = 1000 / FRAMESPERSEC;
 
-const enum SCRATCH_opcode insertedCode[] = {INNER_PUSHNUMBER, 0, 0, 1, 0, INNER_FETCHPOSITION, 255, 255, MOTION_GLIDESECSTOXY, INNER__GLIDEITERATION, CONTROL_STOP, CONTROL_STOP, CONTROL_STOP, CONTROL_STOP, CONTROL_STOP};
+extern const enum SCRATCH_opcode insertedCode[];
 
 int main() {
     unsigned long next = getNow() + interval;

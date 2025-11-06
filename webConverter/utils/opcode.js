@@ -80,20 +80,27 @@ function toCodeLiteral(number, byteSize, endianness) {
     return bytes;
 }
 
-function findSprite(name) {
+let objectIndex = {
+    sprites: [],
+    broadcasts: [],
+    backdrops: [],
+    variables: [],
+};
+
+function findSprite(name, blocks, project) {
     return 0;
     // TODO: search index of sprite names and return enumerated position
 }
 
-function findBroadcast(name) {
+function findBroadcast(name, blocks, project) {
     return 0;
 }
 
-function findBackdrop(name) {
+function findBackdrop(name, blocks, project) {
     return 0;
 }
 
-function findVariable(name, id) {
+function findVariable(name, id, blocks, project) {
     return [0, 0];
 }
 
@@ -211,6 +218,7 @@ function pushField(field, code) {
 
 let specialFunctions = {
     MOTION_GOTO_MENU: (block, code) => {
+        console.log("got to goto_menu");
         let to = block.fields.TO[0];
         if (to === undefined) {
             console.error("incorrect assumption about the definite shape of motion_goto_menu. block is", block);
@@ -224,13 +232,14 @@ let specialFunctions = {
         let fieldValue = fieldValues[to] || findSprite(to);
         code.push(...toCodeLiteral(fieldValue, 2));
     },
-    MOTION_GOTO: (block, code) => {
+    MOTION_GOTO: (block, code, blocks) => {
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
         code.push("MOTION_GOTOXY");
     },
     MOTION_GLIDETO_MENU: (block, code) => {
         let to = block.fields.TO[0];
         if (to === undefined) {
-            console.error("incorrect assumption about the definite shape of motion_goto_menu. block is", block);
+            console.error("incorrect assumption about the definite shape of motion_glideto_menu. block is", block);
             return;
         }
         code.push("INNER_FETCHPOSITION");
@@ -242,10 +251,12 @@ let specialFunctions = {
         code.push(...toCodeLiteral(fieldValue, 2));
     },
     MOTION_GLIDESECSTOXY: (block, code) => {
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
         code.push(block.opcode);
         code.push("INNER__GLIDEITERATION");
     },
-    MOTION_GLIDETO: (block, code) => {
+    MOTION_GLIDETO: (block, code, blocks) => {
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
         code.push("MOTION_GLIDESECSTOXY");
         code.push("INNER__GLIDEITERATION");
     },
@@ -287,18 +298,17 @@ function getEventCondition(hat) {
 
 export function compileBlock(block, code, blocks) {
     let specialFunction = specialFunctions[block.opcode];
-    if (specialFunction === undefined) {
+    if (specialFunction !== undefined) {
+        specialFunction(block, code, blocks);
+    }
+    else {
         for (let input of Object.values(block.inputs)) {
             pushInput(input, code, blocks);
         }
         code.push(block.opcode);
         for (let field of Object.values(block.fields)) {
-            console.log(block);
             pushField(field, code);
         }
-    }
-    else {
-        specialFunction(block, code, blocks);
     }
 }
 
@@ -312,11 +322,14 @@ export function compileBlocks(hat, blocks, code) {
         block = blocks[block.next];
     }
     code.push("CONTROL_STOP");
-    printCodeAsCarray(code);
     return {entryPoint, startEvent, eventCondition};
 }
 
-function printCodeAsCarray(code) {
+export function getCodeAsCarray(code) {
     let values = code.join(", ");
-    console.log(["const enum SCRATCH_opcode insertedCode[] = {", values, "};"].join(""));
+    return ["const enum SCRATCH_opcode insertedCode[] = {", values, "};\n"].join("");
+}
+
+function printCodeAsCarray(code) {
+    console.log(getCodeAsCarray(code));
 }
