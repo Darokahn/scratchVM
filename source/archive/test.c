@@ -1,4 +1,5 @@
 #include "../scratch.h"
+#include "../graphics.h"
 #include <stddef.h>
 
 int main(void) {
@@ -22,6 +23,9 @@ int main(void) {
     printf("entryPoint     = %zu\n", offsetof(struct SCRATCH_threadHeader, entryPoint));
     printf("startEvent     = %zu\n", offsetof(struct SCRATCH_threadHeader, startEvent));
     printf("sizeof         = %zu\n", sizeof(struct SCRATCH_threadHeader));
+
+    printf("\nOffsets in image:\n");
+    printf("sizeof         = %zu\n", sizeof(struct image));
 
     return 0;
 }

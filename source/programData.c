@@ -5,10 +5,6 @@
 #include "externFunctions.h"
 #include "scratch.h"
 
-int eventTypeOffsets[__EVENTTYPECOUNT];
-bool inputState[5];
-
-
 struct image* getImage(const pixel* imageTable[IMAGEMAX], int spriteIndex, int costumeIndex) {
     int imageResolution;
     // The first sprite is implicitly the stage
@@ -31,6 +27,7 @@ void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool 
     events[eventTypeOffsets[type] + input.i] = state;
 }
 
+/*
 void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]) {
     int offsetTotal = 0;
     eventTypeOffsets[ONKEY] = offsetTotal;
@@ -76,4 +73,19 @@ void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct 
         }
     }
     spriteCount = header.spriteCount;
+}
+*/
+
+void initImages(const uint8_t* buffer, const pixel* images[IMAGEMAX]) {
+    const uint8_t* imageBase = buffer;
+    int spriteSize = 128*128*sizeof(pixel);
+    for (int i = 0; i < spriteCount; i++) {
+        struct SCRATCH_sprite* s = sprites[i];
+        images[i] = (void*) imageBase;
+        for (int j = 0; j < s->base.costumeMax; j++) {
+            imageBase += sizeof (struct image);
+            imageBase += spriteSize;
+        }
+        spriteSize = 32*32*sizeof(pixel);
+    }
 }

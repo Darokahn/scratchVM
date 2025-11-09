@@ -142,7 +142,11 @@ const pushFuncs = {
     },
     OBJECTREF: (input, code, blocks) => {
         let block = blocks[input.value];
-        compileBlock(block, code, blocks);
+        while (block != null) {
+            console.log(block);
+            compileBlock(block, code, blocks);
+            block = blocks[block.next];
+        }
     }
 }
 
@@ -189,7 +193,6 @@ export function processBlock(block) {
         inputs: {},
         fields: {},
     };
-    console.log(block);
     for (let [key, value] of Object.entries(block.inputs)) {
         processed.inputs[key] = processInput(value);
     }
@@ -222,6 +225,32 @@ function pushField(field, code) {
 }
 
 let specialFunctions = {
+    CONTROL_IF: (block, code, blocks) => {
+        pushInput(block.inputs.CONDITION, code, blocks);
+        code.push("INNER_JUMPIFNOT");
+        let index = code.length;
+        code.push(...[0, 0]);
+        pushInput(block.inputs.SUBSTACK, code, blocks);
+        code[index] = (code.length & 0xff);
+        code[index + 1] = ((code.length >> 8) & 0xff);
+    },
+    LOOKS_COSTUMENUMBERNAME: (block, code) => {
+        code.push(block.opcode);
+        if (block.fields.NUMBER_NAME[0] == "number") {
+            code.push(...toCodeLiteral(0, 2));
+        }
+        else if (block.fields.NUMBER_NAME[0] == "name") {
+            code.push(...toCodeLiteral(1, 2));
+        }
+    },
+    SENSING_KEYOPTIONS: (block, code) => {
+        code.push("INNER_PUSHNUMBER")
+        code.push(...toScaledInt32Tuple(inputMap[block.fields.KEY_OPTION[0]]));
+    },
+    MOTION_SETROTATIONSTYLE: (block, code) => {
+        code.push(block.opcode);
+        code.push(...toCodeLiteral(["left-right", "don't rotate", "all around"].indexOf(block.fields.STYLE[0]), 2));
+    },
     MOTION_GOTO_MENU: (block, code) => {
         let to = block.fields.TO[0];
         if (to === undefined) {
@@ -310,6 +339,9 @@ export function compileBlock(block, code, blocks) {
             pushInput(input, code, blocks);
         }
         code.push(block.opcode);
+        if (Object.keys(block.fields).length > 0) {
+            console.log(block);
+        }
         for (let field of Object.values(block.fields)) {
             pushField(field, code);
         }

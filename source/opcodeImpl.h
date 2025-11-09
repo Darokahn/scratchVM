@@ -11,6 +11,7 @@
 #define PUSHFRACTION(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.i=value}};
 #define PUSHBOOL(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_BOOL, {.boolean=value}};
 #define PUSHDATA(value) stack[stackIndex++] = value;
+#define PUSHTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_STRING, {.string=NULL}};
 #define PUSHDEGREES(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_DEGREES, {.degrees=value}};
 
 case INNER_PARTITION_BEGINLOOPCONTROL: {
@@ -65,8 +66,9 @@ case SENSING_MOUSEY: {
     status = SCRATCH_continue;
 }
 case SENSING_KEYPRESSED: {
-    // TODO
-    // return a value from the inputs array, with an int16 index gotten from the next few bytes of instructions
+    struct SCRATCH_data keyIndex = POPNUMBER();
+    PUSHBOOL(inputState[keyIndex.data.number.halves.high]);
+    status = SCRATCH_continue;
     break;
 }
 case SENSING_LOUDNESS: {
@@ -192,8 +194,17 @@ case LOOKS_SIZE: {
     // push the size of the sprite specified by (uint16_6) code
 }
 case LOOKS_COSTUMENUMBERNAME: {
-    // TODO
-    break; // I need to look into this one
+    int16_t option = INTERPRET_AS(int16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof option;
+    // number
+    if (option == 0) {
+        PUSHNUMBER(sprite->base.costumeIndex);
+    }
+    else {
+        PUSHTEXT(getImage(imageTable, sprite->base.id, sprite->base.costumeIndex)->name);
+    }
+    status = SCRATCH_continue;
+    break;
 }
 case LOOKS_BACKDROPNUMBERNAME: {
     // TODO
@@ -679,8 +690,9 @@ case MOTION_IFONEDGEBOUNCE: {
     // detect whether any amount of sprite is off edge, then if so flip the sprite's angle
 }
 case MOTION_SETROTATIONSTYLE: {
-    struct SCRATCH_data style = POPID();
-    sprite->base.rotationStyle = style.data.id;
+    uint16_t style = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    thread->programCounter += sizeof style;
+    sprite->base.rotationStyle = style;
     status = SCRATCH_yieldGeneric;
     break;
 }

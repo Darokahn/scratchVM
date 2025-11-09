@@ -20,11 +20,14 @@
 #define WIDTHRATIO (((float) LCDWIDTH) / SCRATCHWIDTH)
 #define HEIGHTRATIO (((float) LCDHEIGHT) / SCRATCHHEIGHT)
 
+#define COSTUMENAMESIZE 256
+
 typedef uint16_t pixel;
 
 struct image {
     uint8_t widthRatio;
     uint8_t heightRatio;
+    char name[COSTUMENAMESIZE];
     pixel pixels[];
 };
 #endif

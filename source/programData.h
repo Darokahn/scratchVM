@@ -33,4 +33,5 @@ void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool 
 struct image* getImage(const pixel* images[IMAGEMAX], int spriteIndex, int costumeIndex);
 
 void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]);
+void initImages(const uint8_t* buffer, const pixel* images[IMAGEMAX]);
 #endif
