@@ -9,6 +9,7 @@
 #define POPDATA() stack[--stackIndex]
 #define PUSHNUMBER(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.halves.high=value}};
 #define PUSHFRACTION(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.i=value}};
+#define PUSHID(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_ID, {.number.i=value}};
 #define PUSHBOOL(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_BOOL, {.boolean=value}};
 #define PUSHDATA(value) stack[stackIndex++] = value;
 #define PUSHTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_STRING, {.string=NULL}};
@@ -185,7 +186,7 @@ case LOOKS_COSTUME: {
     else {
         spriteOperand = sprites[spriteOperandIndex];
     }
-    PUSHDEGREES(spriteOperand->base.rotation);
+    PUSHID(spriteOperand->base.costumeIndex);
     status = SCRATCH_continue;
     break;
 }
