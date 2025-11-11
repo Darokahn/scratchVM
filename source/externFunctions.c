@@ -5,7 +5,6 @@
 
 #include "graphics.h"
 #include "scratch.h"
-#include "programData.h"
 #include "externFunctions.h"
 #include "externGlobals.h"
 #include "letters.h"

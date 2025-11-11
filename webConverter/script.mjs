@@ -136,12 +136,12 @@ function indexThreads(blocks) {
     return ids;
 }
 
-function compileSprite(code, sprite, blocks) {
+function compileSprite(code, sprite, blocks, project) {
     opcode.processBlocks(blocks);
     let threadIds = indexThreads(blocks);
     for (let threadId of threadIds) {
         let hat = blocks[threadId];
-        let thread = opcode.compileBlocks(hat, blocks, code);
+        let thread = opcode.compileBlocks(hat, blocks, code, project);
         sprite.struct.threads.push(thread);
     }
     sprite.struct.threadCount = sprite.struct.threads.length;
@@ -151,7 +151,7 @@ function compileSprites(sprites, projectJson) {
     let code = [];
     for (let sprite of sprites) {
         let blocks = projectJson["targets"][sprite.struct.id]["blocks"]
-        compileSprite(code, sprite, blocks);
+        compileSprite(code, sprite, blocks, projectJson);
     }
     return code;
 }
@@ -229,7 +229,7 @@ async function convertScratchProject() {
 function printAsCfile(details, header, buffer) {
     let totalString = ""
     totalString += (
-        "// THIS IS A GENERATED FILE!\n#include <string.h>\n#include <stdlib.h>\n#include \"programData.h\"\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\nint spriteCount;\nint eventTypeOffsets[__EVENTTYPECOUNT];\nbool inputState[5];\n"
+        "// THIS IS A GENERATED FILE!\n#include <string.h>\n#include <stdlib.h>\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\nint spriteCount;\nint eventTypeOffsets[__EVENTTYPECOUNT];\nbool inputState[5];\n"
     );
     totalString += (
         "const struct SCRATCH_header header = {.spriteCount = " + header.spriteCount + 

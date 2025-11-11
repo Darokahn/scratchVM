@@ -15,6 +15,8 @@
 #define PUSHTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_STRING, {.string=NULL}};
 #define PUSHDEGREES(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_DEGREES, {.degrees=value}};
 
+#define GETARGUMENT(type) (thread->programCounter += sizeof(type), INTERPRET_AS(type, code[thread->programCounter - sizeof(type)]))
+
 case INNER_PARTITION_BEGINLOOPCONTROL: {
     ERROR();
     break;
@@ -31,8 +33,7 @@ case INNER_LOOPINCREMENT: {
     break;
 }
 case INNER_JUMPIFREPEATDONE: {
-    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof(jumpTo);
+    uint16_t jumpTo = GETARGUMENT(uint16_t);
     struct SCRATCH_data toMatch = POPNUMBER();
     machineLog("stack index: %d\n", thread->loopCounterStackIndex);
     machineLog("stack value: %d\n", thread->loopCounterStack[thread->loopCounterStackIndex-1]);
@@ -95,15 +96,13 @@ case SENSING_USERNAME: {
     // push global username string
 }
 case INNER_FETCHINPUT: {
-    uint16_t toFetch = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof(toFetch);
+    uint16_t toFetch = GETARGUMENT(uint16_t);
     PUSHBOOL(inputState[toFetch]);
     status = SCRATCH_continue;
     break;
 }
 case INNER_FETCHPOSITION: {
-    int16_t value = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof value;
+    int16_t value = GETARGUMENT(int16_t);
     if (value == -1) { // random position
         PUSHNUMBER(rand() % 500 - 250);
         PUSHNUMBER(rand() % 400 - 200);
@@ -121,10 +120,8 @@ case INNER_FETCHPOSITION: {
     break;
 }
 case INNER_FETCHVAR: {
-    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
-    int16_t varIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t spriteOperandIndex = GETARGUMENT(int16_t);
+    int16_t varIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
     if (spriteOperandIndex == -1) {
         spriteOperand = sprite;
@@ -137,8 +134,7 @@ case INNER_FETCHVAR: {
     break;
 }
 case MOTION_XPOSITION: {
-    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t spriteOperandIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
     if (spriteOperandIndex == -1) {
         spriteOperand = sprite;
@@ -151,8 +147,7 @@ case MOTION_XPOSITION: {
     break;
 }
 case MOTION_YPOSITION: {
-    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t spriteOperandIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
     if (spriteOperandIndex == -1) {
         spriteOperand = sprite;
@@ -165,8 +160,7 @@ case MOTION_YPOSITION: {
     break;
 }
 case MOTION_DIRECTION: {
-    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t spriteOperandIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
     if (spriteOperandIndex == -1) {
         spriteOperand = sprite;
@@ -179,8 +173,7 @@ case MOTION_DIRECTION: {
     break;
 }
 case LOOKS_COSTUME: {
-    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t spriteOperandIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
     if (spriteOperandIndex == -1) {
         spriteOperand = sprite;
@@ -197,8 +190,7 @@ case LOOKS_SIZE: {
     // push the size of the sprite specified by (uint16_6) code
 }
 case LOOKS_COSTUMENUMBERNAME: {
-    int16_t option = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof option;
+    int16_t option = GETARGUMENT(int16_t);
     // number
     if (option == 0) {
         PUSHNUMBER(sprite->base.costumeIndex);
@@ -210,12 +202,29 @@ case LOOKS_COSTUMENUMBERNAME: {
     break;
 }
 case LOOKS_BACKDROPNUMBERNAME: {
-    // TODO
-    break; // I need to look into this one
+    int16_t option = GETARGUMENT(int16_t);
+    // number
+    if (option == 0) {
+        PUSHNUMBER(sprites[0]->base.costumeIndex);
+    }
+    else {
+        PUSHTEXT(getImage(imageTable, sprites[0]->base.id, sprites[0]->base.costumeIndex)->name);
+    }
+    status = SCRATCH_continue;
+    break;
 }
 case SENSING_TOUCHINGOBJECT: {
-    // TODO
-    // push whether the current sprite is touching the sprite specified by (uint16_t) code
+    int16_t target = GETARGUMENT(int16_t);
+    struct SCRATCH_sprite* spriteOperand;
+    if (target >= 0) {
+        spriteOperand = sprites[target];
+    }
+    struct SCRATCH_rect myRect = getRect(sprite, imageTable);
+    struct SCRATCH_rect otherRect = getRect(spriteOperand, imageTable);
+    bool colliding = rectsCollide(myRect, otherRect);
+    PUSHBOOL(colliding);
+    status = SCRATCH_continue;
+    break;
 }
 case SENSING_TOUCHINGOBJECTMENU: {
     ERROR(); // unused
@@ -263,9 +272,14 @@ case SENSING_OF_OBJECT_MENU: {
     break;
 }
 case INNER_PUSHNUMBER: {
-    scaledInt32 field = INTERPRET_AS(scaledInt32, code[thread->programCounter]);
-    thread->programCounter += sizeof(field);
+    scaledInt32 field = GETARGUMENT(scaledInt32);
     PUSHFRACTION(field.i);
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_PUSHDEGREES: {
+    uint16_t field = GETARGUMENT(uint16_t);
+    PUSHDEGREES(field);
     status = SCRATCH_continue;
     break;
 }
@@ -401,10 +415,8 @@ case INNER_PARTITION_BEGINSTATEMENTS: {
     break;
 }
 case DATA_SETVARIABLETO: {
-    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
-    int16_t varIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t spriteOperandIndex = GETARGUMENT(int16_t);
+    int16_t varIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
     if (spriteOperandIndex == -1) {
         spriteOperand = sprite;
@@ -413,15 +425,13 @@ case DATA_SETVARIABLETO: {
         spriteOperand = sprites[spriteOperandIndex];
     }
     struct SCRATCH_data x = POPDATA();
-    sprite->variables[varIndex] = x;
+    spriteOperand->variables[varIndex] = x;
     status = SCRATCH_continue;
     break;
 }
 case DATA_CHANGEVARIABLEBY: {
-    int16_t spriteOperandIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
-    int16_t varIndex = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof spriteOperandIndex;
+    int16_t spriteOperandIndex = GETARGUMENT(int16_t);
+    int16_t varIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
     if (spriteOperandIndex == -1) {
         spriteOperand = sprite;
@@ -430,15 +440,7 @@ case DATA_CHANGEVARIABLEBY: {
         spriteOperand = sprites[spriteOperandIndex];
     }
     struct SCRATCH_data x = POPDATA();
-    sprite->variables[varIndex].data.number.i = x.data.number.i;
-    status = SCRATCH_continue;
-    break;
-}
-case INNER_CHANGEVARIABLEBYLOCAL: {
-    uint16_t varIndex = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof varIndex;
-    struct SCRATCH_data value = POPNUMBER();
-    sprite->variables[varIndex].data.number.i += value.data.number.i;
+    spriteOperand->variables[varIndex].data.number.i = x.data.number.i;
     status = SCRATCH_continue;
     break;
 }
@@ -451,14 +453,13 @@ case DATA_HIDEVARIABLE: {
     break;
 }
 case INNER_LOOPJUMP: {
-    uint16_t to = INTERPRET_AS(uint16_t, code[thread->programCounter]);
+    uint16_t to = GETARGUMENT(uint16_t);
     thread->programCounter = to;
     status = SCRATCH_yieldGeneric;
     break;
 }
 case CONTROL_CREATE_CLONE_OF: {
-    uint16_t field = INTERPRET_AS(int16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof field;
+    uint16_t field = GETARGUMENT(int16_t);
     struct SCRATCH_spriteHeader h;
     struct SCRATCH_sprite* template;
     if (field == -1) {
@@ -494,30 +495,6 @@ case CONTROL_WAIT: {
     status = SCRATCH_yieldGeneric;
     break;
 }
-case CONTROL_REPEAT: {
-    // TODO
-    break;
-}
-case CONTROL_FOREVER: {
-    // TODO
-    break;
-}
-case CONTROL_IF: {
-    // TODO
-    break;
-}
-case CONTROL_IF_ELSE: {
-    // TODO
-    break;
-}
-case CONTROL_WAIT_UNTIL: {
-    // TODO
-    break;
-}
-case CONTROL_REPEAT_UNTIL: {
-    // TODO
-    break;
-}
 case CONTROL_CREATE_CLONE_OF_MENU: {
     // TODO
     break;
@@ -537,8 +514,7 @@ case CONTROL_STOP: {
     break;
 }
 case INNER_JUMPIF: {
-    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof jumpTo;
+    uint16_t jumpTo = GETARGUMENT(uint16_t);
     struct SCRATCH_data evaluand = POPBOOL();
     if (evaluand.data.boolean) {
         thread->programCounter = jumpTo;
@@ -547,8 +523,7 @@ case INNER_JUMPIF: {
     break;
 }
 case INNER_JUMPIFNOT: {
-    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof jumpTo;
+    uint16_t jumpTo = GETARGUMENT(uint16_t);
     struct SCRATCH_data evaluand = POPBOOL();
     if (!evaluand.data.boolean) {
         thread->programCounter = jumpTo;
@@ -557,8 +532,7 @@ case INNER_JUMPIFNOT: {
     break;
 }
 case INNER_JUMP: {
-    uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof jumpTo;
+    uint16_t jumpTo = GETARGUMENT(uint16_t);
     thread->programCounter = jumpTo;
     break;
 }
@@ -693,8 +667,7 @@ case MOTION_IFONEDGEBOUNCE: {
     // detect whether any amount of sprite is off edge, then if so flip the sprite's angle
 }
 case MOTION_SETROTATIONSTYLE: {
-    uint16_t style = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof style;
+    uint16_t style = GETARGUMENT(uint16_t);
     sprite->base.rotationStyle = style;
     status = SCRATCH_yieldGeneric;
     break;
@@ -712,8 +685,7 @@ case LOOKS_THINK: {
     // set the sprite's first variable to the string popped from the stack
 }
 case LOOKS_SWITCHCOSTUMETO: {
-    int16_t index = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof index;
+    int16_t index = GETARGUMENT(uint16_t);
     sprite->base.costumeIndex = index;
     status = SCRATCH_yieldGeneric;
     break;

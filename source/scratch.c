@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "scratch.h"
-#include "programData.h"
 #include "externFunctions.h"
 #include "externGlobals.h"
 
@@ -53,7 +52,7 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
 
     [INNER_PUSHNUMBER] = "INNER_PUSHNUMBER",
     [INNER_PUSHTEXT] = "INNER_PUSHTEXT",
-    [INNER_PUSHANGLE] = "INNER_PUSHANGLE",
+    [INNER_PUSHDEGREES] = "INNER_PUSHDEGREES",
 
     [OPERATOR_ADD] = "OPERATOR_ADD",
     [OPERATOR_SUBTRACT] = "OPERATOR_SUBTRACT",
@@ -163,7 +162,7 @@ void clearEvents() {
     }
 }
 
-enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
+enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread, const pixel* imageTable[]) {
     struct SCRATCH_data stack[STACKMAX];
     int stackIndex = 0;
     enum SCRATCH_opcode operation;
@@ -178,20 +177,20 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, 
     }
 }
 
-void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread) {
+void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread, const pixel* imageTable[]) {
     enum SCRATCH_continueStatus status = SCRATCH_continue;
     while (status == SCRATCH_continue) {
-        status = SCRATCH_processBlock(sprite, thread);
+        status = SCRATCH_processBlock(sprite, thread, imageTable);
     }
 }
 
-int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount) {
+int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount, const pixel* imageTable[]) {
     int activeThreadCount = 0;
     for (int i = 0; i < spriteCount; i++) {
         struct SCRATCH_sprite* sprite = sprites[i];
         for (int ii = 0; ii < sprite->base.threadCount; ii++) {
             if (sprite->threads[ii].active) {
-                SCRATCH_processThread(sprite, &sprite->threads[ii]);
+                SCRATCH_processThread(sprite, &sprite->threads[ii], imageTable);
                 activeThreadCount += sprite->threads[ii].active; // may have changed during this execution
             }
         }
@@ -257,4 +256,28 @@ void SCRATCH_wakeSprites() {
             t->programCounter = t->base.entryPoint;
         }
     }
+}
+
+struct SCRATCH_rect getRect(struct SCRATCH_sprite* s, const pixel* imageTable[]) {
+    struct SCRATCH_rect rect;
+    rect.x = s->base.x.halves.high;
+    rect.y = s->base.y.halves.high;
+    struct image* i = getImage(imageTable, s->base.id, s->base.costumeIndex);
+    rect.width = i->widthRatio * SCRATCHWIDTH / 255;
+    rect.height = i->heightRatio * SCRATCHWIDTH / 255;
+    rect.x -= rect.width / 2;
+    rect.y -= rect.height / 2;
+    return rect;
+}
+
+bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2) {
+    bool collides = false;
+    for (int i = 0; i < 4; i++) {
+        int x = r1.x;
+        int y = r1.y;
+        if (i & 1) x += r1.width;
+        if (i & 2) y += r1.height;
+        collides |= (x > r2.x && x < r2.x + r2.width) && (y > r2.y && y < r2.y + r2.height);
+    }
+    return collides;
 }

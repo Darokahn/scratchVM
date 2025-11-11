@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "scratch.h"
-#include "programData.h"
 #include "graphics.h"
 #include "externFunctions.h"
 #include "externGlobals.h"
@@ -36,7 +35,7 @@ int main() {
             //machineLog("%d\n", getNow());
         } while (getNow() < next);
         next += interval;
-        SCRATCH_visitAllThreads(sprites, spriteCount);
+        SCRATCH_visitAllThreads(sprites, spriteCount, imageTable);
         if (count++ % drawRate == 0) {
             drawSprites(sprites, spriteCount, imageTable);
             updateGraphics();

@@ -1,6 +1,5 @@
 #include <stdint.h>
 
-#include "programData.h"
 #include "externGlobals.h"
 #include "externFunctions.h"
 #include "scratch.h"

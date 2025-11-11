@@ -25,9 +25,9 @@ for (const [key, value] of Object.entries(enums)) {
 
 export const inputMap = {
     "up arrow": 0,
-    "down arrow": 1,
-    "left arrow": 2,
-    "right arrow": 3,
+    "right arrow": 1,
+    "down arrow": 2,
+    "left arrow": 3,
     "space": 4
 };
 
@@ -81,31 +81,46 @@ function toCodeLiteral(number, byteSize, endianness) {
 }
 
 let objectIndex = {
-    sprites: [],
-    broadcasts: [],
-    backdrops: [],
-    variables: [],
+    sprites: {},
+    broadcasts: {},
+    backdrops: {},
+    variables: {},
 };
 
 function indexObjects(project) {
+    let spriteCount = 0;
+    let broadcastCount = 0;
+    let backdropCount = 0;
+    let variableCounts = {};
+    for (let target of project.targets) {
+        variableCounts[target.name] = 0;
+        objectIndex.sprites[target.name] = objectIndex.sprites[target.name] || spriteCount++;
+        for (let broadcast in target.broadcasts) {
+            objectIndex.broadcasts[broadcast] = objectIndex.broadcasts[broadcast] || broadcastCount++;
+        }
+        for (let variable in target.variables) {
+            let spriteIndex = objectIndex.sprites[target.name];
+            let varIndex = objectIndex.broadcasts[variable] || variableCounts[target.name]++;
+            objectIndex.variables[variable] = [spriteIndex, varIndex];
+        }
+    }
+    console.log(objectIndex);
 }
 
-function findSprite(name, blocks, project) {
-    return 0;
-    // TODO: search index of sprite names and return enumerated position.
-    // Create index from project if not present.
+function findSprite(name) {
+    return objectIndex.sprites[name];
 }
 
-function findBroadcast(name, blocks, project) {
-    return 0;
+function findBroadcast(name, id) {
+    return objectIndex.broadcasts[id];
 }
 
-function findBackdrop(name, blocks, project) {
-    return 0;
+function findBackdrop(name) {
+    return objectIndex.backdrops[name];
 }
 
-function findVariable(name, id, blocks, project) {
-    return [0, 0];
+function findVariable(name, id) {
+    return objectIndex.variables[id];
 }
 
 const pushFuncs = {
@@ -118,8 +133,12 @@ const pushFuncs = {
     POSNUM: "NUM",
     WHOLENUM: "NUM",
     INTNUM: "NUM",
-    ANGLENUM: (input) => {
-        console.log("ANGLENUM");
+    ANGLENUM: (input, code) => {
+        let degrees = Number(input.value[0]);
+        let opcode = "INNER_PUSHDEGREES";
+        code.push(opcode);
+        degrees *= (65536 / 360);
+        code.push(...toCodeLiteral(degrees, 2));
     },
     COLOR: (input) => {
         console.log("COLOR");
@@ -135,7 +154,7 @@ const pushFuncs = {
     BROADCAST: (input) => {
         console.log("BROADCAST");
     },
-    VAR: (input, code) => {
+    VAR: (input, code, blocks, project) => {
         code.push("INNER_FETCHVAR");
         let [spriteIndex, varIndex] = findVariable(...input.value);
         code.push(...toCodeLiteral(spriteIndex, 2));
@@ -228,14 +247,14 @@ function pushField(field, code) {
     console.log("in pushField:", field);
 }
 
-function getEventCondition(hat) {
+function getEventCondition(hat, project) {
     let defaultFunc = () => {return 0};
     const eventFuncs = {
         EVENT_WHENKEYPRESSED: () => {
             return inputMap[hat.fields.KEY_OPTION[0]];
         },
         EVENT_WHENBROADCASTRECEIVED: () => {
-            return findBroadcast(hat.fields.BROADCAST_OPTION[0]);
+            return findBroadcast(...hat.fields.BROADCAST_OPTION);
         },
         EVENT_WHENBACKDROPSWITCHESTO: () => {
             return findBackdrop(hat.fields.BACKDROP[0]);
@@ -249,6 +268,23 @@ function getEventCondition(hat) {
 }
 
 let specialFunctions = {
+    SENSING_TOUCHINGOBJECTMENU: (block, code) => {
+        let to = block.fields.TOUCHINGOBJECTMENU[0];
+        if (to === undefined) {
+            console.error("incorrect assumption about the definite shape of motion_goto_menu. block is", block);
+            return;
+        }
+        const fieldValues = {
+            _edge_: -1,
+            _mouse_: -2,
+        };
+        let fieldValue = fieldValues[to] || findSprite(to);
+        code.push(...toCodeLiteral(fieldValue, 2));
+    },
+    SENSING_TOUCHINGOBJECT: (block, code, blocks) => {
+        code.push(block.opcode);
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
+    },
     CONTROL_REPEAT: (block, code, blocks) => {
         code.push("INNER_LOOPINIT"); // get a loop frame on the loop stack to track repetition
         let loopBegin = code.length;
@@ -368,10 +404,12 @@ let specialFunctions = {
         code.push(...toCodeLiteral(-1, 2));
     },
     DATA_SETVARIABLETO: (block, code, blocks) => {
+        console.log("set variable:", block);
         for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
+        let [spriteIndex, variableIndex] = findVariable(...block.fields.VARIABLE);
         code.push(block.opcode);
-        code.push(...toCodeLiteral(-1, 2));
-        code.push(...toCodeLiteral(findVariable(...block.fields.VARIABLE), 2));
+        code.push(...toCodeLiteral(spriteIndex, 2));
+        code.push(...toCodeLiteral(variableIndex, 2));
     }
 };
 
@@ -394,7 +432,8 @@ export function compileBlock(block, code, blocks) {
     }
 }
 
-export function compileBlocks(hat, blocks, code) {
+export function compileBlocks(hat, blocks, code, project) {
+    indexObjects(project);
     let entryPoint = code.length;
     let startEvent = events.indexOf(hat.opcode);
     let eventCondition = getEventCondition(hat);

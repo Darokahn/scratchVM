@@ -5,12 +5,15 @@
 #include <stdio.h>
 
 #include "opcodeEnum.h"
+#include "graphics.h"
 
 #define STACKMAX (128)
 #define MAXOPCODE (255)
 #define LOOPNESTMAX (16) // deepest nesting for `repeat x` loops before failure
 #define SPRITEMAX (8) // maximum spritecount
 #define IMAGEMAX (16)
+#define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
+
 
 #define FRAMESPERSEC 30
 
@@ -66,6 +69,13 @@ union SCRATCH_field {
 struct SCRATCH_data {
     enum SCRATCH_fieldType type;
     union SCRATCH_field data;
+};
+
+struct SCRATCH_rect {
+    int x;
+    int y;
+    int width;
+    int height;
 };
 
 struct SCRATCH_list {
@@ -194,9 +204,9 @@ struct SCRATCH_sprite {
     struct SCRATCH_thread threads[];
 };
 
-enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
-void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread);
-int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount);
+enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread, const pixel* imageTable[]);
+void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread, const pixel* imageTable[]);
+int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount, const pixel* imageTable[]);
 struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header);
 void SCRATCH_initThread(struct SCRATCH_thread*, struct SCRATCH_threadHeader);
 void handleInputs();
@@ -205,5 +215,14 @@ bool SCRATCH_addSprite(struct SCRATCH_sprite* sprite);
 bool SCRATCH_wakeSprite(struct SCRATCH_sprite* sprite, enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
 void SCRATCH_wakeSprites();
 
+bool getEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
+void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool state);
+
+struct image* getImage(const pixel* images[IMAGEMAX], int spriteIndex, int costumeIndex);
+
+void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]);
+void initImages(const uint8_t* buffer, const pixel* images[IMAGEMAX]);
+struct SCRATCH_rect getRect(struct SCRATCH_sprite* s, const pixel* imageTable[]);
+bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2);
 
 #endif

@@ -6,7 +6,6 @@
 
 #include "graphics.h"
 #include "scratch.h"
-#include "programData.h"
 #include "externGlobals.h"
 
 void startGraphics();
