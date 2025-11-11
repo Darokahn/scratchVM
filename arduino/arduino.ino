@@ -123,8 +123,7 @@ extern "C" bool getInput(int index) {
     int vry = analogRead(VRY_PIN);
     bool sw  = digitalRead(SW_PIN) == LOW;  // Active-low button
 
-    //machineLog("%d, %d\r\n", vrx, vry);
-
+    return true; // this is causing a cryptic crash, not sure why. early escape for now.
     switch (index) {
         case 0: // UP
             return vry < ADC_CENTER - DEADZONE;
