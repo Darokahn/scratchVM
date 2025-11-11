@@ -248,7 +248,7 @@ function printAsCfile(details, header, buffer) {
         ";\n"
     );
     let i = 0;
-    totalString += `void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]) {
+    totalString += `void initData(const struct SCRATCH_header header, struct SCRATCH_sprite* sprites[SPRITEMAX]) {
     int offsetTotal = 0;
     eventTypeOffsets[ONKEY] = offsetTotal;
     offsetTotal += 5;
@@ -275,8 +275,6 @@ function printAsCfile(details, header, buffer) {
     }
     totalString += ("\tspriteCount = header.spriteCount;\n");
     totalString += ("}\n");
-    totalString += ("const uint8_t programData[] = {");
-    totalString += ("\n};\n");
     totalString += programStructure.getImageBufferAsCarray(details.imageBuffer) + "\n";
     console.log(totalString);
     fetch("upload/definitions.c", {

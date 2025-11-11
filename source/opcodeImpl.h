@@ -68,6 +68,7 @@ case SENSING_MOUSEX: {
 case SENSING_MOUSEY: {
     PUSHNUMBER(0);
     status = SCRATCH_continue;
+    break;
 }
 case SENSING_KEYPRESSED: {
     struct SCRATCH_data keyIndex = POPNUMBER();
@@ -78,6 +79,7 @@ case SENSING_KEYPRESSED: {
 case SENSING_LOUDNESS: {
     PUSHNUMBER(0);
     status = SCRATCH_continue;
+    break;
 }
 case SENSING_TIMER: {
     // TODO
@@ -283,6 +285,9 @@ case INNER_PUSHDEGREES: {
     status = SCRATCH_continue;
     break;
 }
+case INNER_PUSHTEXT: {
+    break;
+}
 case OPERATOR_ADD: {
     struct SCRATCH_data op2 = POPNUMBER();
     struct SCRATCH_data op1 = POPNUMBER();
@@ -459,7 +464,7 @@ case INNER_LOOPJUMP: {
     break;
 }
 case CONTROL_CREATE_CLONE_OF: {
-    uint16_t field = GETARGUMENT(int16_t);
+    int16_t field = GETARGUMENT(int16_t);
     struct SCRATCH_spriteHeader h;
     struct SCRATCH_sprite* template;
     if (field == -1) {

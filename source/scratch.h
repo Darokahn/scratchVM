@@ -49,8 +49,7 @@
 struct SCRATCH_sprite;
 struct SCRATCH_thread;
 
-// using GNU typed enum extension
-enum SCRATCH_fieldType : uint8_t {
+enum SCRATCH_fieldType {
     SCRATCH_BOOL,
     SCRATCH_NUMBER,
     SCRATCH_DEGREES,
@@ -67,7 +66,7 @@ union SCRATCH_field {
 };
 
 struct SCRATCH_data {
-    enum SCRATCH_fieldType type;
+    uint8_t type;
     union SCRATCH_field data;
 };
 
@@ -85,7 +84,7 @@ struct SCRATCH_list {
 };
 
 // values indicating which dynamic value to fetch
-enum SCRATCH_fetchValue : uint8_t {
+enum SCRATCH_fetchValue {
     SCRATCH_xPosition,
     SCRATCH_yPosition,
     SCRATCH_direction,
@@ -114,7 +113,7 @@ typedef enum SCRATCH_continueStatus (*SCRATCH_function)(struct SCRATCH_sprite* s
 // that this block should yield and use the returned enumeration to set a new current task.
 
 
-enum SCRATCH_EVENTTYPE : uint8_t {
+enum SCRATCH_EVENTTYPE {
     ONKEY,
     ONMESSAGE,
     ONBACKDROP,
@@ -134,7 +133,7 @@ union SCRATCH_eventInput { // redundant union; meant for semantic labeling
 };
 
 struct SCRATCH_event {
-    enum SCRATCH_EVENTTYPE type;
+    uint8_t type;
     union SCRATCH_eventInput input;
 };
 
@@ -181,7 +180,7 @@ struct SCRATCH_spriteHeader {
 struct SCRATCH_threadHeader {
     union SCRATCH_eventInput eventCondition;
     uint16_t entryPoint;
-    enum SCRATCH_EVENTTYPE startEvent;
+    uint8_t startEvent;
 };
 
 struct SCRATCH_thread {
@@ -220,7 +219,7 @@ void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool 
 
 struct image* getImage(const pixel* images[IMAGEMAX], int spriteIndex, int costumeIndex);
 
-void initData(const struct SCRATCH_header header, const uint8_t* buffer, struct SCRATCH_sprite* sprites[SPRITEMAX], const pixel* images[IMAGEMAX]);
+void initData(const struct SCRATCH_header header, struct SCRATCH_sprite* sprites[SPRITEMAX]);
 void initImages(const uint8_t* buffer, const pixel* images[IMAGEMAX]);
 struct SCRATCH_rect getRect(struct SCRATCH_sprite* s, const pixel* imageTable[]);
 bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2);

@@ -1,4 +1,4 @@
-enum SCRATCH_opcode : uint8_t {
+enum SCRATCH_opcode {
     INNER_PARTITION_BEGINLOOPCONTROL, // Semantic partition.
 
     // Loop opcodes. 
@@ -81,19 +81,12 @@ enum SCRATCH_opcode : uint8_t {
     // Statement opcodes. Statements always leave the stack empty, unless there has been an error in compilation or implementation.
     DATA_SETVARIABLETO,          // Set a variable                                           @field variable index @input data
     DATA_CHANGEVARIABLEBY,          // increment a variable                                     @field variable index @input amount
-    INNER_CHANGEVARIABLEBYLOCAL,          // increment a variable                                     @field variable index @input amount
     DATA_SHOWVARIABLE,
     DATA_HIDEVARIABLE,
 
     INNER_LOOPJUMP,        // Signal a loop iteration to interpreter                   @field jump destination
     CONTROL_CREATE_CLONE_OF,           // Treat cloning as a privileged primitive operation        @input sprite index
     CONTROL_WAIT,
-    CONTROL_REPEAT,
-    CONTROL_FOREVER,
-    CONTROL_IF,
-    CONTROL_IF_ELSE,
-    CONTROL_WAIT_UNTIL,
-    CONTROL_REPEAT_UNTIL,
     CONTROL_CREATE_CLONE_OF_MENU,
     CONTROL_DELETE_THIS_CLONE,          // Delete a sprite
     CONTROL_STOP,

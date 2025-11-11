@@ -134,8 +134,8 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
 
 void debugImage(struct image *imgObj, int width, int height) {
     pixel* img = imgObj->pixels;
-    uint8_t pixels[(width * height * 21) + (5 * 128) + 1];
-    uint8_t* pixelPointer = (uint8_t*) &pixels;
+    char pixels[(width * height * 21) + (5 * 128) + 1];
+    char* pixelPointer = (char*) &pixels;
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
             pixel pixel = img[y * width + x];

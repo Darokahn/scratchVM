@@ -22,7 +22,7 @@ extern uint8_t imageBuffer[];
 
 int main() {
     unsigned long next = getNow() + interval;
-    initData(header, programData, sprites, imageTable);
+    initData(header, sprites);
     initImages(imageBuffer, imageTable);
     code = (enum SCRATCH_opcode*)insertedCode;
     startGraphics();
