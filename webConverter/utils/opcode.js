@@ -80,6 +80,17 @@ function toCodeLiteral(number, byteSize, endianness) {
     return bytes;
 }
 
+function alignCode(code, mask) {
+    while (code.length != (code.length & ~mask)) {
+        code.push(0);
+    }
+}
+
+function pushArg(code, arg) {
+    alignCode(code, 3);
+    code.push(...arg);
+}
+
 let objectIndex = {
     sprites: {},
     broadcasts: {},
@@ -128,7 +139,7 @@ const pushFuncs = {
         let number = Number(input.value[0]);
         let opcode = "INNER_PUSHNUMBER";
         code.push(opcode);
-        code.push(...toScaledInt32Tuple(number));
+        pushArg(code, toScaledInt32Tuple(number));
     },
     POSNUM: "NUM",
     WHOLENUM: "NUM",
@@ -138,7 +149,7 @@ const pushFuncs = {
         let opcode = "INNER_PUSHDEGREES";
         code.push(opcode);
         degrees *= (65536 / 360);
-        code.push(...toCodeLiteral(degrees, 2));
+        pushArg(code, toCodeLiteral(degrees, 2));
     },
     COLOR: (input) => {
         console.log("COLOR");
@@ -157,8 +168,8 @@ const pushFuncs = {
     VAR: (input, code, blocks, project) => {
         code.push("INNER_FETCHVAR");
         let [spriteIndex, varIndex] = findVariable(...input.value);
-        code.push(...toCodeLiteral(spriteIndex, 2));
-        code.push(...toCodeLiteral(varIndex, 2));
+        pushArg(code, toCodeLiteral(spriteIndex, 2));
+        pushArg(code, toCodeLiteral(varIndex, 2));
     },
     LIST: (input) => {
         console.log("LIST", code);
@@ -279,7 +290,7 @@ let specialFunctions = {
             _mouse_: -2,
         };
         let fieldValue = fieldValues[to] || findSprite(to);
-        code.push(...toCodeLiteral(fieldValue, 2));
+        pushArg(code, toCodeLiteral(fieldValue, 2));
     },
     SENSING_TOUCHINGOBJECT: (block, code, blocks) => {
         code.push(block.opcode);
@@ -291,11 +302,12 @@ let specialFunctions = {
         pushInput(block.inputs.TIMES, code, blocks);
         code.push("INNER_JUMPIFREPEATDONE");
         let loopBreakPosition = code.length;
+        alignCode(code, 3);
         code.push(0, 0); // to be filled with end-of-loop
         pushInput(block.inputs.SUBSTACK, code, blocks);
         code.push("INNER_LOOPINCREMENT");
         code.push("INNER_LOOPJUMP");
-        code.push(...toCodeLiteral(loopBegin, 2))
+        pushArg(code, toCodeLiteral(loopBegin, 2))
         code[loopBreakPosition] = (code.length & 0xff);
         code[loopBreakPosition + 1] = ((code.length >> 8) & 0xff);
     },
@@ -310,11 +322,12 @@ let specialFunctions = {
         let beginning = code.length;
         pushInput(block.inputs.SUBSTACK, code, blocks);
         code.push("INNER_LOOPJUMP");
-        code.push(...toCodeLiteral(beginning, 2));
+        pushArg(code, toCodeLiteral(beginning, 2));
     },
     CONTROL_IF: (block, code, blocks) => {
         pushInput(block.inputs.CONDITION, code, blocks);
         code.push("INNER_JUMPIFNOT");
+        alignCode(code, 3);
         let index = code.length;
         code.push(0, 0);
         pushInput(block.inputs.SUBSTACK, code, blocks);
@@ -324,10 +337,12 @@ let specialFunctions = {
     CONTROL_IF_ELSE: (block, code, blocks) => {
         pushInput(block.inputs.CONDITION, code, blocks);
         code.push("INNER_JUMPIFNOT");
+        alignCode(code, 3);
         let elseIndex = code.length;
         code.push(0, 0);
         pushInput(block.inputs.SUBSTACK, code, blocks);
         code.push("INNER_JUMP");
+        alignCode(code, 3);
         let endIndex = code.length;
         code.push(0, 0);
         code[elseIndex] = (code.length & 0xff);
@@ -339,19 +354,19 @@ let specialFunctions = {
     LOOKS_COSTUMENUMBERNAME: (block, code) => {
         code.push(block.opcode);
         if (block.fields.NUMBER_NAME[0] == "number") {
-            code.push(...toCodeLiteral(0, 2));
+            pushArg(code, toCodeLiteral(0, 2));
         }
         else if (block.fields.NUMBER_NAME[0] == "name") {
-            code.push(...toCodeLiteral(1, 2));
+            pushArg(code, toCodeLiteral(1, 2));
         }
     },
     SENSING_KEYOPTIONS: (block, code) => {
         code.push("INNER_PUSHNUMBER")
-        code.push(...toScaledInt32Tuple(inputMap[block.fields.KEY_OPTION[0]]));
+        pushArg(code, toScaledInt32Tuple(inputMap[block.fields.KEY_OPTION[0]]));
     },
     MOTION_SETROTATIONSTYLE: (block, code) => {
         code.push(block.opcode);
-        code.push(...toCodeLiteral(["left-right", "don't rotate", "all around"].indexOf(block.fields.STYLE[0]), 2));
+        pushArg(code, toCodeLiteral(["left-right", "don't rotate", "all around"].indexOf(block.fields.STYLE[0]), 2));
     },
     MOTION_GOTO_MENU: (block, code) => {
         let to = block.fields.TO[0];
@@ -365,7 +380,7 @@ let specialFunctions = {
             _mouse_: -2,
         };
         let fieldValue = fieldValues[to] || findSprite(to);
-        code.push(...toCodeLiteral(fieldValue, 2));
+        pushArg(code, toCodeLiteral(fieldValue, 2));
     },
     MOTION_GOTO: (block, code, blocks) => {
         for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
@@ -383,7 +398,7 @@ let specialFunctions = {
             _mouse_: -2,
         };
         let fieldValue = fieldValues[to] || findSprite(to);
-        code.push(...toCodeLiteral(fieldValue, 2));
+        pushArg(code, toCodeLiteral(fieldValue, 2));
     },
     MOTION_GLIDESECSTOXY: (block, code) => {
         for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
@@ -397,19 +412,19 @@ let specialFunctions = {
     },
     MOTION_XPOSITION: (block, code) => {
         code.push(block.opcode);
-        code.push(...toCodeLiteral(-1, 2));
+        pushArg(code, toCodeLiteral(-1, 2));
     },
     MOTION_YPOSITION: (block, code) => {
         code.push(block.opcode);
-        code.push(...toCodeLiteral(-1, 2));
+        pushArg(code, toCodeLiteral(-1, 2));
     },
     DATA_SETVARIABLETO: (block, code, blocks) => {
         console.log("set variable:", block);
         for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
         let [spriteIndex, variableIndex] = findVariable(...block.fields.VARIABLE);
         code.push(block.opcode);
-        code.push(...toCodeLiteral(spriteIndex, 2));
-        code.push(...toCodeLiteral(variableIndex, 2));
+        pushArg(code, toCodeLiteral(spriteIndex, 2));
+        pushArg(code, toCodeLiteral(variableIndex, 2));
     }
 };
 

@@ -15,7 +15,7 @@
 #define PUSHTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_STRING, {.string=NULL}};
 #define PUSHDEGREES(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_DEGREES, {.degrees=value}};
 
-#define GETARGUMENT(type) (thread->programCounter += sizeof(type), INTERPRET_AS(type, code[thread->programCounter - sizeof(type)]))
+#define GETARGUMENT(type) (thread->programCounter = (thread->programCounter + 3) & ~3, thread->programCounter += sizeof(type), INTERPRET_AS(type, code[thread->programCounter - sizeof(type)]))
 
 case INNER_PARTITION_BEGINLOOPCONTROL: {
     ERROR();

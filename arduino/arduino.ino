@@ -23,7 +23,6 @@ TFT_eSprite tftSprite = TFT_eSprite(&tft);
 extern "C" {
   #include "scratch.h"
   #include "graphics.h"
-  #include "programData.h"
 }
 
 extern "C" int main();
@@ -83,6 +82,17 @@ extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, co
         }
         int x;
         int y;
+        machineLog("dump:\n\rwidth: %d\n\rheight: %d\n\rimageResolution: %d\n\rbaseX: %d\n\rbaseY: %d\n\rscanStep: %d\n\rscanStart: %d\n\rxStride: %f\n\ryStride: %f\n\r",
+            width,
+            height,
+            imageResolution,
+            baseX,
+            baseY,
+            scanStep,
+            scanStart,
+            xStride,
+            yStride
+        );
         for (y = 0; y < height; y++) {
             scanX = scanStart;
             for ((x = 0, scanX = scanStart); x < width; (x++, scanX += scanStep)) {

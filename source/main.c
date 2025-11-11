@@ -28,6 +28,7 @@ int main() {
     startGraphics();
     drawSprites(sprites, spriteCount, imageTable);
     updateGraphics();
+    return 0;
     setEvent(ONFLAG, (union SCRATCH_eventInput) {0}, true);
     while (true) {
         do {

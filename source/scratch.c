@@ -169,7 +169,7 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, 
     while (true) {
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
-        machineLog("%s\n", SCRATCH_opcode_names[operation]);
+        //machineLog("%s\n\r", SCRATCH_opcode_names[operation]);
         switch (operation) {
             #include "opcodeImpl.h"
         }
