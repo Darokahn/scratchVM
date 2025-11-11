@@ -87,9 +87,13 @@ let objectIndex = {
     variables: [],
 };
 
+function indexObjects(project) {
+}
+
 function findSprite(name, blocks, project) {
     return 0;
-    // TODO: search index of sprite names and return enumerated position
+    // TODO: search index of sprite names and return enumerated position.
+    // Create index from project if not present.
 }
 
 function findBroadcast(name, blocks, project) {
@@ -224,15 +228,77 @@ function pushField(field, code) {
     console.log("in pushField:", field);
 }
 
+function getEventCondition(hat) {
+    let defaultFunc = () => {return 0};
+    const eventFuncs = {
+        EVENT_WHENKEYPRESSED: () => {
+            return inputMap[hat.fields.KEY_OPTION[0]];
+        },
+        EVENT_WHENBROADCASTRECEIVED: () => {
+            return findBroadcast(hat.fields.BROADCAST_OPTION[0]);
+        },
+        EVENT_WHENBACKDROPSWITCHESTO: () => {
+            return findBackdrop(hat.fields.BACKDROP[0]);
+        },
+        CONTROL_START_AS_CLONE: defaultFunc,
+        EVENT_WHENFLAGCLICKED: defaultFunc,
+        EVENT_WHENTHISSPRITECLICKED: defaultFunc,
+        EVENT_WHENGREATERTHAN: defaultFunc,
+    };
+    return eventFuncs[hat.opcode]();
+}
+
 let specialFunctions = {
+    CONTROL_REPEAT: (block, code, blocks) => {
+        code.push("INNER_LOOPINIT"); // get a loop frame on the loop stack to track repetition
+        let loopBegin = code.length;
+        pushInput(block.inputs.TIMES, code, blocks);
+        code.push("INNER_JUMPIFREPEATDONE");
+        let loopBreakPosition = code.length;
+        code.push(0, 0); // to be filled with end-of-loop
+        pushInput(block.inputs.SUBSTACK, code, blocks);
+        code.push("INNER_LOOPINCREMENT");
+        code.push("INNER_LOOPJUMP");
+        code.push(...toCodeLiteral(loopBegin, 2))
+        code[loopBreakPosition] = (code.length & 0xff);
+        code[loopBreakPosition + 1] = ((code.length >> 8) & 0xff);
+    },
+    CONTROL_WAIT: (block, code, blocks) => {
+        for (let input of Object.values(block.inputs)) {
+            pushInput(input, code, blocks);
+        }
+        code.push(block.opcode);
+        code.push("INNER__WAITITERATION");
+    },
+    CONTROL_FOREVER: (block, code, blocks) => {
+        let beginning = code.length;
+        pushInput(block.inputs.SUBSTACK, code, blocks);
+        code.push("INNER_LOOPJUMP");
+        code.push(...toCodeLiteral(beginning, 2));
+    },
     CONTROL_IF: (block, code, blocks) => {
         pushInput(block.inputs.CONDITION, code, blocks);
         code.push("INNER_JUMPIFNOT");
         let index = code.length;
-        code.push(...[0, 0]);
+        code.push(0, 0);
         pushInput(block.inputs.SUBSTACK, code, blocks);
         code[index] = (code.length & 0xff);
         code[index + 1] = ((code.length >> 8) & 0xff);
+    },
+    CONTROL_IF_ELSE: (block, code, blocks) => {
+        pushInput(block.inputs.CONDITION, code, blocks);
+        code.push("INNER_JUMPIFNOT");
+        let elseIndex = code.length;
+        code.push(0, 0);
+        pushInput(block.inputs.SUBSTACK, code, blocks);
+        code.push("INNER_JUMP");
+        let endIndex = code.length;
+        code.push(0, 0);
+        code[elseIndex] = (code.length & 0xff);
+        code[elseIndex + 1] = ((code.length >> 8) & 0xff);
+        pushInput(block.inputs.SUBSTACK2, code, blocks);
+        code[endIndex] = (code.length & 0xff);
+        code[endIndex + 1] = ((code.length >> 8) & 0xff);
     },
     LOOKS_COSTUMENUMBERNAME: (block, code) => {
         code.push(block.opcode);
@@ -308,26 +374,6 @@ let specialFunctions = {
         code.push(...toCodeLiteral(findVariable(...block.fields.VARIABLE), 2));
     }
 };
-
-function getEventCondition(hat) {
-    let defaultFunc = () => {return 0};
-    const eventFuncs = {
-        EVENT_WHENKEYPRESSED: () => {
-            return inputMap[hat.fields.KEY_OPTION[0]];
-        },
-        EVENT_WHENBROADCASTRECEIVED: () => {
-            return findBroadcast(hat.fields.BROADCAST_OPTION[0]);
-        },
-        EVENT_WHENBACKDROPSWITCHESTO: () => {
-            return findBackdrop(hat.fields.BACKDROP[0]);
-        },
-        CONTROL_START_AS_CLONE: defaultFunc,
-        EVENT_WHENFLAGCLICKED: defaultFunc,
-        EVENT_WHENTHISSPRITECLICKED: defaultFunc,
-        EVENT_WHENGREATERTHAN: defaultFunc,
-    };
-    return eventFuncs[hat.opcode]();
-}
 
 export function compileBlock(block, code, blocks) {
     let specialFunction = specialFunctions[block.opcode];

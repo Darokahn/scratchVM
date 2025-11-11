@@ -31,11 +31,14 @@ int main() {
     updateGraphics();
     setEvent(ONFLAG, (union SCRATCH_eventInput) {0}, true);
     while (true) {
-        do handleInputs(); while (getNow() < next);
+        do {
+            handleInputs();
+            //machineLog("%d\n", getNow());
+        } while (getNow() < next);
         next += interval;
         SCRATCH_visitAllThreads(sprites, spriteCount);
         if (count++ % drawRate == 0) {
-            drawSprites(sprites, 2, imageTable);
+            drawSprites(sprites, spriteCount, imageTable);
             updateGraphics();
         }
         SCRATCH_wakeSprites();

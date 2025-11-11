@@ -31,11 +31,13 @@ case INNER_LOOPINCREMENT: {
     break;
 }
 case INNER_JUMPIFREPEATDONE: {
-    uint16_t toMatch = INTERPRET_AS(uint16_t, code[thread->programCounter]);
-    thread->programCounter += sizeof(toMatch);
     uint16_t jumpTo = INTERPRET_AS(uint16_t, code[thread->programCounter]);
     thread->programCounter += sizeof(jumpTo);
-    if (thread->loopCounterStack[thread->loopCounterStackIndex-1] >= toMatch) {
+    struct SCRATCH_data toMatch = POPNUMBER();
+    machineLog("stack index: %d\n", thread->loopCounterStackIndex);
+    machineLog("stack value: %d\n", thread->loopCounterStack[thread->loopCounterStackIndex-1]);
+    if (thread->loopCounterStack[thread->loopCounterStackIndex-1] >= toMatch.data.number.halves.high) {
+        thread->loopCounterStackIndex--;
         thread->programCounter = jumpTo;
     }
     status = SCRATCH_continue;
