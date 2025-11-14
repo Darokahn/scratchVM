@@ -60,11 +60,11 @@ void* mallocDMA(size_t size) {
     return malloc(size);
 }
 
-void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable) {
-    for (int i = 0; i < spriteCount; i++) {
-        struct SCRATCH_sprite* sprite = sprites[i];
+void drawSprites(struct SCRATCH_spriteContext* context) {
+    for (int i = 0; i < context->spriteCount; i++) {
+        struct SCRATCH_sprite* sprite = context->sprites[i];
         if (!sprite->base.visible) continue;
-        struct image* image = getImage(imageTable, sprite->base.id, sprite->base.costumeIndex);
+        struct image* image = getImage(context, sprite);
         int imageResolution;
         int baseX;
         int baseY;
@@ -102,17 +102,6 @@ void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel**
         }
         int x;
         int y;
-        machineLog("dump:\n\rwidth: %d\n\rheight: %d\n\rimageResolution: %d\n\rbaseX: %d\n\rbaseY: %d\n\rscanStep: %d\n\rscanStart: %d\n\rxStride: %f\n\ryStride: %f\n\r",
-            width,
-            height,
-            imageResolution,
-            baseX,
-            baseY,
-            scanStep,
-            scanStart,
-            xStride,
-            yStride
-        );
         for (y = 0; y < height; y++) {
             scanX = scanStart;
             for ((x = 0, scanX = scanStart); x < width; (x++, scanX += scanStep)) {

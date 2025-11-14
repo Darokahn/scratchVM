@@ -8,40 +8,41 @@
 
 unsigned long getNow();
 
-const pixel* imageTable[IMAGEMAX];
-struct SCRATCH_sprite* sprites[SPRITEMAX];
-extern int spriteCount;
-
 int count = 0;
 int drawRate = 2;
 
 unsigned long interval = 1000 / FRAMESPERSEC;
-
-extern const enum SCRATCH_opcode insertedCode[];
 extern uint8_t imageBuffer[];
 
 int main() {
+    struct SCRATCH_sprite* sprites[SPRITEMAX];
+    struct image* images[IMAGEMAX];
+    int spriteSetIndices[SPRITEMAX];
+    struct SCRATCH_spriteContext context = {
+        .sprites = sprites,
+        .imageTable = images,
+        .spriteSetIndices = spriteSetIndices,
+    };
     unsigned long next = getNow() + interval;
-    initData(header, sprites);
-    initImages(imageBuffer, imageTable);
-    code = (enum SCRATCH_opcode*)insertedCode;
+    uint8_t* code;
+    initData(&context, &code);
+    initImages(&context, imageBuffer);
+    getImage(&context, context.sprites[0]);
     startGraphics();
-    drawSprites(sprites, spriteCount, imageTable);
     updateGraphics();
-    return 0;
     setEvent(ONFLAG, (union SCRATCH_eventInput) {0}, true);
     while (true) {
         do {
             handleInputs();
-            //machineLog("%d\n", getNow());
         } while (getNow() < next);
         next += interval;
-        SCRATCH_visitAllThreads(sprites, spriteCount, imageTable);
+        inputState[1] = 1;
+        SCRATCH_visitAllThreads(&context, code);
         if (count++ % drawRate == 0) {
-            drawSprites(sprites, spriteCount, imageTable);
+            drawSprites(&context);
             updateGraphics();
         }
-        SCRATCH_wakeSprites();
+        SCRATCH_wakeSprites(&context);
         clearEvents();
     }
 }

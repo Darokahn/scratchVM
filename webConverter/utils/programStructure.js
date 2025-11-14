@@ -3,7 +3,7 @@ import mime from 'https://cdn.skypack.dev/mime';
 const SCRATCHWIDTH = 480;
 const SCRATCHHEIGHT = 360;
 
-const structImageSize = 258;
+const structImageSize = 260;
 const imageNameSize = 256;
 
 async function scaleImage(pixels, width, height, targetWidth, targetHeight) {
@@ -192,8 +192,8 @@ export async function getImageBuffer(file, details) {
             let costumeName = new TextEncoder().encode(image.name);
             let costumeNameBuffer = new Uint8Array(imageNameSize);
             costumeNameBuffer.set(costumeName);
-            buffer.set(new Uint8Array([widthRatio, heightRatio]), index);
-            index += 2;
+            buffer.set(new Uint8Array([widthRatio, heightRatio, spriteWidth, spriteWidth]), index);
+            index += 4;
             buffer.set(costumeNameBuffer, index);
             index += imageNameSize;
             buffer.set(new Uint8Array(array.buffer), index);

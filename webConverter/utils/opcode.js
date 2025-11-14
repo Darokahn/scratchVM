@@ -91,19 +91,24 @@ function pushArg(code, arg) {
     code.push(...arg);
 }
 
-let objectIndex = {
+let globalObjectIndex = {
     sprites: {},
     broadcasts: {},
     backdrops: {},
     variables: {},
 };
 
-function indexObjects(project) {
+export function indexObjects(project) {
     let spriteCount = 0;
     let broadcastCount = 0;
     let backdropCount = 0;
     let variableCounts = {};
+    let stage;
+    let objectIndex = globalObjectIndex;
     for (let target of project.targets) {
+        if (target.isStage) {
+            stage = target;
+        }
         variableCounts[target.name] = 0;
         objectIndex.sprites[target.name] = objectIndex.sprites[target.name] || spriteCount++;
         for (let broadcast in target.broadcasts) {
@@ -115,23 +120,26 @@ function indexObjects(project) {
             objectIndex.variables[variable] = [spriteIndex, varIndex];
         }
     }
-    console.log(objectIndex);
+    for (let backdrop of stage.costumes) {
+        objectIndex.backdrops[backdrop.name] = backdropCount++;
+    }
+    return objectIndex;
 }
 
 function findSprite(name) {
-    return objectIndex.sprites[name];
+    return globalObjectIndex.sprites[name];
 }
 
 function findBroadcast(name, id) {
-    return objectIndex.broadcasts[id];
+    return globalObjectIndex.broadcasts[id];
 }
 
 function findBackdrop(name) {
-    return objectIndex.backdrops[name];
+    return globalObjectIndex.backdrops[name];
 }
 
 function findVariable(name, id) {
-    return objectIndex.variables[id];
+    return globalObjectIndex.variables[id];
 }
 
 const pushFuncs = {
@@ -400,7 +408,7 @@ let specialFunctions = {
         let fieldValue = fieldValues[to] || findSprite(to);
         pushArg(code, toCodeLiteral(fieldValue, 2));
     },
-    MOTION_GLIDESECSTOXY: (block, code) => {
+    MOTION_GLIDESECSTOXY: (block, code, blocks) => {
         for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
         code.push(block.opcode);
         code.push("INNER__GLIDEITERATION");

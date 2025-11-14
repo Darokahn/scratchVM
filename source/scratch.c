@@ -155,10 +155,12 @@ void clearEvents() {
     }
 }
 
-enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread, const pixel* imageTable[]) {
+enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code) {
     struct SCRATCH_data stack[STACKMAX];
     int stackIndex = 0;
     enum SCRATCH_opcode operation;
+    struct SCRATCH_sprite* sprite = context->sprite;
+    struct SCRATCH_sprite** sprites = context->sprites;
     while (true) {
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
@@ -170,21 +172,21 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_sprite* sprite, 
     }
 }
 
-void SCRATCH_processThread(struct SCRATCH_sprite* sprite, struct SCRATCH_thread* thread, const pixel* imageTable[]) {
+void SCRATCH_processThread(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code) {
     enum SCRATCH_continueStatus status = SCRATCH_continue;
     while (status == SCRATCH_continue) {
-        status = SCRATCH_processBlock(sprite, thread, imageTable);
+        status = SCRATCH_processBlock(context, thread, code);
     }
 }
 
-int SCRATCH_visitAllThreads(struct SCRATCH_sprite** sprites, int spriteCount, const pixel* imageTable[]) {
+int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code) {
     int activeThreadCount = 0;
-    for (int i = 0; i < spriteCount; i++) {
-        struct SCRATCH_sprite* sprite = sprites[i];
-        for (int ii = 0; ii < sprite->base.threadCount; ii++) {
-            if (sprite->threads[ii].active) {
-                SCRATCH_processThread(sprite, &sprite->threads[ii], imageTable);
-                activeThreadCount += sprite->threads[ii].active; // may have changed during this execution
+    for (int i = 0; i < context->spriteCount; i++) {
+        context->sprite = context->sprites[i];
+        for (int ii = 0; ii < context->sprite->base.threadCount; ii++) {
+            if (context->sprite->threads[ii].active) {
+                SCRATCH_processThread(context, &context->sprite->threads[ii], code);
+                activeThreadCount += context->sprite->threads[ii].active; // may have changed during this execution
             }
         }
     }
@@ -215,10 +217,10 @@ void SCRATCH_initThread(struct SCRATCH_thread* thread, struct SCRATCH_threadHead
     thread->base = h;
 }
 
-bool SCRATCH_addSprite(struct SCRATCH_sprite* sprite) {
-    if (spriteCount >= SPRITEMAX) return false;
+bool SCRATCH_addSprite(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite) {
+    if (context->spriteCount >= SPRITEMAX) return false;
     else {
-        sprites[spriteCount++] = sprite;
+        context->sprites[context->spriteCount++] = sprite;
         return true;
     }
 }
@@ -236,9 +238,9 @@ bool SCRATCH_wakeSprite(struct SCRATCH_sprite* sprite, enum SCRATCH_EVENTTYPE ty
     return woke;
 }
 
-void SCRATCH_wakeSprites() {
-    for (int i = 0; i < spriteCount; i++) {
-        struct SCRATCH_sprite* s = sprites[i];
+void SCRATCH_wakeSprites(struct SCRATCH_spriteContext* context) {
+    for (int i = 0; i < context->spriteCount; i++) {
+        struct SCRATCH_sprite* s = context->sprites[i];
         for (int j = 0; j < s->base.threadCount; j++) {
             struct SCRATCH_thread* t = &s->threads[j];
             if (t->active) {
@@ -251,11 +253,14 @@ void SCRATCH_wakeSprites() {
     }
 }
 
-struct SCRATCH_rect getRect(struct SCRATCH_sprite* s, const pixel* imageTable[]) {
+struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand) {
     struct SCRATCH_rect rect;
+    struct SCRATCH_sprite* s;
+    if (operand == NULL) s = context->sprite;
+    else s = operand;
     rect.x = s->base.x.halves.high;
     rect.y = s->base.y.halves.high;
-    struct image* i = getImage(imageTable, s->base.id, s->base.costumeIndex);
+    struct image* i = getImage(context, s);
     rect.width = i->widthRatio * SCRATCHWIDTH / 255;
     rect.height = i->heightRatio * SCRATCHWIDTH / 255;
     rect.x -= rect.width / 2;
@@ -273,4 +278,10 @@ bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2) {
         collides |= (x > r2.x && x < r2.x + r2.width) && (y > r2.y && y < r2.y + r2.height);
     }
     return collides;
+}
+
+struct {int xError; int yError;} rectOffscreen(struct SCRATCH_rect r1) {
+    struct {int xError; int yError;} result;
+    result.xError = 0;
+    // TODO
 }

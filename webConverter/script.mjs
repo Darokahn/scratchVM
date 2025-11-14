@@ -63,12 +63,10 @@ function spriteTemplate() {
 function detailsTemplate() {
     return {
         unzippedFile: null,
-        messages: {},
-        backdropCount: 0,
+        imageBuffer: null,
         sprites: [],
-        stageImages: [],
-        spriteImages: [],
-        code: []
+        code: [],
+        objectIndex: {}
     };
 }
 
@@ -100,7 +98,7 @@ async function getBinary() {
 }
 
 // extract relevant details from the sb3 file and load them into a details template
-function getDetails(project) {
+async function getDetails(project) {
     let details = detailsTemplate();
     details.unzippedFile = project;
     let projectJson = JSON.parse(new TextDecoder("utf-8").decode(project["project.json"])); // I hate javascript
@@ -121,7 +119,9 @@ function getDetails(project) {
         adjustSprite(sprite, target.isStage);
         details.sprites.push(sprite);
     }
+    details.objectIndex = opcode.indexObjects(projectJson);
     details.code = compileSprites(details.sprites, projectJson);
+    details.imageBuffer = await programStructure.getImageBuffer(project, details);
     return details;
 }
 
@@ -193,69 +193,34 @@ function copyStruct(buffer, offset, struct, name) {
 let PROJECTMAX = 4096 * 100;
 
 async function convertScratchProject() {
-    let header = {
-        codeLength: 0,
-        imageLength: 0,
-        spriteCount: 0,
-        messageCount: 0,
-        backdropCount: 0,
-    };
     const file = getFsEntry("project");
     const buffer = new Uint8Array(PROJECTMAX);
-    let details = getDetails(file);
-    header.backdropCount = details.stageImages.length;
-    let index = 0;
-    buffer.set(new Uint8Array(details.code), index);
-    index += details.code.length;
-    index = (index + 7) & ~7;
-    header.codeLength = index;
-    details.imageBuffer = await programStructure.getImageBuffer(file, details);
-    index = (index + 7) & ~7;
-    header.imageLength = index - header.codeLength;
-    for (let sprite of details.sprites) {
-        copyStruct(buffer.buffer, index, sprite.struct, "sprite");
-        index += offsets.sprite.sizeof;
-        index = (index + 7) & ~7;
-        for (let thread of sprite.struct.threads) {
-            copyStruct(buffer.buffer, index, thread, "thread");
-            index += offsets.thread.sizeof;
-            index = (index + 7) & ~7;
-        }
-    }
-    header.spriteCount = details.sprites.length;
-    printAsCfile(details, header, buffer);
+    let details = await getDetails(file);
+    printAsCfile(details, buffer);
 }
 
-function printAsCfile(details, header, buffer) {
+async function printAsCfile(details, buffer) {
     let totalString = ""
     totalString += (
-        "// THIS IS A GENERATED FILE!\n#include <string.h>\n#include <stdlib.h>\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\nint spriteCount;\nint eventTypeOffsets[__EVENTTYPECOUNT];\nbool inputState[5];\n"
-    );
-    totalString += (
-        "const struct SCRATCH_header header = {.spriteCount = " + header.spriteCount + 
-        ", .codeLength = " + header.codeLength + 
-        ", .imageLength = " + header.imageLength +
-        ", .messageCount = " + header.messageCount +
-        ", .backdropCount = " + header.backdropCount +
-        "};\n"
+        "// THIS IS A GENERATED FILE!\n#include <string.h>\n#include <stdlib.h>\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\nint eventTypeOffsets[__EVENTTYPECOUNT];\nbool inputState[5];\n"
     );
     totalString += opcode.getCodeAsCarray(details.code);
     totalString += (
         "bool events[" +
-        (Object.entries(opcode.inputMap).length + Object.keys(details.messages).length + header.backdropCount + 1) +
+        (Object.entries(opcode.inputMap).length + Object.keys(details.objectIndex.broadcasts).length + Object.keys(details.objectIndex.backdrops).length + 1) +
         "];\n" +
         "int eventCount = sizeof events" +
         ";\n"
     );
     let i = 0;
-    totalString += `void initData(const struct SCRATCH_header header, struct SCRATCH_sprite* sprites[SPRITEMAX]) {
+    totalString += `void initData(struct SCRATCH_spriteContext* context, void* code) {
     int offsetTotal = 0;
     eventTypeOffsets[ONKEY] = offsetTotal;
     offsetTotal += 5;
     eventTypeOffsets[ONMESSAGE] = offsetTotal;
-    offsetTotal += header.messageCount;
+    offsetTotal += ${Object.keys(details.objectIndex.broadcasts).length};
     eventTypeOffsets[ONBACKDROP] = offsetTotal;
-    offsetTotal += header.backdropCount;
+    offsetTotal += ${Object.keys(details.objectIndex.backdrops).length};
     eventTypeOffsets[ONCLONE] = -1; // ONCLONE is an event, but it is not triggered globally so takes no space in the events array
     offsetTotal += 0;
     eventTypeOffsets[ONFLAG] = offsetTotal;
@@ -264,18 +229,18 @@ function printAsCfile(details, header, buffer) {
     offsetTotal += 0;
     eventTypeOffsets[ONLOUDNESS] = -1;
     offsetTotal += 0;\n`
+    totalString += ("\tcontext->spriteCount = " + 0 + ";\n");
     for (let sprite of details.sprites) {
-        totalString += `\tsprites[${i}] = SCRATCH_makeNewSprite((struct SCRATCH_spriteHeader){.x = ${sprite.struct.x}, .y = ${sprite.struct.y}, .rotation = ${sprite.struct.rotation}, .visible = ${sprite.struct.visible}, .layer = ${sprite.struct.layer}, .size = ${sprite.struct.size}, .rotationStyle = ${sprite.struct.rotationStyle}, .costumeIndex = ${sprite.struct.costumeIndex}, .costumeMax = ${sprite.struct.costumeMax}, .threadCount = ${sprite.struct.threadCount}, .variableCount = ${sprite.struct.variableCount}, .id=${sprite.struct.id}});\n`
+        totalString += `\tcontext->sprites[${i}] = SCRATCH_makeNewSprite((struct SCRATCH_spriteHeader){.x = ${sprite.struct.x}, .y = ${sprite.struct.y}, .rotation = ${sprite.struct.rotation}, .visible = ${sprite.struct.visible}, .layer = ${sprite.struct.layer}, .size = ${sprite.struct.size}, .rotationStyle = ${sprite.struct.rotationStyle}, .costumeIndex = ${sprite.struct.costumeIndex}, .costumeMax = ${sprite.struct.costumeMax}, .threadCount = ${sprite.struct.threadCount}, .variableCount = ${sprite.struct.variableCount}, .id=${sprite.struct.id}});\n`
         let j = 0;
         for (let thread of sprite.struct.threads) {
-            totalString += `\t\tSCRATCH_initThread(&(sprites[${i}]->threads[${j}]), (struct SCRATCH_threadHeader) {.eventCondition = ${thread.eventCondition}, .entryPoint = ${thread.entryPoint}, .startEvent = ${thread.startEvent}});\n`;
+            totalString += `\t\tSCRATCH_initThread(&(context->sprites[${i}]->threads[${j}]), (struct SCRATCH_threadHeader) {.eventCondition = ${thread.eventCondition}, .entryPoint = ${thread.entryPoint}, .startEvent = ${thread.startEvent}});\n`;
             j++;
         }
         i++;
     }
-    totalString += ("\tspriteCount = header.spriteCount;\n");
     totalString += ("}\n");
-    totalString += programStructure.getImageBufferAsCarray(details.imageBuffer) + "\n";
+    totalString += await programStructure.getImageBufferAsCarray(details.imageBuffer) + "\n";
     console.log(totalString);
     fetch("upload/definitions.c", {
         method: 'POST',

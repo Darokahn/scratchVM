@@ -83,6 +83,7 @@ enum SCRATCH_opcode {
     DATA_CHANGEVARIABLEBY,          // increment a variable                                     @field variable index @input amount
     DATA_SHOWVARIABLE,
     DATA_HIDEVARIABLE,
+    EVENT_BROADCAST,
 
     INNER_LOOPJUMP,        // Signal a loop iteration to interpreter                   @field jump destination
     CONTROL_CREATE_CLONE_OF,           // Treat cloning as a privileged primitive operation        @input sprite index
@@ -116,8 +117,9 @@ enum SCRATCH_opcode {
     MOTION_SETROTATIONSTYLE,
 
     LOOKS_SAY,
-    LOOKS_THINKFORSECS,
+    LOOKS_SAYFORSECS,
     LOOKS_THINK,
+    LOOKS_THINKFORSECS,
     LOOKS_SWITCHCOSTUMETO,
     LOOKS_NEXTCOSTUME,
     LOOKS_SWITCHBACKDROPTO,

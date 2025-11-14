@@ -4,8 +4,8 @@
 #define FULLLCDWIDTH 320
 #define FULLLCDHEIGHT 240
 
-#define LCDWIDTH FULLLCDWIDTH
-#define LCDHEIGHT FULLLCDHEIGHT
+#define LCDWIDTH 265
+#define LCDHEIGHT 208
 
 #define SCRATCHWIDTH 480
 #define SCRATCHHEIGHT 360
@@ -20,6 +20,8 @@ typedef uint16_t pixel;
 struct image {
     uint8_t widthRatio;
     uint8_t heightRatio;
+    uint8_t xResolution;
+    uint8_t yResolution;
     char name[COSTUMENAMESIZE];
     pixel pixels[];
 };

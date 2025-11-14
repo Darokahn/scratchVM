@@ -35,8 +35,6 @@ case INNER_LOOPINCREMENT: {
 case INNER_JUMPIFREPEATDONE: {
     uint16_t jumpTo = GETARGUMENT(uint16_t);
     struct SCRATCH_data toMatch = POPNUMBER();
-    machineLog("stack index: %d\n", thread->loopCounterStackIndex);
-    machineLog("stack value: %d\n", thread->loopCounterStack[thread->loopCounterStackIndex-1]);
     if (thread->loopCounterStack[thread->loopCounterStackIndex-1] >= toMatch.data.number.halves.high) {
         thread->loopCounterStackIndex--;
         thread->programCounter = jumpTo;
@@ -73,6 +71,7 @@ case SENSING_MOUSEY: {
 case SENSING_KEYPRESSED: {
     struct SCRATCH_data keyIndex = POPNUMBER();
     PUSHBOOL(inputState[keyIndex.data.number.halves.high]);
+    machineLog("%d, %d\n", keyIndex.data.number.halves.high, inputState[keyIndex.data.number.halves.high]);
     status = SCRATCH_continue;
     break;
 }
@@ -99,6 +98,7 @@ case SENSING_USERNAME: {
 }
 case INNER_FETCHINPUT: {
     uint16_t toFetch = GETARGUMENT(uint16_t);
+    machineLog("%d\n", toFetch);
     PUSHBOOL(inputState[toFetch]);
     status = SCRATCH_continue;
     break;
@@ -221,8 +221,8 @@ case SENSING_TOUCHINGOBJECT: {
     if (target >= 0) {
         spriteOperand = sprites[target];
     }
-    struct SCRATCH_rect myRect = getRect(sprite, imageTable);
-    struct SCRATCH_rect otherRect = getRect(spriteOperand, imageTable);
+    struct SCRATCH_rect myRect = getRect(context, NULL);
+    struct SCRATCH_rect otherRect = getRect(context, spriteOperand);
     bool colliding = rectsCollide(myRect, otherRect);
     PUSHBOOL(colliding);
     status = SCRATCH_continue;
@@ -485,7 +485,7 @@ case CONTROL_CREATE_CLONE_OF: {
         // variables need to be handled specially because they can hold allocated strings that need to be copied. TODO
     }
     SCRATCH_wakeSprite(newSprite, 0, (union SCRATCH_eventInput) {0});
-    if (!SCRATCH_addSprite(newSprite)) {
+    if (!SCRATCH_addSprite(context, newSprite)) {
         free(newSprite);
     }
     status = SCRATCH_yieldGeneric;
@@ -702,7 +702,9 @@ case LOOKS_NEXTCOSTUME: {
     break;
 }
 case LOOKS_SWITCHBACKDROPTO: {
-    // TODO
+    int16_t index = GETARGUMENT(uint16_t);
+    sprites[0]->base.costumeIndex = index;
+    status = SCRATCH_yieldGeneric;
     break;
 }
 case LOOKS_BACKDROPS: {
@@ -710,7 +712,9 @@ case LOOKS_BACKDROPS: {
     break;
 }
 case LOOKS_NEXTBACKDROP: {
-    // TODO
+    sprites[0]->base.costumeIndex += 1;
+    sprites[0]->base.costumeIndex %= sprite->base.costumeMax;
+    status = SCRATCH_yieldGeneric;
     break;
 }
 case LOOKS_CHANGESIZEBY: {
