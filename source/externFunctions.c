@@ -14,16 +14,17 @@ SDL_Renderer* renderer;
 SDL_Texture* texture;
 pixel* screen;
 
-void startGraphics() {
+void startIO() {
     SDL_Init(SDL_INIT_VIDEO);
     window = SDL_CreateWindow(
             "Scratch Project",
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
-            LCDWIDTH, LCDHEIGHT,
+            LCDWIDTH * 3, LCDHEIGHT * 3,
             0
             );
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    SDL_RenderSetLogicalSize(renderer, LCDWIDTH, LCDWIDTH);
 
     texture = SDL_CreateTexture(
         renderer,
@@ -31,10 +32,12 @@ void startGraphics() {
         SDL_TEXTUREACCESS_STREAMING,
         LCDWIDTH, LCDHEIGHT
     );
-    screen = mallocDMA(LCDWIDTH * LCDHEIGHT * sizeof *screen);
+    screen = malloc(LCDWIDTH * LCDHEIGHT * sizeof *screen);
 }
 
-void updateGraphics() {
+int cursorX = 0;
+int cursorY = 0;
+void updateIO() {
     SDL_UpdateTexture(texture, NULL, screen, LCDWIDTH * sizeof(*screen));
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
@@ -60,65 +63,9 @@ void* mallocDMA(size_t size) {
     return malloc(size);
 }
 
-void drawSprites(struct SCRATCH_spriteContext* context) {
-    for (int i = 0; i < context->spriteCount; i++) {
-        struct SCRATCH_sprite* sprite = context->sprites[i];
-        if (!sprite->base.visible) continue;
-        struct image* image = getImage(context, sprite);
-        int imageResolution;
-        int baseX;
-        int baseY;
-        int width;
-        int height;
-        if (i == 0) {
-            imageResolution = 128;
-            baseX = 0;
-            baseY = 0;
-            width = LCDWIDTH;
-            height = LCDHEIGHT;
-        }
-        else {
-            imageResolution = 32;
-            baseX = (sprite->base.x.halves.high + (SCRATCHWIDTH / 2)) * WIDTHRATIO;
-            baseY = (-sprite->base.y.halves.high + (SCRATCHHEIGHT / 2)) * HEIGHTRATIO;
-            width = (((float)image->widthRatio / 255) * LCDWIDTH) * sprite->base.size / 100;
-            height = (((float)image->heightRatio/ 255) * LCDHEIGHT) * sprite->base.size / 100;
-            baseX -= (width / 2);
-            baseY -= (height / 2);
-        }
-        // convert from inner scratch-centric coordinates to real screen coordinates
-        float xStride = ((float)imageResolution) / width;
-        float yStride = ((float)imageResolution) / height;
-        int scanX;
-        int scanStep;
-        int scanStart;
-        if (sprite->base.rotation < halfRotation) {
-            scanStart = 0;
-            scanStep = 1;
-        }
-        else {
-            scanStart = width;
-            scanStep = -1;
-        }
-        int x;
-        int y;
-        for (y = 0; y < height; y++) {
-            scanX = scanStart;
-            for ((x = 0, scanX = scanStart); x < width; (x++, scanX += scanStep)) {
-                if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
-                int row = (y * yStride);
-                int index = ((row * imageResolution) + (scanX * xStride));
-                pixel color = image->pixels[index];
-
-                // transparent pixels reveal white if they are on the background; do nothing if they are on a sprite.
-                if (color == 0) {
-                    if (i == 0) color = (pixel) 0xffff;
-                    else continue;
-                }
-                screen[(y + baseY ) * LCDWIDTH + x + baseX] = color;
-            }
-        }
-    }
+void drawPixel(int x, int y, pixel color) {
+    if (y < 0 || y >= LCDHEIGHT || x < 0 || x >= LCDWIDTH) return;
+    screen[y * LCDWIDTH + x] = color;
 }
 
 void debugImage(struct image *imgObj, int width, int height) {

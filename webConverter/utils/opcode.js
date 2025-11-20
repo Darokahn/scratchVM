@@ -96,6 +96,7 @@ let globalObjectIndex = {
     broadcasts: {},
     backdrops: {},
     variables: {},
+    costumes: {},
 };
 
 export function indexObjects(project) {
@@ -103,6 +104,7 @@ export function indexObjects(project) {
     let broadcastCount = 0;
     let backdropCount = 0;
     let variableCounts = {};
+    let costumeCounts = {};
     let stage;
     let objectIndex = globalObjectIndex;
     for (let target of project.targets) {
@@ -110,14 +112,22 @@ export function indexObjects(project) {
             stage = target;
         }
         variableCounts[target.name] = 0;
+        costumeCounts[target.name] = 0;
         objectIndex.sprites[target.name] = objectIndex.sprites[target.name] || spriteCount++;
         for (let broadcast in target.broadcasts) {
             objectIndex.broadcasts[broadcast] = objectIndex.broadcasts[broadcast] || broadcastCount++;
         }
+        let spriteIndex = objectIndex.sprites[target.name];
         for (let variable in target.variables) {
-            let spriteIndex = objectIndex.sprites[target.name];
-            let varIndex = objectIndex.broadcasts[variable] || variableCounts[target.name]++;
+            let varIndex = objectIndex.variables[variable];
+            if (varIndex === undefined) varIndex = variableCounts[target.name]++;
+            else varIndex = varIndex[1];
             objectIndex.variables[variable] = [spriteIndex, varIndex];
+        }
+        for (let costume of target.costumes) {
+            let key = JSON.stringify([target.name, costume.name]);
+            let costumeIndex = objectIndex.costumes[key] || costumeCounts[target.name]++;
+            objectIndex.costumes[key] = costumeIndex;
         }
     }
     for (let backdrop of stage.costumes) {
@@ -128,6 +138,10 @@ export function indexObjects(project) {
 
 function findSprite(name) {
     return globalObjectIndex.sprites[name];
+}
+
+function findCostume(spriteName, costumeName) {
+    return globalObjectIndex.costumes[JSON.stringify([spriteName, costumeName])]
 }
 
 function findBroadcast(name, id) {
@@ -173,7 +187,7 @@ const pushFuncs = {
     BROADCAST: (input) => {
         console.log("BROADCAST");
     },
-    VAR: (input, code, blocks, project) => {
+    VAR: (input, code, blocks) => {
         code.push("INNER_FETCHVAR");
         let [spriteIndex, varIndex] = findVariable(...input.value);
         pushArg(code, toCodeLiteral(spriteIndex, 2));
@@ -182,11 +196,11 @@ const pushFuncs = {
     LIST: (input) => {
         console.log("LIST", code);
     },
-    OBJECTREF: (input, code, blocks) => {
+    OBJECTREF: (input, code, blocks, owner) => {
         let block = blocks[input.value];
         while (block != null) {
             console.log(block);
-            compileBlock(block, code, blocks);
+            compileBlock(block, code, blocks, owner);
             block = blocks[block.next];
         }
     }
@@ -250,7 +264,7 @@ export function processBlocks(blocks) {
     }
 }
 
-function pushInput(input, code, blocks) {
+function pushInput(input, code, blocks, owner) {
     let pushFunc = input.type;
     while (typeof pushFunc === "string") {
         pushFunc = pushFuncs[pushFunc];
@@ -259,7 +273,7 @@ function pushInput(input, code, blocks) {
         console.error("pushFuncs does not contain value for", input);
         return;
     }
-    pushFunc(input, code, blocks);
+    pushFunc(input, code, blocks, owner);
 }
 
 function pushField(field, code) {
@@ -286,7 +300,42 @@ function getEventCondition(hat, project) {
     return eventFuncs[hat.opcode]();
 }
 
+// Initially, I optimized certain opcodes by cutting out "middleman" opcodes whose purpose is only to load data for the opcode which calls them.
+// My VM is capable of loading values directly from the text of the bytecode rather than the normal method, which is to first push to the stack and then pop from it.
+// Scratch often uses dynamic inputs instead of fields, even when the property cannot be chosen dynamically at runtime.
+// Giving myself some charity, scratch is incredibly inconsistent about what it considers an "input" vs. a "field".
+// The VM was architectured to optimize cases where an "input" really cannot change at runtime and just read them as fields for "simplicity".
+// It did not turn out to be simpler, and in fact led to a much higher demand on the programmer to find where inputs are really inputs.
+// This was an example of premature optimization, as the VM itself runs plenty quickly, and the special cases it requires the programmer to handle are not worth the complexity.
+// The inconsistent strategy you will see among these opcode handlers is reflective of a pivot from the prior strategy to a simpler interpretation where inputs are trusted as inputs.
+// A refactor is needed to bring everything up to consistency.
 let specialFunctions = {
+    CONTROL_CREATE_CLONE_OF_MENU: (block, code, blocks, owner) => {
+        let cloneIndex = findSprite(block.fields.CLONE_OPTION[0]);
+        if (cloneIndex === undefined) cloneIndex = -1;
+        code.push("INNER_PUSHID");
+        pushArg(code, toCodeLiteral(cloneIndex, 2));
+    },
+    LOOKS_SWITCHBACKDROPTO: (block, code, blocks, owner) => {
+        code.push(block.opcode);
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks, owner);
+    },
+    LOOKS_BACKDROPS: (block, code, blocks, owner) => {
+        let costumeName = block.fields.BACKDROP[0];
+        let spriteName = owner.name;
+        let costumeIndex = (findCostume(spriteName, costumeName));
+        pushArg(code, toCodeLiteral(costumeIndex, 2));
+    },
+    LOOKS_SWITCHCOSTUMETO: (block, code, blocks, owner) => {
+        code.push(block.opcode);
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks, owner);
+    },
+    LOOKS_COSTUME: (block, code, blocks, owner) => {
+        let costumeName = block.fields.COSTUME[0];
+        let spriteName = owner.name;
+        let costumeIndex = (findCostume(spriteName, costumeName));
+        pushArg(code, toCodeLiteral(costumeIndex, 2));
+    },
     SENSING_TOUCHINGOBJECTMENU: (block, code) => {
         let to = block.fields.TOUCHINGOBJECTMENU[0];
         if (to === undefined) {
@@ -300,62 +349,62 @@ let specialFunctions = {
         let fieldValue = fieldValues[to] || findSprite(to);
         pushArg(code, toCodeLiteral(fieldValue, 2));
     },
-    SENSING_TOUCHINGOBJECT: (block, code, blocks) => {
+    SENSING_TOUCHINGOBJECT: (block, code, blocks, owner) => {
         code.push(block.opcode);
-        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks, owner);
     },
-    CONTROL_REPEAT: (block, code, blocks) => {
+    CONTROL_REPEAT: (block, code, blocks, owner) => {
         code.push("INNER_LOOPINIT"); // get a loop frame on the loop stack to track repetition
         let loopBegin = code.length;
-        pushInput(block.inputs.TIMES, code, blocks);
+        pushInput(block.inputs.TIMES, code, blocks, owner);
         code.push("INNER_JUMPIFREPEATDONE");
         let loopBreakPosition = code.length;
         alignCode(code, 3);
         code.push(0, 0); // to be filled with end-of-loop
-        pushInput(block.inputs.SUBSTACK, code, blocks);
+        pushInput(block.inputs.SUBSTACK, code, blocks, owner);
         code.push("INNER_LOOPINCREMENT");
         code.push("INNER_LOOPJUMP");
         pushArg(code, toCodeLiteral(loopBegin, 2))
         code[loopBreakPosition] = (code.length & 0xff);
         code[loopBreakPosition + 1] = ((code.length >> 8) & 0xff);
     },
-    CONTROL_WAIT: (block, code, blocks) => {
+    CONTROL_WAIT: (block, code, blocks, owner) => {
         for (let input of Object.values(block.inputs)) {
-            pushInput(input, code, blocks);
+            pushInput(input, code, blocks, owner);
         }
         code.push(block.opcode);
         code.push("INNER__WAITITERATION");
     },
-    CONTROL_FOREVER: (block, code, blocks) => {
+    CONTROL_FOREVER: (block, code, blocks, owner) => {
         let beginning = code.length;
-        pushInput(block.inputs.SUBSTACK, code, blocks);
+        pushInput(block.inputs.SUBSTACK, code, blocks, owner);
         code.push("INNER_LOOPJUMP");
         pushArg(code, toCodeLiteral(beginning, 2));
     },
-    CONTROL_IF: (block, code, blocks) => {
-        pushInput(block.inputs.CONDITION, code, blocks);
+    CONTROL_IF: (block, code, blocks, owner) => {
+        pushInput(block.inputs.CONDITION, code, blocks, owner);
         code.push("INNER_JUMPIFNOT");
         alignCode(code, 3);
         let index = code.length;
         code.push(0, 0);
-        pushInput(block.inputs.SUBSTACK, code, blocks);
+        pushInput(block.inputs.SUBSTACK, code, blocks, owner);
         code[index] = (code.length & 0xff);
         code[index + 1] = ((code.length >> 8) & 0xff);
     },
-    CONTROL_IF_ELSE: (block, code, blocks) => {
-        pushInput(block.inputs.CONDITION, code, blocks);
+    CONTROL_IF_ELSE: (block, code, blocks, owner) => {
+        pushInput(block.inputs.CONDITION, code, blocks, owner);
         code.push("INNER_JUMPIFNOT");
         alignCode(code, 3);
         let elseIndex = code.length;
         code.push(0, 0);
-        pushInput(block.inputs.SUBSTACK, code, blocks);
+        pushInput(block.inputs.SUBSTACK, code, blocks, owner);
         code.push("INNER_JUMP");
         alignCode(code, 3);
         let endIndex = code.length;
         code.push(0, 0);
         code[elseIndex] = (code.length & 0xff);
         code[elseIndex + 1] = ((code.length >> 8) & 0xff);
-        pushInput(block.inputs.SUBSTACK2, code, blocks);
+        pushInput(block.inputs.SUBSTACK2, code, blocks, owner);
         code[endIndex] = (code.length & 0xff);
         code[endIndex + 1] = ((code.length >> 8) & 0xff);
     },
@@ -390,8 +439,8 @@ let specialFunctions = {
         let fieldValue = fieldValues[to] || findSprite(to);
         pushArg(code, toCodeLiteral(fieldValue, 2));
     },
-    MOTION_GOTO: (block, code, blocks) => {
-        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
+    MOTION_GOTO: (block, code, blocks, owner) => {
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks, owner);
         code.push("MOTION_GOTOXY");
     },
     MOTION_GLIDETO_MENU: (block, code) => {
@@ -408,13 +457,13 @@ let specialFunctions = {
         let fieldValue = fieldValues[to] || findSprite(to);
         pushArg(code, toCodeLiteral(fieldValue, 2));
     },
-    MOTION_GLIDESECSTOXY: (block, code, blocks) => {
-        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
+    MOTION_GLIDESECSTOXY: (block, code, blocks, owner) => {
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks, owner);
         code.push(block.opcode);
         code.push("INNER__GLIDEITERATION");
     },
-    MOTION_GLIDETO: (block, code, blocks) => {
-        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
+    MOTION_GLIDETO: (block, code, blocks, owner) => {
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks, owner);
         code.push("MOTION_GLIDESECSTOXY");
         code.push("INNER__GLIDEITERATION");
     },
@@ -426,9 +475,15 @@ let specialFunctions = {
         code.push(block.opcode);
         pushArg(code, toCodeLiteral(-1, 2));
     },
-    DATA_SETVARIABLETO: (block, code, blocks) => {
-        console.log("set variable:", block);
-        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks);
+    DATA_SETVARIABLETO: (block, code, blocks, owner) => {
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks, owner);
+        let [spriteIndex, variableIndex] = findVariable(...block.fields.VARIABLE);
+        code.push(block.opcode);
+        pushArg(code, toCodeLiteral(spriteIndex, 2));
+        pushArg(code, toCodeLiteral(variableIndex, 2));
+    },
+    DATA_CHANGEVARIABLEBY: (block, code, blocks, owner) => {
+        for (let input of Object.values(block.inputs)) pushInput(input, code, blocks, owner);
         let [spriteIndex, variableIndex] = findVariable(...block.fields.VARIABLE);
         code.push(block.opcode);
         pushArg(code, toCodeLiteral(spriteIndex, 2));
@@ -436,18 +491,18 @@ let specialFunctions = {
     }
 };
 
-export function compileBlock(block, code, blocks) {
+export function compileBlock(block, code, blocks, owner) {
     let specialFunction = specialFunctions[block.opcode];
     if (specialFunction !== undefined) {
-        specialFunction(block, code, blocks);
+        specialFunction(block, code, blocks, owner);
     }
     else {
         for (let input of Object.values(block.inputs)) {
-            pushInput(input, code, blocks);
+            pushInput(input, code, blocks, owner);
         }
         code.push(block.opcode);
         if (Object.keys(block.fields).length > 0) {
-            console.log(block);
+            //console.log(block);
         }
         for (let field of Object.values(block.fields)) {
             pushField(field, code);
@@ -455,14 +510,14 @@ export function compileBlock(block, code, blocks) {
     }
 }
 
-export function compileBlocks(hat, blocks, code, project) {
+export function compileBlocks(hat, owner, blocks, code, project) {
     indexObjects(project);
     let entryPoint = code.length;
     let startEvent = events.indexOf(hat.opcode);
     let eventCondition = getEventCondition(hat);
     let block = blocks[hat.next];
     while (block != null) {
-        compileBlock(block, code, blocks);
+        compileBlock(block, code, blocks, owner);
         block = blocks[block.next];
     }
     code.push("CONTROL_STOP");
@@ -471,7 +526,7 @@ export function compileBlocks(hat, blocks, code, project) {
 
 export function getCodeAsCarray(code) {
     let values = code.join(", ");
-    return ["const enum SCRATCH_opcode insertedCode[] = {", values, "};\n"].join("");
+    return ["uint8_t code[] = {", values, "};\n"].join("");
 }
 
 function printCodeAsCarray(code) {

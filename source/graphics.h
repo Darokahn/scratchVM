@@ -1,6 +1,10 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
+#include <stdint.h>
+#include "scratch.h"
+#include "letters.h"
+
 #define FULLLCDWIDTH 320
 #define FULLLCDHEIGHT 240
 
@@ -25,4 +29,5 @@ struct image {
     char name[COSTUMENAMESIZE];
     pixel pixels[];
 };
+
 #endif

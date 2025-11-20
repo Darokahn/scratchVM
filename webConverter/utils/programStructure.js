@@ -124,8 +124,7 @@ function drawRGB565ToCanvas(rgb565Array, width, height) {
     return canvas;
 }
 
-async function getScaledImageFromFile(directory, filename, isStage) {
-    let resolution = isStage * 128 + !isStage * 32;
+async function getScaledImageFromFile(directory, filename, resolution) {
     let file = directory[filename];
     let type = mime.getType(filename);
     let {pixels, width, height} = await drawAndGetPixels(file, type);
@@ -160,22 +159,22 @@ async function drawAndGetPixels(uint8arr, mimeType) {
 
 export async function getImageBuffer(file, details) {
     let totalSize = 0;
-    let spriteSize = 128*128*2;
+    let spriteWidth = 128;
+    let spriteSize = spriteWidth*spriteWidth*2;
     for (let sprite of details.sprites) {
         for (let image of sprite.costumes) {
             totalSize += structImageSize + spriteSize;
         }
-        spriteSize = 32*32*2;
+        spriteSize = 64*64*2;
     }
     let buffer = new Uint8Array(totalSize);
-    spriteSize = 128*128*2;
-    let spriteWidth = 128;
+    spriteSize = spriteWidth*spriteWidth*2;
     let isStage = true;
     let index = 0;
     for (let sprite of details.sprites) {
         for (let image of sprite.costumes) {
             // get the image data from the file
-            let {scaledImage, width, height} = await getScaledImageFromFile(file, image.md5ext, isStage);
+            let {scaledImage, width, height} = await getScaledImageFromFile(file, image.md5ext, spriteWidth);
             let array = scaledImage;
             array = RGB888to565(array);
 
@@ -200,8 +199,8 @@ export async function getImageBuffer(file, details) {
             index += array.byteLength;
         }
         isStage = false;
-        spriteWidth = 32;
-        spriteSize = 32*32;
+        spriteWidth = 64;
+        spriteSize = 64*64;
     }
     return buffer;
 }

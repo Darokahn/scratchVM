@@ -8,8 +8,8 @@
 #include "scratch.h"
 #include "externGlobals.h"
 
-void startGraphics();
-void updateGraphics();
+void startIO();
+void updateIO();
 int machineLog(const char* fmt, ...);
 
 void* mallocDMA(size_t size);

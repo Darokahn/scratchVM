@@ -3,8 +3,12 @@
 #include <unistd.h>
 #include "scratch.h"
 #include "graphics.h"
+#include "drawing.h"
+#include "letters.h"
 #include "externFunctions.h"
 #include "externGlobals.h"
+
+extern uint8_t code[];
 
 unsigned long getNow();
 
@@ -24,23 +28,19 @@ int main() {
         .spriteSetIndices = spriteSetIndices,
     };
     unsigned long next = getNow() + interval;
-    uint8_t* code;
-    initData(&context, &code);
+    initData(&context);
     initImages(&context, imageBuffer);
-    getImage(&context, context.sprites[0]);
-    startGraphics();
-    updateGraphics();
+    startIO();
     setEvent(ONFLAG, (union SCRATCH_eventInput) {0}, true);
     while (true) {
         do {
             handleInputs();
         } while (getNow() < next);
         next += interval;
-        inputState[1] = 1;
         SCRATCH_visitAllThreads(&context, code);
         if (count++ % drawRate == 0) {
             drawSprites(&context);
-            updateGraphics();
+            updateIO();
         }
         SCRATCH_wakeSprites(&context);
         clearEvents();

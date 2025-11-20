@@ -10,7 +10,7 @@
 #define STACKMAX (128)
 #define MAXOPCODE (255)
 #define LOOPNESTMAX (16) // deepest nesting for `repeat x` loops before failure
-#define SPRITEMAX (8) // maximum spritecount
+#define SPRITEMAX (32) // maximum spritecount
 #define IMAGEMAX (16)
 #define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
 
@@ -54,6 +54,7 @@ enum SCRATCH_fieldType {
     SCRATCH_NUMBER,
     SCRATCH_DEGREES,
     SCRATCH_STRING,
+    SCRATCH_STATICSTRING,
     SCRATCH_ID,
 };
 
@@ -62,7 +63,7 @@ union SCRATCH_field {
     uint16_t degrees;
     bool boolean;
     char* string;
-    uint8_t id;
+    uint16_t id;
 };
 
 struct SCRATCH_data {
@@ -105,6 +106,8 @@ enum SCRATCH_fetchValue {
 enum SCRATCH_continueStatus {
     SCRATCH_continue,
     SCRATCH_yieldGeneric,
+    SCRATCH_killThread,
+    SCRATCH_killSprite
 };
 
 typedef bool (*SCRATCH_functionIterator)(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, int iteration);
@@ -199,6 +202,7 @@ struct SCRATCH_thread {
 // address after the end of `threads`.
 struct SCRATCH_sprite {
     struct SCRATCH_spriteHeader base;
+    char* talkingString;
     struct SCRATCH_data* variables; // Variable 0 is always the sprite's message (what it might be `say`ing at any moment)
     struct SCRATCH_thread threads[];
 };
@@ -209,11 +213,11 @@ struct SCRATCH_spriteContext {
     int* spriteSetIndices;
     int spriteCount;
     struct SCRATCH_sprite* stage;
-    struct SCRATCH_sprite* sprite;
+    int currentIndex;
 };
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code);
-void SCRATCH_processThread(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code);
+enum SCRATCH_continueStatus SCRATCH_processThread(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code);
 int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code);
 struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header);
 void SCRATCH_initThread(struct SCRATCH_thread*, struct SCRATCH_threadHeader);
@@ -228,7 +232,7 @@ void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool 
 
 struct image* getImage(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand);
 
-void initData(struct SCRATCH_spriteContext* context, void** code);
+void initData(struct SCRATCH_spriteContext* context);
 void initImages(struct SCRATCH_spriteContext* context, uint8_t* buffer);
 struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand);
 bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2);

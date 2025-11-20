@@ -6,7 +6,7 @@
 
 struct image* getImage(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand) {
     struct SCRATCH_sprite* s = operand;
-    if (s == NULL) s = context->sprite;
+    if (s == NULL) s = context->sprites[context->currentIndex];
     int index = context->spriteSetIndices[s->base.id] + s->base.costumeIndex;
     struct image* image = context->imageTable[index];
     return image;

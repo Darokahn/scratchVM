@@ -2,6 +2,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <stdlib.h>
 #include "scratch.h"
 #include "externFunctions.h"
 #include "externGlobals.h"
@@ -9,6 +11,7 @@
 #define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
 
 const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
+    [EVENT_BROADCAST] = "EVENT_BROADCAST",
     [INNER_PARTITION_BEGINLOOPCONTROL] = "INNER_PARTITION_BEGINLOOPCONTROL",
     [INNER_LOOPINIT] = "INNER_LOOPINIT",
     [INNER_LOOPINCREMENT] = "INNER_LOOPINCREMENT",
@@ -116,6 +119,7 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [MOTION_SETROTATIONSTYLE] = "MOTION_SETROTATIONSTYLE",
 
     [LOOKS_SAY] = "LOOKS_SAY",
+    [LOOKS_SAYFORSECS] = "LOOKS_SAYFORSECS",
     [LOOKS_THINKFORSECS] = "LOOKS_THINKFORSECS",
     [LOOKS_THINK] = "LOOKS_THINK",
     [LOOKS_SWITCHCOSTUMETO] = "LOOKS_SWITCHCOSTUMETO",
@@ -138,6 +142,8 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [INNER_DEBUGSTATEMENT] = "INNER_DEBUGSTATEMENT",
 };
 
+
+
 void handleInputs() {
     for (int i = 0; i < 5; i++) {
         bool prior = inputState[i];
@@ -159,12 +165,21 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
     struct SCRATCH_data stack[STACKMAX];
     int stackIndex = 0;
     enum SCRATCH_opcode operation;
-    struct SCRATCH_sprite* sprite = context->sprite;
+    struct SCRATCH_sprite* sprite = context->sprites[context->currentIndex];
     struct SCRATCH_sprite** sprites = context->sprites;
+    enum SCRATCH_opcode watchValue = -1;
     while (true) {
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
-        //machineLog("%s\n\r", SCRATCH_opcode_names[operation]);
+        const char* opcodeName = SCRATCH_opcode_names[operation];
+        if (false) {
+            machineLog("id: %d ", sprite->base.id);
+            if (opcodeName == NULL) machineLog("opcode: %d\n", operation);
+            else machineLog("opcode: %s\n\r", SCRATCH_opcode_names[operation]);
+            if (operation == watchValue) {
+                raise(SIGTRAP);
+            }
+        }
         switch (operation) {
             #include "opcodeImpl.h"
         }
@@ -172,23 +187,30 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
     }
 }
 
-void SCRATCH_processThread(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code) {
+enum SCRATCH_continueStatus SCRATCH_processThread(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code) {
     enum SCRATCH_continueStatus status = SCRATCH_continue;
     while (status == SCRATCH_continue) {
         status = SCRATCH_processBlock(context, thread, code);
     }
+    return status;
 }
 
 int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code) {
     int activeThreadCount = 0;
     for (int i = 0; i < context->spriteCount; i++) {
-        context->sprite = context->sprites[i];
-        for (int ii = 0; ii < context->sprite->base.threadCount; ii++) {
-            if (context->sprite->threads[ii].active) {
-                SCRATCH_processThread(context, &context->sprite->threads[ii], code);
-                activeThreadCount += context->sprite->threads[ii].active; // may have changed during this execution
+        context->currentIndex = i;
+        for (int ii = 0; ii < context->sprites[i]->base.threadCount; ii++) {
+            if (context->sprites[i]->threads[ii].active) {
+                enum SCRATCH_continueStatus status = SCRATCH_processThread(context, &context->sprites[i]->threads[ii], code);
+                if (status == SCRATCH_continue || status == SCRATCH_yieldGeneric) {
+                    activeThreadCount++;
+                }
+                else if (status == SCRATCH_killSprite) {
+                    goto nextSprite;
+                }
             }
         }
+nextSprite:
     }
     return activeThreadCount;
 }
@@ -207,6 +229,7 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header)
     }
     spriteChunk->base = header;
     spriteChunk->variables = (struct SCRATCH_data*) (firstChunkSize + (uint8_t*) spriteChunk);
+    spriteChunk->talkingString = NULL;
     return spriteChunk;
 }
 
@@ -256,7 +279,7 @@ void SCRATCH_wakeSprites(struct SCRATCH_spriteContext* context) {
 struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand) {
     struct SCRATCH_rect rect;
     struct SCRATCH_sprite* s;
-    if (operand == NULL) s = context->sprite;
+    if (operand == NULL) s = context->sprites[context->currentIndex];
     else s = operand;
     rect.x = s->base.x.halves.high;
     rect.y = s->base.y.halves.high;
@@ -277,6 +300,14 @@ bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2) {
         if (i & 2) y += r1.height;
         collides |= (x > r2.x && x < r2.x + r2.width) && (y > r2.y && y < r2.y + r2.height);
     }
+    for (int i = 0; i < 4; i++) {
+        int x = r2.x;
+        int y = r2.y;
+        if (i & 1) x += r2.width;
+        if (i & 2) y += r2.height;
+        collides |= (x > r1.x && x < r1.x + r1.width) && (y > r1.y && y < r1.y + r1.height);
+    }
+    printf("rect1: %d %d %d %d, rect2: %d %d %d %d, collides: %d\n", r1.x, r1.y, r1.width, r1.height, r2.x, r2.y, r2.width, r2.height, collides);
     return collides;
 }
 

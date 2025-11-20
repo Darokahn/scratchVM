@@ -40,7 +40,8 @@ function threadTemplate() {
 // template for the object representing each game object
 function spriteTemplate() {
     return {
-        costumes: null,
+        name: "",
+        costumes: [],
         struct: {
             x: 0,
             y: 0,
@@ -105,6 +106,8 @@ async function getDetails(project) {
     for (let [index, target] of projectJson.targets.entries()) {
         let key = target.name;
         let sprite = spriteTemplate();
+        sprite.name = target.name
+        sprite.costumes = target.costumes;
         sprite.struct.id = index;
         sprite.struct.variableCount = Object.entries(target.variables).length;
         sprite.struct.x = target.x;
@@ -115,7 +118,6 @@ async function getDetails(project) {
         sprite.struct.costumeIndex = target.currentCostume;
         sprite.struct.costumeMax = target.costumes.length;
         sprite.struct.rotationStyle = target.rotationStyle;
-        sprite.costumes = target.costumes;
         adjustSprite(sprite, target.isStage);
         details.sprites.push(sprite);
     }
@@ -141,7 +143,7 @@ function compileSprite(code, sprite, blocks, project) {
     let threadIds = indexThreads(blocks);
     for (let threadId of threadIds) {
         let hat = blocks[threadId];
-        let thread = opcode.compileBlocks(hat, blocks, code, project);
+        let thread = opcode.compileBlocks(hat, sprite, blocks, code, project);
         sprite.struct.threads.push(thread);
     }
     sprite.struct.threadCount = sprite.struct.threads.length;
@@ -202,7 +204,7 @@ async function convertScratchProject() {
 async function printAsCfile(details, buffer) {
     let totalString = ""
     totalString += (
-        "// THIS IS A GENERATED FILE!\n#include <string.h>\n#include <stdlib.h>\n#include \"scratch.h\"\nenum SCRATCH_opcode* code;\nint eventTypeOffsets[__EVENTTYPECOUNT];\nbool inputState[5];\n"
+        "// THIS IS A GENERATED FILE!\n#include <string.h>\n#include <stdlib.h>\n#include \"scratch.h\"\nint eventTypeOffsets[__EVENTTYPECOUNT];\nbool inputState[5];\n"
     );
     totalString += opcode.getCodeAsCarray(details.code);
     totalString += (
@@ -213,7 +215,7 @@ async function printAsCfile(details, buffer) {
         ";\n"
     );
     let i = 0;
-    totalString += `void initData(struct SCRATCH_spriteContext* context, void* code) {
+    totalString += `void initData(struct SCRATCH_spriteContext* context) {
     int offsetTotal = 0;
     eventTypeOffsets[ONKEY] = offsetTotal;
     offsetTotal += 5;
@@ -229,7 +231,7 @@ async function printAsCfile(details, buffer) {
     offsetTotal += 0;
     eventTypeOffsets[ONLOUDNESS] = -1;
     offsetTotal += 0;\n`
-    totalString += ("\tcontext->spriteCount = " + 0 + ";\n");
+    totalString += ("\tcontext->spriteCount = " + details.sprites.length + ";\n");
     for (let sprite of details.sprites) {
         totalString += `\tcontext->sprites[${i}] = SCRATCH_makeNewSprite((struct SCRATCH_spriteHeader){.x = ${sprite.struct.x}, .y = ${sprite.struct.y}, .rotation = ${sprite.struct.rotation}, .visible = ${sprite.struct.visible}, .layer = ${sprite.struct.layer}, .size = ${sprite.struct.size}, .rotationStyle = ${sprite.struct.rotationStyle}, .costumeIndex = ${sprite.struct.costumeIndex}, .costumeMax = ${sprite.struct.costumeMax}, .threadCount = ${sprite.struct.threadCount}, .variableCount = ${sprite.struct.variableCount}, .id=${sprite.struct.id}});\n`
         let j = 0;
@@ -239,6 +241,7 @@ async function printAsCfile(details, buffer) {
         }
         i++;
     }
+    totalString += "\tcontext->stage = context->sprites[0];\n";
     totalString += ("}\n");
     totalString += await programStructure.getImageBufferAsCarray(details.imageBuffer) + "\n";
     console.log(totalString);

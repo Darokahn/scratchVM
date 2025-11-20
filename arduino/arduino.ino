@@ -20,86 +20,47 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite tftSprite = TFT_eSprite(&tft);
 
+#include <Bonezegei_XPT2046.h>
+
+#define TS_CS 33
+#define TS_IRQ 32
+Bonezegei_XPT2046 ts(TS_CS, TS_IRQ);
+int cursorX = 0;
+int cursorY = 0;
+
 extern "C" {
   #include "scratch.h"
   #include "graphics.h"
+  #include "letters.h"
 }
 
 extern "C" int main();
-extern "C" void startGraphics() {
+extern "C" void startIO() {
+    Serial.begin(115200);
     tft.init();
+    ts.begin();
     tft.setRotation(1);
     tftSprite.createSprite(LCDWIDTH, LCDHEIGHT);
     tft.fillScreen(TFT_BLACK);
+    pinMode(33, INPUT);
+    pinMode(32, INPUT);
+    pinMode(25, INPUT_PULLUP);
 }
-extern "C" void updateGraphics(uint16_t* framebuffer) {
+extern "C" void updateIO(uint16_t* framebuffer) {
     tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH) / 2, (FULLLCDHEIGHT - LCDHEIGHT) / 2);
+    ts.getInput();
+    if (ts.z > 500) {
+        cursorX = LCDWIDTH - (ts.x * LCDWIDTH / 4000);
+        cursorY = (ts.y * LCDHEIGHT / 4000);
+    }
 }
 
 extern "C" void* mallocDMA(size_t size) {
     return heap_caps_malloc(size, MALLOC_CAP_DMA);
 }
 
-extern "C" void drawSprites(struct SCRATCH_sprite** sprites, int spriteCount, const pixel** imageTable) {
-    for (int i = 0; i < spriteCount; i++) {
-        struct SCRATCH_sprite* sprite = sprites[i];
-        if (!sprite->base.visible) continue;
-        struct image* image = getImage(imageTable, sprite->base.id, sprite->base.costumeIndex);
-        int imageResolution;
-        int baseX;
-        int baseY;
-        int width;
-        int height;
-        if (i == 0) {
-            imageResolution = 128;
-            baseX = 0;
-            baseY = 0;
-            width = LCDWIDTH;
-            height = LCDHEIGHT;
-        }
-        else {
-            imageResolution = 32;
-            baseX = (sprite->base.x.halves.high + (SCRATCHWIDTH / 2)) * WIDTHRATIO;
-            baseY = (-sprite->base.y.halves.high + (SCRATCHHEIGHT / 2)) * HEIGHTRATIO;
-            width = (((float)image->widthRatio / 255) * LCDWIDTH) * sprite->base.size / 100;
-            height = (((float)image->heightRatio/ 255) * LCDHEIGHT) * sprite->base.size / 100;
-            baseX -= (width / 2);
-            baseY -= (height / 2);
-        }
-        // convert from inner scratch-centric coordinates to real screen coordinates
-        float xStride = ((float)imageResolution) / width;
-        float yStride = ((float)imageResolution) / height;
-        int scanX;
-        int scanStep;
-        int scanStart;
-        if (sprite->base.rotation < halfRotation) {
-            scanStart = 0;
-            scanStep = 1;
-        }
-        else {
-            scanStart = width;
-            scanStep = -1;
-        }
-        int x;
-        int y;
-        for (y = 0; y < height; y++) {
-            scanX = scanStart;
-            for ((x = 0, scanX = scanStart); x < width; (x++, scanX += scanStep)) {
-                if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
-                int row = (y * yStride);
-                int index = ((row * imageResolution) + (scanX * xStride));
-                pixel color = image->pixels[index];
-
-                // transparent pixels reveal white if they are on the background; do nothing if they are on a sprite.
-                if (color == 0) {
-                    if (i == 0) color = (pixel) 0xffff;
-                    else continue;
-                }
-                tftSprite.drawPixel(x + baseX, y + baseY, color);
-                //tft.drawPixel(x + baseX, y + baseY, color);
-            }
-        }
-    }
+extern "C" void drawPixel(int x, int y, pixel color) {
+    tftSprite.drawPixel(x, y, color);
 }
 
 int frameInterval = 1000 / FRAMESPERSEC;
@@ -122,17 +83,15 @@ extern "C" bool getInput(int index) {
     int vry = analogRead(VRY_PIN);
     bool sw  = digitalRead(SW_PIN) == LOW;  // Active-low button
 
-    //machineLog("%d, %d\r\n", vrx, vry);
-
     switch (index) {
         case 0: // UP
-            return vry < ADC_CENTER - DEADZONE;
+            return vry > ADC_CENTER + DEADZONE;
         case 1: // RIGHT
             return vrx > ADC_CENTER + DEADZONE;
         case 2: // DOWN
-            return vry > ADC_CENTER + DEADZONE;
+            return vry < ADC_CENTER - DEADZONE;
         case 3: // LEFT
-            return vrx < ADC_CENTER - DEADZONE;
+            return vrx > ADC_CENTER - DEADZONE;
         case 4: // SPACE / action button
             return sw;
     }
@@ -147,9 +106,9 @@ extern "C" int machineLog(const char* fmt, ...) {
     return n;
 }
 
-void loop() {}
+void loop() {
+}
 
 void setup() {
-    Serial.begin(115200);
     main();
 }
