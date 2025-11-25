@@ -526,7 +526,7 @@ export function compileBlocks(hat, owner, blocks, code, project) {
 
 export function getCodeAsCarray(code) {
     let values = code.join(", ");
-    return ["uint8_t code[] = {", values, "};\n"].join("");
+    return ["const uint8_t code[] = {", values, "};\n"].join("");
 }
 
 function printCodeAsCarray(code) {

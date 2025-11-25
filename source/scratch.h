@@ -10,8 +10,8 @@
 #define STACKMAX (128)
 #define MAXOPCODE (255)
 #define LOOPNESTMAX (16) // deepest nesting for `repeat x` loops before failure
-#define SPRITEMAX (32) // maximum spritecount
-#define IMAGEMAX (16)
+#define SPRITEMAX (256) // maximum spritecount
+#define IMAGEMAX (256)
 #define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
 
 

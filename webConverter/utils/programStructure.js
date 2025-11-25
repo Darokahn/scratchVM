@@ -206,5 +206,5 @@ export async function getImageBuffer(file, details) {
 }
 
 export function getImageBufferAsCarray(buffer) {
-    return ["uint8_t imageBuffer[] = {", buffer.join(", "), "}\n;"].join("");
+    return ["const uint8_t imageBuffer[] = {", buffer.join(", "), "}\n;"].join("");
 }

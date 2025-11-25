@@ -183,7 +183,8 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
         switch (operation) {
             #include "opcodeImpl.h"
         }
-        if (operation > INNER_PARTITION_BEGINSTATEMENTS) return status; // A block has completed
+        if (status == SCRATCH_killSprite) return status;
+        if (operation > INNER_PARTITION_BEGINSTATEMENTS)return status; // A block has completed
     }
 }
 
@@ -286,6 +287,8 @@ struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATC
     struct image* i = getImage(context, s);
     rect.width = i->widthRatio * SCRATCHWIDTH / 255;
     rect.height = i->heightRatio * SCRATCHWIDTH / 255;
+    rect.width = (rect.width * s->base.size) / 100;
+    rect.height = (rect.height * s->base.size) / 100;
     rect.x -= rect.width / 2;
     rect.y -= rect.height / 2;
     return rect;
@@ -307,7 +310,6 @@ bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2) {
         if (i & 2) y += r2.height;
         collides |= (x > r1.x && x < r1.x + r1.width) && (y > r1.y && y < r1.y + r1.height);
     }
-    printf("rect1: %d %d %d %d, rect2: %d %d %d %d, collides: %d\n", r1.x, r1.y, r1.width, r1.height, r2.x, r2.y, r2.width, r2.height, collides);
     return collides;
 }
 

@@ -57,7 +57,7 @@ void drawSprites(struct SCRATCH_spriteContext* context) {
                 if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
                 int row = (y * yStride);
                 int index = ((row * imageResolution) + (scanX * xStride));
-                if (index >= image->width * image->height) continue;
+                if (index >= image->xResolution * image->yResolution) continue;
                 pixel color = image->pixels[index];
 
                 // transparent pixels reveal white if they are on the background; do nothing if they are on a sprite.
