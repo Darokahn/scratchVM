@@ -212,15 +212,15 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
     enum SCRATCH_opcode operation;
     struct SCRATCH_sprite* sprite = context->sprites[context->currentIndex];
     struct SCRATCH_sprite** sprites = context->sprites;
-    enum SCRATCH_opcode watchValue = CONTROL_CREATE_CLONE_OF;
+    enum SCRATCH_opcode watchValue = -1;//OPERATOR_MULTIPLY;
     while (true) {
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        bool loggingCondition = false;
+        bool loggingCondition = false;//sprite->base.id == 1 && thread - sprite->threads == 0;
         if (loggingCondition) {
-            machineLog("id: %d, index: %d, hat: %s, ", sprite->base.id, context->currentIndex, hatTable[thread->base.startEvent]);
-            if (opcodeName == NULL) machineLog("opcode: %d\n", operation);
+            machineLog("id: %d, index: %d, thread: %d, hat: %s, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent]);
+            if (opcodeName == NULL) machineLog("opcode: %d\n\r", operation);
             else machineLog("opcode: %s\n\r", SCRATCH_opcode_names[operation]);
             if (operation == watchValue) {
                 raise(SIGTRAP);
@@ -251,7 +251,6 @@ int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code
         context->currentIndex = i;
         for (int ii = 0; ii < context->sprites[i]->base.threadCount; ii++) {
             if (!context->sprites[i]->threads[ii].active) continue;
-            //machineLog("begin sprite %d, thread %d\n", i, ii);
             enum SCRATCH_continueStatus status = SCRATCH_processThread(context, &context->sprites[i]->threads[ii], code);
             if (status == SCRATCH_continue || status == SCRATCH_yieldGeneric || status == SCRATCH_yieldLogic) {
                 activeThreadCount++;
@@ -286,6 +285,9 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header)
     }
     spriteChunk->base = header;
     spriteChunk->variables = (struct SCRATCH_data*) (firstChunkSize + (uint8_t*) spriteChunk);
+    for (int i = 0; i < header.variableCount; i++) {
+        spriteChunk->variables[i].type = SCRATCH_UNINIT;
+    }
     spriteChunk->talkingString = NULL;
     return spriteChunk;
 }
@@ -384,6 +386,9 @@ struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, cha
         "false",
         "true"
     };
+    if (d.type == SCRATCH_UNINIT) {
+        machineLog("WARNING: scratch data value uninitialized. Likely a variable that was never set.");
+    }
     if (d.type == type) return d;
     int combination = pair(type, d.type);
     switch (combination) {

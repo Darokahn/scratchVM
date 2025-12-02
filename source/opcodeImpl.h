@@ -131,6 +131,13 @@ case INNER_FETCHVAR: {
     else {
         spriteOperand = sprites[spriteOperandIndex];
     }
+    printf("sprite: %d, var: %d\n", spriteOperand->base.id, varIndex);
+    if (spriteOperand->variables[varIndex].type == SCRATCH_UNINIT) {
+        machineLog("WARNING: scratch variable uninitialized.");
+        fflush(stdout);
+    }
+    char buffer[32];
+    printf("value: %s\n", cast(spriteOperand->variables[varIndex], SCRATCH_STRING, buffer).data.string);
     PUSHDATA(spriteOperand->variables[varIndex]);
     status = SCRATCH_continue;
     break;
@@ -253,7 +260,8 @@ case SENSING_TOUCHINGOBJECTMENU: {
     break;
 }
 case SENSING_TOUCHINGCOLOR: {
-    ERROR(); // unused
+    PUSHBOOL(false);
+    status = SCRATCH_continue;
     break;
 }
 case SENSING_COLORISTOUCHINGCOLOR: {
@@ -353,7 +361,7 @@ case OPERATOR_SUBTRACT: {
 case OPERATOR_MULTIPLY: {
     struct SCRATCH_data op2 = POPNUMBER();
     struct SCRATCH_data op1 = POPNUMBER();
-    PUSHFRACTION((op1.data.number.i * op2.data.number.i) >> 16);
+    PUSHFRACTION(((int64_t)op1.data.number.i * op2.data.number.i) >> 16);
     status = SCRATCH_continue;
     break;
 }

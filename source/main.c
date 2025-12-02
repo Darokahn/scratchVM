@@ -23,10 +23,13 @@ extern const uint8_t programData[];
 
 unsigned long interval = 1000 / FRAMESPERSEC;
 
-int main() {
+int app(const uint8_t* programData) {
     struct SCRATCH_sprite* sprites[SPRITEMAX];
     struct image* images[IMAGEMAX];
     int spriteSetIndices[SPRITEMAX];
+    for (int i = 0; i < SPRITEMAX; i++) {
+        sprites[i] = NULL;
+    }
     struct SCRATCH_spriteContext context = {
         .sprites = sprites,
         .imageTable = images,
@@ -35,8 +38,6 @@ int main() {
     };
     unsigned long next = getNow() + interval;
     initProgram(programData, &context, &code, &eventCount, eventTypeOffsets);
-    machineLog("%d\n", eventCount);
-    startIO();
     setEvent(ONFLAG, (union SCRATCH_eventInput) {0}, true);
     while (true) {
         do {
@@ -50,5 +51,12 @@ int main() {
         }
         SCRATCH_wakeSprites(&context);
         clearEvents(eventCount);
+    }
+}
+
+int main() {
+    startIO();
+    while (true) {
+        app(programData);
     }
 }

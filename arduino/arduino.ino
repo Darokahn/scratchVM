@@ -16,15 +16,11 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #define TFT_DC    2  // Data Command control pin
 #define TFT_RST   4  // Reset pin (could connect to RST pin)
 
-
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite tftSprite = TFT_eSprite(&tft);
 
-#include <Bonezegei_XPT2046.h>
-
 #define TS_CS 33
 #define TS_IRQ 32
-Bonezegei_XPT2046 ts(TS_CS, TS_IRQ);
 int cursorX = 0;
 int cursorY = 0;
 
@@ -36,9 +32,7 @@ extern "C" {
 
 extern "C" int main();
 extern "C" void startIO() {
-    Serial.begin(115200);
     tft.init();
-    ts.begin();
     tft.setRotation(1);
     tftSprite.createSprite(LCDWIDTH, LCDHEIGHT);
     tft.fillScreen(TFT_BLACK);
@@ -48,11 +42,6 @@ extern "C" void startIO() {
 }
 extern "C" void updateIO(uint16_t* framebuffer) {
     tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH) / 2, (FULLLCDHEIGHT - LCDHEIGHT) / 2);
-    ts.getInput();
-    if (ts.z > 500) {
-        cursorX = LCDWIDTH - (ts.x * LCDWIDTH / 4000);
-        cursorY = (ts.y * LCDHEIGHT / 4000);
-    }
     //Serial.println(ESP.getFreeHeap());
 }
 
@@ -84,19 +73,26 @@ extern "C" bool getInput(int index) {
     int vry = analogRead(VRY_PIN);
     bool sw  = digitalRead(SW_PIN) == LOW;  // Active-low button
 
+    bool activated = false;
     switch (index) {
         case 0: // UP
-            return vry > ADC_CENTER + DEADZONE;
-        case 1: // RIGHT
-            return vrx > ADC_CENTER + DEADZONE;
+            activated = vry > ADC_CENTER + DEADZONE;
+            break;
+        case 1: // LEFT
+            activated = vrx > ADC_CENTER + DEADZONE;
+            break;
         case 2: // DOWN
-            return vry < ADC_CENTER - DEADZONE;
-        case 3: // LEFT
-            return vrx > ADC_CENTER - DEADZONE;
+            activated = vry < ADC_CENTER - DEADZONE;
+            break;
+        case 3: // RIGHT
+            activated = vrx < ADC_CENTER - DEADZONE;
+            break;
         case 4: // SPACE / action button
-            return sw;
+            activated = sw;
+            break;
     }
-    return false;
+    delay(1);
+    return activated;
 }
 
 extern "C" int machineLog(const char* fmt, ...) {
@@ -111,5 +107,6 @@ void loop() {
 }
 
 void setup() {
+    Serial.begin(115200);
     main();
 }

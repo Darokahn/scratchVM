@@ -199,14 +199,14 @@ export async function getImageBuffer(file, details, byteBudget) {
         }
     }
     for (let image of images) {
-        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, image.md5ext, {mode: "scaleMax", x: 100, y: 100});
+        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, image.md5ext, {mode: "scaleMax", x: 200, y: 200});
         image.scaledImage = scaledImage;
         image.width = width;
         image.height = height;
         image.scaledWidth = targetWidth;
         image.scaledHeight = targetHeight;
         totalSize += structImageSize;
-        totalSize += width * height * 2;
+        totalSize += targetWidth * targetHeight * 2;
     }
     let buffer = new Uint8Array(totalSize);
     let isStage = true;

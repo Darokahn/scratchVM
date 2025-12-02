@@ -56,6 +56,7 @@ enum SCRATCH_fieldType {
     SCRATCH_BOOL,
     SCRATCH_STRING,
     SCRATCH_STATICSTRING,
+    SCRATCH_UNINIT,
 };
 
 union SCRATCH_field {
@@ -166,7 +167,7 @@ struct SCRATCH_spriteHeader {
     uint16_t size; // number representing percent of original size
     bool visible;
     int8_t layer;
-    bool rotationStyle;
+    uint8_t rotationStyle;
     uint8_t costumeIndex;
     uint8_t costumeMax;
     uint8_t threadCount;
@@ -197,7 +198,7 @@ struct SCRATCH_thread {
 struct SCRATCH_sprite {
     struct SCRATCH_spriteHeader base;
     char* talkingString;
-    struct SCRATCH_data* variables; // Variable 0 is always the sprite's message (what it might be `say`ing at any moment)
+    struct SCRATCH_data* variables;
     struct SCRATCH_thread threads[];
 };
 

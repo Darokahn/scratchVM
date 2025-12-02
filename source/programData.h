@@ -3,6 +3,17 @@
 #include <stdio.h>
 #include <stdint.h>
 
+void debugSprite(struct SCRATCH_sprite* sprite) {
+    struct SCRATCH_spriteHeader base = sprite->base;
+    machineLog("General thread information: sizeof header = %d, alignof = %d\n\r", sizeof(base), __alignof(base));
+    machineLog("Specialized information (all fields in their native format): x: %d, y: %d, rotation: %d, size: %d, visible: %d, layer: %d, rotationStyle: %d, costumeIndex: %d, costumeMax: %d, threadCount: %d, variableCount: %d, id: %d\n\r", base.x.i, base.y.i, base.rotation, base.size, base.visible, base.layer, base.rotationStyle, base.costumeIndex, base.costumeMax, base.threadCount, base.variableCount, base.id);
+    machineLog("General thread information: sizeof header = %d, alignof = %d\n\r", sizeof(struct SCRATCH_threadHeader), __alignof(struct SCRATCH_threadHeader));
+    for (int i = 0; i < base.threadCount; i++) {
+        struct SCRATCH_threadHeader tHeader = sprite->threads[i].base;
+        machineLog("condition: %d, entry: %d, start: %d\n\r", tHeader.eventCondition, tHeader.entryPoint, tHeader.startEvent);
+    }
+}
+
 struct dataHeader {
     uint16_t spriteCount;
     uint16_t codeLength;
@@ -33,17 +44,21 @@ static inline void initProgram(const uint8_t* buffer, struct SCRATCH_spriteConte
     eventTypeOffsets[ONLOUDNESS] = -1;
     offsetTotal += 0;
     *eventCount = offsetTotal;
+    machineLog("\n\r\n\r");
+    machineLog("%d %d %d %d %d %d %d %d %d\n\r", d->spriteCount, d->codeLength, d->inputCount, d->broadcastCount, d->backdropCount, d->codeOffset, d->spriteOffset, d->threadOffset, d->imageOffset);
     *code = &(buffer[d->codeOffset]);
     const struct SCRATCH_spriteHeader* spriteHeaders = (struct SCRATCH_spriteHeader*) &(buffer[d->spriteOffset]);
     const struct SCRATCH_threadHeader* threadHeaders = (struct SCRATCH_threadHeader*) &(buffer[d->threadOffset]);
     context->spriteCount = d->spriteCount;
     for (int i = 0; i < d->spriteCount; i++) {
         struct SCRATCH_spriteHeader spriteHeader = spriteHeaders[i];
+        if (context->sprites[i] != NULL) free(context->sprites[i]);
         context->sprites[i] = SCRATCH_makeNewSprite(spriteHeader);
         for (int ii = 0; ii < spriteHeader.threadCount; ii++) {
             struct SCRATCH_threadHeader threadHeader = *threadHeaders++;
             SCRATCH_initThread(&(context->sprites[i]->threads[ii]), threadHeader);
         }
+        debugSprite(context->sprites[i]);
     }
     context->stage = context->sprites[0];
     initImages(context, &(buffer[d->imageOffset]));
