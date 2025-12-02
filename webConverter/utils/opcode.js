@@ -1,5 +1,131 @@
 const print = console.log.bind(console);
 
+const UINT32_MAX = 4294967295;
+
+export const opcodeArray = [
+    "INNER_PARTITION_BEGINLOOPCONTROL",
+    "INNER_LOOPINIT",
+    "INNER_LOOPINCREMENT",
+    "INNER_JUMPIFREPEATDONE",
+    "INNER_PARTITION_BEGINEXPRESSIONS",
+    "SENSING_ANSWER",
+    "SENSING_MOUSEDOWN",
+    "SENSING_MOUSEX",
+    "SENSING_MOUSEY",
+    "SENSING_KEYPRESSED",
+    "SENSING_LOUDNESS",
+    "SENSING_TIMER",
+    "SENSING_CURRENT",
+    "SENSING_DAYSSINCE2000",
+    "SENSING_USERNAME",
+    "INNER_FETCHINPUT",
+    "INNER_FETCHPOSITION",
+    "INNER_FETCHVAR",
+    "MOTION_XPOSITION",
+    "MOTION_YPOSITION",
+    "MOTION_DIRECTION",
+    "LOOKS_COSTUME",
+    "LOOKS_SIZE",
+    "LOOKS_COSTUMENUMBERNAME",
+    "LOOKS_BACKDROPNUMBERNAME",
+    "SENSING_TOUCHINGOBJECT",
+    "SENSING_TOUCHINGOBJECTMENU",
+    "SENSING_TOUCHINGCOLOR",
+    "SENSING_COLORISTOUCHINGCOLOR",
+    "SENSING_DISTANCETO",
+    "SENSING_DISTANCETOMENU",
+    "SENSING_ASKANDWAIT",
+    "SENSING_KEYOPTIONS",
+    "SENSING_SETDRAGMODE",
+    "SENSING_RESETTIMER",
+    "SENSING_OF",
+    "SENSING_OF_OBJECT_MENU",
+    "INNER_PUSHNUMBER",
+    "INNER_PUSHDEGREES",
+    "INNER_PUSHTEXT",
+    "INNER_PUSHID",
+    "OPERATOR_ADD",
+    "OPERATOR_SUBTRACT",
+    "OPERATOR_MULTIPLY",
+    "OPERATOR_DIVIDE",
+    "OPERATOR_RANDOM",
+    "OPERATOR_GT",
+    "OPERATOR_LT",
+    "OPERATOR_EQUALS",
+    "INNER_LE",
+    "INNER_GE",
+    "OPERATOR_AND",
+    "OPERATOR_OR",
+    "OPERATOR_NOT",
+    "OPERATOR_JOIN",
+    "OPERATOR_LETTER_OF",
+    "OPERATOR_LENGTH",
+    "OPERATOR_CONTAINS",
+    "OPERATOR_MOD",
+    "OPERATOR_ROUND",
+    "OPERATOR_MATHOP",
+    "INNER_DEBUGEXPRESSION",
+    "INNER_PARTITION_BEGINSTATEMENTS",
+    "DATA_SETVARIABLETO",
+    "DATA_CHANGEVARIABLEBY",
+    "DATA_SHOWVARIABLE",
+    "DATA_HIDEVARIABLE",
+    "EVENT_BROADCAST",
+    "INNER_LOOPJUMP",
+    "CONTROL_CREATE_CLONE_OF",
+    "CONTROL_WAIT",
+    "CONTROL_WAIT_UNTIL",
+    "CONTROL_CREATE_CLONE_OF_MENU",
+    "CONTROL_DELETE_THIS_CLONE",
+    "CONTROL_STOP",
+    "INNER_JUMPIF",
+    "INNER_JUMPIFNOT",
+    "INNER_JUMP",
+    "INNER__GLIDEITERATION",
+    "MOTION_MOVESTEPS",
+    "MOTION_TURNRIGHT",
+    "MOTION_TURNLEFT",
+    "MOTION_GOTO",
+    "MOTION_GOTO_MENU",
+    "MOTION_GOTOXY",
+    "MOTION_GLIDETO",
+    "MOTION_GLIDETO_MENU",
+    "MOTION_GLIDESECSTOXY",
+    "MOTION_POINTINDIRECTION",
+    "MOTION_POINTTOWARDS",
+    "MOTION_POINTTOWARDS_MENU",
+    "MOTION_CHANGEXBY",
+    "MOTION_SETX",
+    "MOTION_CHANGEYBY",
+    "MOTION_SETY",
+    "MOTION_IFONEDGEBOUNCE",
+    "MOTION_SETROTATIONSTYLE",
+    "LOOKS_SAY",
+    "LOOKS_SAYFORSECS",
+    "LOOKS_THINK",
+    "LOOKS_THINKFORSECS",
+    "LOOKS_SWITCHCOSTUMETO",
+    "LOOKS_NEXTCOSTUME",
+    "LOOKS_SWITCHBACKDROPTO",
+    "LOOKS_BACKDROPS",
+    "LOOKS_NEXTBACKDROP",
+    "LOOKS_CHANGESIZEBY",
+    "LOOKS_SETSIZETO",
+    "LOOKS_CHANGEEFFECTBY",
+    "LOOKS_SETEFFECTTO",
+    "LOOKS_CLEARGRAPHICEFFECTS",
+    "LOOKS_SHOW",
+    "LOOKS_HIDE",
+    "LOOKS_GOTOFRONTBACK",
+    "LOOKS_GOFORWARDBACKWARDLAYERS",
+    "INNER__WAITITERATION",
+    "INNER_DEBUGSTATEMENT",
+];
+
+export const opcodeEnum = Object.fromEntries(
+  Object.entries(opcodeArray).map(([key, val]) => [val, key]),
+);
+
 const enums = {
   unobscuredShadow: 1,
   noShadow: 2,
@@ -25,9 +151,9 @@ for (const [key, value] of Object.entries(enums)) {
 
 export const inputMap = {
     "up arrow": 0,
-    "right arrow": 1,
+    "left arrow": 1,
     "down arrow": 2,
-    "left arrow": 3,
+    "right arrow": 3,
     "space": 4
 };
 
@@ -170,22 +296,25 @@ const pushFuncs = {
         let degrees = Number(input.value[0]);
         let opcode = "INNER_PUSHDEGREES";
         code.push(opcode);
-        degrees *= (65536 / 360);
-        pushArg(code, toCodeLiteral(degrees, 2));
+        degrees *= ((UINT32_MAX + 1) / 360);
+        pushArg(code, toCodeLiteral(degrees, 4));
     },
     COLOR: (input) => {
         console.log("COLOR");
     },
     TEXT: (input, code) => {
-        if (Number(input.value[0]) !== NaN) {
-            return pushFuncs.NUM(input, code);
+        if (!isNaN(input.value[0])) {
+            pushFuncs.NUM(input, code);
+            return;
         }
         code.push("INNER_PUSHTEXT");
         code.push(...toBytes(input.value[0]));
         code.push(0);
     },
-    BROADCAST: (input) => {
-        console.log("BROADCAST");
+    BROADCAST: (input, code) => {
+        code.push("INNER_PUSHID");
+        let eventIndex = findBroadcast(input.value[0], input.value[1]);
+        pushArg(code, toCodeLiteral(eventIndex, 2));
     },
     VAR: (input, code, blocks) => {
         code.push("INNER_FETCHVAR");
@@ -194,12 +323,11 @@ const pushFuncs = {
         pushArg(code, toCodeLiteral(varIndex, 2));
     },
     LIST: (input) => {
-        console.log("LIST", code);
+        console.log("LIST");
     },
     OBJECTREF: (input, code, blocks, owner) => {
         let block = blocks[input.value];
         while (block != null) {
-            console.log(block);
             compileBlock(block, code, blocks, owner);
             block = blocks[block.next];
         }
@@ -310,11 +438,42 @@ function getEventCondition(hat, project) {
 // The inconsistent strategy you will see among these opcode handlers is reflective of a pivot from the prior strategy to a simpler interpretation where inputs are trusted as inputs.
 // A refactor is needed to bring everything up to consistency.
 let specialFunctions = {
+    LOOKS_CHANGEEFFECTBY: () => {},
+    LOOKS_SETEFFECTTO: () => {},
+    CONTROL_STOP: (block, code, blocks, owner) => {
+        let options = ["this script", "all", "other scripts in sprite"];
+        console.log(block.fields);
+        console.log(block.fields.STOP_OPTION);
+        let index = options.indexOf(block.fields.STOP_OPTION[0]);
+        code.push("INNER_PUSHID");
+        pushArg(code, toCodeLiteral(index, 2));
+        code.push("CONTROL_STOP");
+    },
     CONTROL_CREATE_CLONE_OF_MENU: (block, code, blocks, owner) => {
         let cloneIndex = findSprite(block.fields.CLONE_OPTION[0]);
         if (cloneIndex === undefined) cloneIndex = -1;
         code.push("INNER_PUSHID");
         pushArg(code, toCodeLiteral(cloneIndex, 2));
+    },
+    LOOKS_SAYFORSECS: (block, code, blocks, owner) => {
+        pushInput(block.inputs.MESSAGE, code, blocks, owner);
+        code.push("LOOKS_SAY");
+        pushInput(block.inputs.SECS, code, blocks, owner);
+        code.push("CONTROL_WAIT");
+        code.push("INNER__WAITITERATION");
+        code.push("INNER_PUSHTEXT");
+        code.push(0);
+        code.push("LOOKS_SAY");
+    },
+    LOOKS_THINKFORSECS: (block, code, blocks, owner) => {
+        pushInput(block.inputs.MESSAGE, code, blocks, owner);
+        code.push("LOOKS_SAY");
+        pushInput(block.inputs.SECS, code, blocks, owner);
+        code.push("CONTROL_WAIT");
+        code.push("INNER__WAITITERATION");
+        code.push("INNER_PUSHTEXT");
+        code.push(0);
+        code.push("LOOKS_THINK");
     },
     LOOKS_SWITCHBACKDROPTO: (block, code, blocks, owner) => {
         code.push(block.opcode);
@@ -343,8 +502,8 @@ let specialFunctions = {
             return;
         }
         const fieldValues = {
-            _edge_: -1,
-            _mouse_: -2,
+            _mouse_: -1,
+            _edge_: -2,
         };
         let fieldValue = fieldValues[to] || findSprite(to);
         pushArg(code, toCodeLiteral(fieldValue, 2));
@@ -374,6 +533,31 @@ let specialFunctions = {
         }
         code.push(block.opcode);
         code.push("INNER__WAITITERATION");
+    },
+    CONTROL_WAIT_UNTIL: (block, code, blocks, owner) => {
+        let beginningIndex = code.length;
+        pushInput(block.inputs.CONDITION, code, blocks, owner);
+        code.push("INNER_JUMPIF");
+        alignCode(code, 3);
+        let argIndex = code.length;
+        code.push(...[0, 0]);
+        code.push("INNER_LOOPJUMP");
+        pushArg(code, toCodeLiteral(beginningIndex, 2));
+        code[argIndex] = (code.length & 0xff);
+        code[argIndex + 1] = ((code.length >> 8) & 0xff);
+    },
+    CONTROL_REPEAT_UNTIL: (block, code, blocks, owner) => {
+        let beginningIndex = code.length;
+        pushInput(block.inputs.CONDITION, code, blocks, owner);
+        code.push("INNER_JUMPIF");
+        alignCode(code, 3);
+        let argIndex = code.length;
+        code.push(...[0, 0]);
+        pushInput(block.inputs.SUBSTACK, code, blocks, owner);
+        code.push("INNER_LOOPJUMP");
+        pushArg(code, toCodeLiteral(beginningIndex, 2));
+        code[argIndex] = (code.length & 0xff);
+        code[argIndex + 1] = ((code.length >> 8) & 0xff);
     },
     CONTROL_FOREVER: (block, code, blocks, owner) => {
         let beginning = code.length;
@@ -492,6 +676,10 @@ let specialFunctions = {
 };
 
 export function compileBlock(block, code, blocks, owner) {
+    if (block.opcode.startsWith("SOUND")) {
+        console.log("skipping sound block");
+        return;
+    }
     let specialFunction = specialFunctions[block.opcode];
     if (specialFunction !== undefined) {
         specialFunction(block, code, blocks, owner);
@@ -502,7 +690,6 @@ export function compileBlock(block, code, blocks, owner) {
         }
         code.push(block.opcode);
         if (Object.keys(block.fields).length > 0) {
-            //console.log(block);
         }
         for (let field of Object.values(block.fields)) {
             pushField(field, code);
@@ -520,6 +707,8 @@ export function compileBlocks(hat, owner, blocks, code, project) {
         compileBlock(block, code, blocks, owner);
         block = blocks[block.next];
     }
+    code.push("INNER_PUSHID");
+    pushArg(code, [0, 0]);
     code.push("CONTROL_STOP");
     return {entryPoint, startEvent, eventCondition};
 }
@@ -527,6 +716,10 @@ export function compileBlocks(hat, owner, blocks, code, project) {
 export function getCodeAsCarray(code) {
     let values = code.join(", ");
     return ["const uint8_t code[] = {", values, "};\n"].join("");
+}
+
+export function getCodeAsBuffer(code) {
+    return code.map((num) => Number(opcodeEnum[num] || num));
 }
 
 function printCodeAsCarray(code) {

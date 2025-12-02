@@ -20,11 +20,11 @@ void startIO() {
             "Scratch Project",
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
-            LCDWIDTH * 3, LCDHEIGHT * 3,
+            LCDWIDTH, LCDHEIGHT,
             0
             );
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    SDL_RenderSetLogicalSize(renderer, LCDWIDTH, LCDWIDTH);
+    SDL_RenderSetLogicalSize(renderer, LCDWIDTH, LCDHEIGHT);
 
     texture = SDL_CreateTexture(
         renderer,
@@ -107,9 +107,9 @@ bool getInput(int index) {
     keyboardState = SDL_GetKeyboardState(&numkeys);
     switch (index) {
         case 0: return keyboardState[SDL_SCANCODE_UP];
-        case 1: return keyboardState[SDL_SCANCODE_RIGHT];
+        case 1: return keyboardState[SDL_SCANCODE_LEFT];
         case 2: return keyboardState[SDL_SCANCODE_DOWN];
-        case 3: return keyboardState[SDL_SCANCODE_LEFT];
+        case 3: return keyboardState[SDL_SCANCODE_RIGHT];
         case 4: return keyboardState[SDL_SCANCODE_SPACE];
     }
     return 0;

@@ -53,7 +53,7 @@ extern "C" void updateIO(uint16_t* framebuffer) {
         cursorX = LCDWIDTH - (ts.x * LCDWIDTH / 4000);
         cursorY = (ts.y * LCDHEIGHT / 4000);
     }
-    Serial.println(ESP.getFreeHeap());
+    //Serial.println(ESP.getFreeHeap());
 }
 
 extern "C" void* mallocDMA(size_t size) {

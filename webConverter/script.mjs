@@ -1,41 +1,10 @@
 import { unzipSync } from "https://unpkg.com/fflate/esm/browser.js";
 import * as opcode from "./utils/opcode.js";
-import * as programStructure from "./utils/programStructure.js";
+import * as imageDrawing from "./utils/imageDrawing.js";
+
+const SIZERATIO = 1024;
 
 const files = {};
-
-const offsets = {
-    sprite: {
-        x: { offset: 0, size: 4 }, // scaledInt32 (high half is whole number, low half is fractional number)
-        y: { offset: 4, size: 4 }, // scaledInt32
-        rotation: { offset: 8, size: 2 }, // scaled rotation (0 -> 360 maps to 0 -> 655636)
-        visible: { offset: 10, size: 1 },
-        layer: { offset: 11, size: 1 },
-        size: { offset: 12, size: 2 },
-        rotationStyle: { offset: 14, size: 1 }, // bool
-        costumeIndex: { offset: 15, size: 1 },
-        costumeMax: { offset: 16, size: 1 },
-        threadCount: { offset: 17, size: 1 },
-        variableCount: { offset: 18, size: 1 },
-        id: {offset: 19, size: 1},
-        sizeof: 20
-    },
-    thread: {
-        eventCondition: { offset: 0, size: 2 }, // enum
-        entryPoint: { offset: 2, size: 2 },
-        startEvent: { offset: 4, size: 2 }, // enum
-        sizeof: 6
-    }
-};
-
-// template for the object representing the runtime of a stack of blocks
-function threadTemplate() {
-    return {
-        startEvent: 0, // The triggering event
-        eventCondition: 0, // The parameter that must match for the triggering event to follow through
-        entryPoint: 0,
-    };
-}
 
 // template for the object representing each game object
 function spriteTemplate() {
@@ -77,12 +46,9 @@ function toScaledInt32(x) {
     return x << 16;
 }
 
-function degreesToScaled16(degrees) {
-    // Normalize degrees to [0, 360)
-    degrees = ((degrees % 360) + 360) % 360;
-
-    // Scale to 0–65536 range (wraps naturally in 16-bit)
-    let scaled = Math.round((degrees / 360) * 65536) & 0xFFFF;
+function degreesToScaled32(degrees) {
+    degrees %= 360;
+    let scaled = (degrees / 360 * (2 ** 32)) & 0xFFFFFFFF;
 
     return scaled;
 }
@@ -90,12 +56,6 @@ function degreesToScaled16(degrees) {
 // get the sb3 file from the operation layer
 function getFsEntry(name) {
     return files[name];
-}
-
-// get the static binary for patching
-async function getBinary() {
-    let file = await fetch("a.out");
-    return file;
 }
 
 // extract relevant details from the sb3 file and load them into a details template
@@ -123,7 +83,7 @@ async function getDetails(project) {
     }
     details.objectIndex = opcode.indexObjects(projectJson);
     details.code = compileSprites(details.sprites, projectJson);
-    details.imageBuffer = await programStructure.getImageBuffer(project, details);
+    details.imageBuffer = await imageDrawing.getImageBuffer(project, details);
     return details;
 }
 
@@ -165,91 +125,135 @@ function adjustSprite(sprite, isStage) {
     }
     sprite.struct.x = toScaledInt32(sprite.struct.x);
     sprite.struct.y = toScaledInt32(sprite.struct.y);
-    sprite.struct.rotation = degreesToScaled16(sprite.struct.rotation);
+    sprite.struct.rotation = degreesToScaled32(sprite.struct.rotation);
     sprite.struct.rotationStyle = ["left-right", "don't rotate", "all around"].indexOf(sprite.struct.rotationStyle);
-    sprite.struct.size = Number(+sprite.struct.size || 0);
+    sprite.struct.size = Number(+sprite.struct.size / 100 * SIZERATIO || 0);
 }
 
-// copy a sprite into the array's memory the way it will be represented in the memory of the processor
-function copyStruct(buffer, offset, struct, name) {
-    const view = new DataView(buffer);
+function bytesToCarray(bytes, name) {
+    console.log(bytes);
+    return ["const unsigned char ", name, "[] = {", bytes.join(", "), "};"].join("");
+}
 
-    const sizes = {
-        1: "Uint8",
-        2: "Uint16",
-        4: "Uint32",
-        8: "Uint64"
-    };
-
-    let layout = offsets[name];
-
-    for (let field in layout) {
-        if (field == "sizeof") continue;
-        let offsetData = layout[field];
-        let totalOffset = offset + offsetData.offset;
-        let setSize = "set" + sizes[offsetData.size];
-        view[setSize](totalOffset, struct[field], true);
+function pad(array, align) {
+    while ((array.length % align) !== 0) {
+        array.push(0);
     }
 }
-
-let PROJECTMAX = 4096 * 100;
 
 async function convertScratchProject() {
     const file = getFsEntry("project");
-    const buffer = new Uint8Array(PROJECTMAX);
     let details = await getDetails(file);
-    printAsCfile(details, buffer);
+    let bytes = await getProgramAsBlob(details);
+    sendFile(bytesToCarray(bytes, "programData"));
 }
 
-async function printAsCfile(details, buffer) {
-    let totalString = ""
-    totalString += (
-        "// THIS IS A GENERATED FILE!\n#include <string.h>\n#include <stdlib.h>\n#include \"scratch.h\"\nint eventTypeOffsets[__EVENTTYPECOUNT];\nbool inputState[5];\n"
-    );
-    totalString += opcode.getCodeAsCarray(details.code);
-    totalString += (
-        "bool events[" +
-        (Object.entries(opcode.inputMap).length + Object.keys(details.objectIndex.broadcasts).length + Object.keys(details.objectIndex.backdrops).length + 1) +
-        "];\n" +
-        "int eventCount = sizeof events" +
-        ";\n"
-    );
-    let i = 0;
-    totalString += `void initData(struct SCRATCH_spriteContext* context) {
-    int offsetTotal = 0;
-    eventTypeOffsets[ONKEY] = offsetTotal;
-    offsetTotal += 5;
-    eventTypeOffsets[ONMESSAGE] = offsetTotal;
-    offsetTotal += ${Object.keys(details.objectIndex.broadcasts).length};
-    eventTypeOffsets[ONBACKDROP] = offsetTotal;
-    offsetTotal += ${Object.keys(details.objectIndex.backdrops).length};
-    eventTypeOffsets[ONCLONE] = -1; // ONCLONE is an event, but it is not triggered globally so takes no space in the events array
-    offsetTotal += 0;
-    eventTypeOffsets[ONFLAG] = offsetTotal;
-    offsetTotal += 1;
-    eventTypeOffsets[ONCLICK] = -1;
-    offsetTotal += 0;
-    eventTypeOffsets[ONLOUDNESS] = -1;
-    offsetTotal += 0;\n`
-    totalString += ("\tcontext->spriteCount = " + details.sprites.length + ";\n");
-    for (let sprite of details.sprites) {
-        totalString += `\tcontext->sprites[${i}] = SCRATCH_makeNewSprite((struct SCRATCH_spriteHeader){.x = ${sprite.struct.x}, .y = ${sprite.struct.y}, .rotation = ${sprite.struct.rotation}, .visible = ${sprite.struct.visible}, .layer = ${sprite.struct.layer}, .size = ${sprite.struct.size}, .rotationStyle = ${sprite.struct.rotationStyle}, .costumeIndex = ${sprite.struct.costumeIndex}, .costumeMax = ${sprite.struct.costumeMax}, .threadCount = ${sprite.struct.threadCount}, .variableCount = ${sprite.struct.variableCount}, .id=${sprite.struct.id}});\n`
-        let j = 0;
-        for (let thread of sprite.struct.threads) {
-            totalString += `\t\tSCRATCH_initThread(&(context->sprites[${i}]->threads[${j}]), (struct SCRATCH_threadHeader) {.eventCondition = ${thread.eventCondition}, .entryPoint = ${thread.entryPoint}, .startEvent = ${thread.startEvent}});\n`;
-            j++;
-        }
-        i++;
-    }
-    totalString += "\tcontext->stage = context->sprites[0];\n";
-    totalString += ("}\n");
-    totalString += await programStructure.getImageBufferAsCarray(details.imageBuffer) + "\n";
-    console.log(totalString);
+async function sendFile(blob) {
     fetch("upload/definitions.c", {
         method: 'POST',
         headers: {},
-        body: totalString
+        body: blob
     });
+}
+
+// assume little endian and no padding
+function toIntStruct(arr, sizes) {
+    if (arr.length !== sizes.length) {
+        console.error("toIntStruct: lengths don't match");
+        return;
+    }
+    let length = 0;
+    for (let size of sizes) {
+        length += size;
+    }
+    let intStruct = [];
+    let index = 0;
+    for (let i = 0; i < arr.length; i++) {
+        let intVal = arr[i];
+        let size = sizes[i];
+        for (let j = 0; j < size; j++) {
+            intStruct[index] = (intVal >> (j * 8)) & 0xff;
+            index += 1;
+        }
+    }
+    return intStruct;
+}
+
+function makeSprite(spriteBase) {
+    let sizes = [
+        4, 4, 4,
+        2,
+        1, 1, 1, 1, 1, 1, 1, 1
+    ];
+    return toIntStruct(
+        [
+            spriteBase.x, spriteBase.y, spriteBase.rotation,
+            spriteBase.size,
+            spriteBase.visible, spriteBase.layer, spriteBase.rotationStyle, spriteBase.costumeIndex,
+            spriteBase.costumeMax, spriteBase.threadCount, spriteBase.variableCount, spriteBase.id
+        ],
+        sizes
+    );
+}
+
+function makeThread(threadBase) {
+    let sizes = [2, 2, 1];
+    return toIntStruct(
+        [threadBase.eventCondition, threadBase.entryPoint, threadBase.startEvent],
+        sizes
+    );
+}
+
+async function getProgramAsBlob(details) {
+    console.log(details.code);
+    let code = opcode.getCodeAsBuffer(details.code);
+    pad(code, 4);
+    let headerArray = [
+        details.sprites.length,
+        code.length,
+        5,
+        Object.keys(details.objectIndex.broadcasts).length,
+        Object.keys(details.objectIndex.backdrops).length,
+        0,
+        0,
+        0,
+        0
+    ];
+    let headerArraySizes = [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        4,
+        4,
+        4
+    ];
+    // just to get a length
+    let headerStruct = toIntStruct(headerArray, headerArraySizes);
+    pad(headerStruct, 4);
+    let spriteBuffer = [];
+    let threadBuffer = [];
+    details.sprites.forEach(sprite => {
+        spriteBuffer.push(...makeSprite(sprite.struct))
+        pad(spriteBuffer, 4);
+        sprite.struct.threads.forEach( thread => {
+            threadBuffer.push(...makeThread(thread));
+            pad(threadBuffer, 2);
+        });
+    });
+    headerArray[5] = headerStruct.length;
+    headerArray[6] = headerStruct.length + code.length;
+    headerArray[7] = headerStruct.length + code.length + spriteBuffer.length;
+    headerArray[8] = headerStruct.length + code.length + spriteBuffer.length + threadBuffer.length;
+    // for real this time
+    headerStruct = toIntStruct(headerArray, headerArraySizes);
+
+    console.log(headerStruct, code, spriteBuffer, threadBuffer);
+    let imageBytes = details.imageBuffer;
+    let bytes = [...headerStruct, ...code, ...spriteBuffer, ...threadBuffer, ...details.imageBuffer];
+    return bytes;
 }
 
 async function addZipToFs(file) {
@@ -257,10 +261,6 @@ async function addZipToFs(file) {
     const bytes = new Uint8Array(buffer);
     const unzipped = unzipSync(bytes);
     files["project"] = unzipped;
-}
-
-function assert(condition, phrase) {
-    if (!condition) console.log("ERROR: " + phrase);
 }
 
 async function main() {

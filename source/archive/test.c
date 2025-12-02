@@ -15,16 +15,23 @@ int main(void) {
     printf("costumeMax    = %zu\n", offsetof(struct SCRATCH_spriteHeader, costumeMax));
     printf("threadCount   = %zu\n", offsetof(struct SCRATCH_spriteHeader, threadCount));
     printf("variableCount = %zu\n", offsetof(struct SCRATCH_spriteHeader, variableCount));
-    printf("id = %zu\n", offsetof(struct SCRATCH_spriteHeader, id));
+    printf("id            = %zu\n", offsetof(struct SCRATCH_spriteHeader, id));
     printf("sizeof        = %zu\n", sizeof(struct SCRATCH_spriteHeader));
+    printf("alignof       = %zu\n", __alignof(struct SCRATCH_spriteHeader));
 
     printf("\nOffsets in SCRATCH_threadHeader:\n");
     printf("eventCondition = %zu\n", offsetof(struct SCRATCH_threadHeader, eventCondition));
     printf("entryPoint     = %zu\n", offsetof(struct SCRATCH_threadHeader, entryPoint));
     printf("startEvent     = %zu\n", offsetof(struct SCRATCH_threadHeader, startEvent));
     printf("sizeof         = %zu\n", sizeof(struct SCRATCH_threadHeader));
+    printf("alignof        = %zu\n", __alignof(struct SCRATCH_threadHeader));
 
     printf("\nOffsets in image:\n");
+    printf("widthRatio     = %zu\n", offsetof(struct image, widthRatio));
+    printf("heightRatio    = %zu\n", offsetof(struct image, heightRatio));
+    printf("xResolution    = %zu\n", offsetof(struct image, xResolution));
+    printf("yResolution    = %zu\n", offsetof(struct image, yResolution));
+    printf("name           = %zu\n", offsetof(struct image, name));
     printf("sizeof         = %zu\n", sizeof(struct image));
 
     return 0;

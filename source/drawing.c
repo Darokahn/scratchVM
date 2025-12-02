@@ -10,14 +10,14 @@
 void drawSprites(struct SCRATCH_spriteContext* context) {
     for (int i = 0; i < context->spriteCount; i++) {
         struct SCRATCH_sprite* sprite = context->sprites[i];
-        if (!sprite->base.visible) continue;
         struct image* image = getImage(context, sprite);
-        int imageResolution;
+        if (!sprite->base.visible) continue;
         int baseX;
         int baseY;
         int width;
         int height;
-        imageResolution = image->xResolution;
+        int xResolution = image->xResolution;
+        int yResolution = image->yResolution;
         if (i == 0) {
             baseX = 0;
             baseY = 0;
@@ -25,16 +25,14 @@ void drawSprites(struct SCRATCH_spriteContext* context) {
             height = LCDHEIGHT;
         }
         else {
-            baseX = (sprite->base.x.halves.high + (SCRATCHWIDTH / 2)) * WIDTHRATIO;
-            baseY = (-sprite->base.y.halves.high + (SCRATCHHEIGHT / 2)) * HEIGHTRATIO;
-            width = (((float)image->widthRatio / 255) * LCDWIDTH) * sprite->base.size / 100;
-            height = (((float)image->heightRatio/ 255) * LCDHEIGHT) * sprite->base.size / 100;
-            baseX -= (width / 2);
-            baseY -= (height / 2);
+            baseX = (sprite->base.x.halves.high - (image->xRotationCenter * sprite->base.size / SIZERATIO) + (SCRATCHWIDTH / 2)) * WIDTHRATIO;
+            baseY = (-sprite->base.y.halves.high - (image->yRotationCenter * sprite->base.size / SIZERATIO) + (SCRATCHHEIGHT / 2)) * HEIGHTRATIO;
+            width = (((float)image->widthRatio / 255) * LCDWIDTH) * sprite->base.size / SIZERATIO;
+            height = (((float)image->heightRatio/ 255) * LCDHEIGHT) * sprite->base.size / SIZERATIO;
         }
         // convert from inner scratch-centric coordinates to real screen coordinates
-        float xStride = ((float)imageResolution) / width;
-        float yStride = ((float)imageResolution) / height;
+        float xStride = ((float)xResolution) / width;
+        float yStride = ((float)yResolution) / height;
         int scanX;
         int scanStep;
         int scanStart;
@@ -43,7 +41,7 @@ void drawSprites(struct SCRATCH_spriteContext* context) {
             scanStep = 1;
         }
         else {
-            scanStart = width;
+            scanStart = width - 1;
             scanStep = -1;
         }
         int x;
@@ -56,7 +54,7 @@ void drawSprites(struct SCRATCH_spriteContext* context) {
             for ((x = 0, scanX = scanStart); x < width; (x++, scanX += scanStep)) {
                 if (y + baseY >= LCDHEIGHT || x + baseX >= LCDWIDTH || y + baseY < 0 || x + baseX < 0) continue;
                 int row = (y * yStride);
-                int index = ((row * imageResolution) + (scanX * xStride));
+                int index = ((row * xResolution) + (scanX * xStride));
                 if (index >= image->xResolution * image->yResolution) continue;
                 pixel color = image->pixels[index];
 
@@ -72,9 +70,11 @@ void drawSprites(struct SCRATCH_spriteContext* context) {
 }
 
 bool getLetterPixel(struct letterSet letterSet, int letter, int row, int col) {
-    letter -= 'A';
+    letter -= '!';
     if (letter >= letterSet.letterMax || letter < 0) return 0;
-    return letterSet.letters[letter].rows[row].cols[col] - '0';
+    if (col >= 3 || col < 0) return 0;
+    if (row >= 5 || row < 0) return 0;
+    return letterSet.letters[letter].rows[row].cols[col];
 }
 
 void drawString(char* string, struct SCRATCH_rect rect, const struct letterSet letterSet, pixel color) {
@@ -83,10 +83,12 @@ void drawString(char* string, struct SCRATCH_rect rect, const struct letterSet l
     int stringLength = strlen(string);
     for (int i = 0; i < stringLength; i++) {
         char c = string[i];
-        int baseX = rect.x + (charWidth + 1) * i;
-        int baseY = rect.y;
-        for (int y = 0; y < charHeight + 1; y++) {
-            for (int x = 0; x < charWidth + 1; x++) {
+        int baseX = (charWidth + 1) * i;
+        int baseY = rect.y + (baseX / rect.width) * (charHeight + 1);
+        baseX %= rect.width;
+        baseX += rect.x;
+        for (int y = -1; y < charHeight + 1; y++) {
+            for (int x = -1; x < charWidth + 1; x++) {
                 bool draw = getLetterPixel(letterSet, c, y, x);
                 pixel thisColor = color;
                 if (!draw || x == charWidth || y == charHeight) thisColor = 0xffff;

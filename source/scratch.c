@@ -4,6 +4,8 @@
 #include <string.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <sys/param.h>
 #include "scratch.h"
 #include "externFunctions.h"
 #include "externGlobals.h"
@@ -56,6 +58,7 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [INNER_PUSHNUMBER] = "INNER_PUSHNUMBER",
     [INNER_PUSHTEXT] = "INNER_PUSHTEXT",
     [INNER_PUSHDEGREES] = "INNER_PUSHDEGREES",
+    [INNER_PUSHID] = "INNER_PUSHID",
 
     [OPERATOR_ADD] = "OPERATOR_ADD",
     [OPERATOR_SUBTRACT] = "OPERATOR_SUBTRACT",
@@ -142,8 +145,6 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [INNER_DEBUGSTATEMENT] = "INNER_DEBUGSTATEMENT",
 };
 
-
-
 void handleInputs() {
     for (int i = 0; i < 5; i++) {
         bool prior = inputState[i];
@@ -155,11 +156,55 @@ void handleInputs() {
     }
 }
 
-void clearEvents() {
+void clearEvents(int eventCount) {
     for (int i = 0; i < eventCount; i++) {
         events[i] = false;
     }
 }
+
+// scratch's rule is to keep sprites in frame by a fixed number of pixels in each direction.
+void keepInFrame(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite) {
+    struct image* i = getImage(context, sprite);
+    int pixelWidth = (i->widthRatio * SCRATCHWIDTH * sprite->base.size) / (SIZERATIO * 255);
+    int pixelHeight = (i->heightRatio * SCRATCHHEIGHT * sprite->base.size) / (SIZERATIO * 255);
+    int allowedOffscreenX = -(pixelWidth / 2) - 1;
+    int allowedOffscreenY = -(pixelHeight / 2) - 1;
+    int left = -(SCRATCHWIDTH / 2) - allowedOffscreenX;
+    int right = (SCRATCHWIDTH / 2) + allowedOffscreenX;
+    int bottom = -(SCRATCHHEIGHT / 2) - allowedOffscreenY;
+    int top = (SCRATCHHEIGHT / 2) + allowedOffscreenY;
+    if (sprite->base.x.halves.high < left) sprite->base.x.halves.high = left;
+    if (sprite->base.x.halves.high > right) sprite->base.x.halves.high = right;
+    if (sprite->base.y.halves.high < bottom) sprite->base.y.halves.high = bottom;
+    if (sprite->base.y.halves.high > top) sprite->base.y.halves.high = top;
+}
+
+void keepInStage(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite) {
+    const int pixelMargin = 10;
+    struct image* i = getImage(context, sprite);
+    int pixelWidth = (i->widthRatio * SCRATCHWIDTH * sprite->base.size) / (SIZERATIO * 255);
+    int pixelHeight = (i->heightRatio * SCRATCHHEIGHT * sprite->base.size) / (SIZERATIO * 255);
+    int allowedOffscreenX = (pixelWidth / 2) - pixelMargin;
+    int allowedOffscreenY = (pixelHeight / 2) - pixelMargin;
+    int left = -(SCRATCHWIDTH / 2) - allowedOffscreenX;
+    int right = (SCRATCHWIDTH / 2) + allowedOffscreenX;
+    int bottom = -(SCRATCHHEIGHT / 2) - allowedOffscreenY;
+    int top = (SCRATCHHEIGHT / 2) + allowedOffscreenY;
+    if (sprite->base.x.halves.high < left) sprite->base.x.halves.high = left;
+    if (sprite->base.x.halves.high > right) sprite->base.x.halves.high = right;
+    if (sprite->base.y.halves.high < bottom) sprite->base.y.halves.high = bottom;
+    if (sprite->base.y.halves.high > top) sprite->base.y.halves.high = top;
+}
+
+const char* hatTable[] = {
+    "when key pressed",
+    "when I receive message",
+    "when backdrop changes to",
+    "when I start as clone",
+    "when flag clicked",
+    "when this sprite clicked",
+    "when loudness >"
+};
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code) {
     struct SCRATCH_data stack[STACKMAX];
@@ -167,13 +212,14 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
     enum SCRATCH_opcode operation;
     struct SCRATCH_sprite* sprite = context->sprites[context->currentIndex];
     struct SCRATCH_sprite** sprites = context->sprites;
-    enum SCRATCH_opcode watchValue = -1;
+    enum SCRATCH_opcode watchValue = CONTROL_CREATE_CLONE_OF;
     while (true) {
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        if (false) {
-            machineLog("id: %d ", sprite->base.id);
+        bool loggingCondition = false;
+        if (loggingCondition) {
+            machineLog("id: %d, index: %d, hat: %s, ", sprite->base.id, context->currentIndex, hatTable[thread->base.startEvent]);
             if (opcodeName == NULL) machineLog("opcode: %d\n", operation);
             else machineLog("opcode: %s\n\r", SCRATCH_opcode_names[operation]);
             if (operation == watchValue) {
@@ -183,15 +229,18 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
         switch (operation) {
             #include "opcodeImpl.h"
         }
-        if (status == SCRATCH_killSprite) return status;
-        if (operation > INNER_PARTITION_BEGINSTATEMENTS)return status; // A block has completed
+        if (status == SCRATCH_killSprite || operation > INNER_PARTITION_BEGINSTATEMENTS) {
+            return status;
+        }
     }
 }
 
 enum SCRATCH_continueStatus SCRATCH_processThread(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code) {
+    bool executedRealBlock = false;
     enum SCRATCH_continueStatus status = SCRATCH_continue;
-    while (status == SCRATCH_continue) {
+    while (status == SCRATCH_continue || executedRealBlock == false) {
         status = SCRATCH_processBlock(context, thread, code);
+        if (status != SCRATCH_yieldLogic) executedRealBlock = true;
     }
     return status;
 }
@@ -201,14 +250,21 @@ int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code
     for (int i = 0; i < context->spriteCount; i++) {
         context->currentIndex = i;
         for (int ii = 0; ii < context->sprites[i]->base.threadCount; ii++) {
-            if (context->sprites[i]->threads[ii].active) {
-                enum SCRATCH_continueStatus status = SCRATCH_processThread(context, &context->sprites[i]->threads[ii], code);
-                if (status == SCRATCH_continue || status == SCRATCH_yieldGeneric) {
-                    activeThreadCount++;
+            if (!context->sprites[i]->threads[ii].active) continue;
+            //machineLog("begin sprite %d, thread %d\n", i, ii);
+            enum SCRATCH_continueStatus status = SCRATCH_processThread(context, &context->sprites[i]->threads[ii], code);
+            if (status == SCRATCH_continue || status == SCRATCH_yieldGeneric || status == SCRATCH_yieldLogic) {
+                activeThreadCount++;
+            }
+            else if (status == SCRATCH_killOtherThreads || status == SCRATCH_killAllThreads) {
+                for (int iii = 0; iii < context->sprites[i]->base.threadCount; iii++) {
+                    if (iii == ii && status == SCRATCH_killOtherThreads) continue;
+                    context->sprites[i]->threads[iii].active = false;
                 }
-                else if (status == SCRATCH_killSprite) {
-                    goto nextSprite;
-                }
+                goto nextSprite;
+            }
+            if (status == SCRATCH_killSprite) {
+                goto nextSprite;
             }
         }
 nextSprite:
@@ -286,11 +342,11 @@ struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATC
     rect.y = s->base.y.halves.high;
     struct image* i = getImage(context, s);
     rect.width = i->widthRatio * SCRATCHWIDTH / 255;
-    rect.height = i->heightRatio * SCRATCHWIDTH / 255;
-    rect.width = (rect.width * s->base.size) / 100;
-    rect.height = (rect.height * s->base.size) / 100;
-    rect.x -= rect.width / 2;
-    rect.y -= rect.height / 2;
+    rect.height = i->heightRatio * SCRATCHHEIGHT / 255;
+    rect.width = (rect.width * s->base.size) / SIZERATIO;
+    rect.height = (rect.height * s->base.size) / SIZERATIO;
+    rect.x -= i->xRotationCenter * s->base.size / SIZERATIO;
+    rect.y -= i->yRotationCenter * s->base.size / SIZERATIO;
     return rect;
 }
 
@@ -313,8 +369,68 @@ bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2) {
     return collides;
 }
 
-struct {int xError; int yError;} rectOffscreen(struct SCRATCH_rect r1) {
-    struct {int xError; int yError;} result;
-    result.xError = 0;
-    // TODO
+/*
+ * NUMBER
+ * DEGREES
+ * BOOL
+ * STRING
+ * STATICSTRING
+ */
+
+#define pair(x, y) (x << 3 | y)
+// TODO: Thorough V8 engine audit to get exactly-accurate conversions. For now: only %d and %d.%d conversions.
+struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, char* stringBuffer) {
+    static char* boolStrings[] = {
+        "false",
+        "true"
+    };
+    if (d.type == type) return d;
+    int combination = pair(type, d.type);
+    switch (combination) {
+        case pair(SCRATCH_STRING, SCRATCH_NUMBER):
+            sprintf(stringBuffer, "%f", (float)d.data.number.halves.high + d.data.number.halves.low / (float)(UINT16_MAX + 1));
+            d.data.string = stringBuffer;
+            d.type = SCRATCH_STRING;
+            return d;
+        case pair(SCRATCH_STRING, SCRATCH_DEGREES):
+            d = cast(d, SCRATCH_NUMBER, stringBuffer);
+            d = cast(d, SCRATCH_STRING, stringBuffer);
+            return d;
+        case pair(SCRATCH_STRING, SCRATCH_BOOL):
+            d.data.string = boolStrings[d.data.boolean];
+            d.type = SCRATCH_STATICSTRING;
+            return d;
+        case pair(SCRATCH_NUMBER, SCRATCH_DEGREES):
+            d.data.number.i = (uint64_t)d.data.degrees * 360 >> 16;
+            d.type = SCRATCH_NUMBER;
+            return d;
+        case pair(SCRATCH_NUMBER, SCRATCH_BOOL):
+            d.data.number.i = d.data.boolean;
+            d.type = SCRATCH_NUMBER;
+            return d;
+        case pair(SCRATCH_NUMBER, SCRATCH_STRING):
+            float f = 0;
+            sscanf(d.data.string, "%f", &f);
+            d.data.number.i = (f * (float)(UINT16_MAX + 1));
+            d.type = SCRATCH_NUMBER;
+            return d;
+        case pair(SCRATCH_DEGREES, SCRATCH_NUMBER):
+            uint64_t newDegrees = (uint64_t)d.data.number.i << 16;
+            newDegrees /= 360;
+            // no-op. Good style? I don't know.
+            d.data.degrees = newDegrees;
+            d.type = SCRATCH_DEGREES;
+            return d;
+        case pair(SCRATCH_DEGREES, SCRATCH_BOOL):
+            d.data.degrees = d.data.boolean;
+            d.type = SCRATCH_DEGREES;
+            return d;
+        case pair(SCRATCH_DEGREES, SCRATCH_STRING):
+            d = cast(d, SCRATCH_NUMBER, NULL);
+            d = cast(d, SCRATCH_DEGREES, NULL);
+            return d;
+        default:
+            return d;
+        // Scratch has no truthiness; All booleans are derived from an expression producing one. There is no cast from something to bool.
+    }
 }

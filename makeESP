@@ -1,6 +1,6 @@
 #!/bin/bash
 # Compile
-arduino-cli compile --fqbn esp32:esp32:esp32 arduino/ --verbose
+arduino-cli compile --fqbn esp32:esp32:esp32 arduino/ --verbose -e
 
 # Upload
 arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 arduino/

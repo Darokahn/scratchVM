@@ -7,16 +7,21 @@
 #include "letters.h"
 #include "externFunctions.h"
 #include "externGlobals.h"
+#include "programData.h"
 
-extern uint8_t code[];
+int eventTypeOffsets[__EVENTTYPECOUNT];
+bool inputState[128];
+bool events[256];
+int eventCount;
 
 unsigned long getNow();
 
 int count = 0;
 int drawRate = 2;
+const uint8_t* code;
+extern const uint8_t programData[];
 
 unsigned long interval = 1000 / FRAMESPERSEC;
-extern uint8_t imageBuffer[];
 
 int main() {
     struct SCRATCH_sprite* sprites[SPRITEMAX];
@@ -26,10 +31,11 @@ int main() {
         .sprites = sprites,
         .imageTable = images,
         .spriteSetIndices = spriteSetIndices,
+        .currentIndex = 0,
     };
     unsigned long next = getNow() + interval;
-    initData(&context);
-    initImages(&context, imageBuffer);
+    initProgram(programData, &context, &code, &eventCount, eventTypeOffsets);
+    machineLog("%d\n", eventCount);
     startIO();
     setEvent(ONFLAG, (union SCRATCH_eventInput) {0}, true);
     while (true) {
@@ -37,12 +43,12 @@ int main() {
             handleInputs();
         } while (getNow() < next);
         next += interval;
-        SCRATCH_visitAllThreads(&context, code);
+        SCRATCH_visitAllThreads(&context, (uint8_t*) code);
         if (count++ % drawRate == 0) {
             drawSprites(&context);
             updateIO();
         }
         SCRATCH_wakeSprites(&context);
-        clearEvents();
+        clearEvents(eventCount);
     }
 }

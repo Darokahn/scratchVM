@@ -20,9 +20,10 @@
 #define STAGERESOLUTION 128
 #define SPRITERESOLUTION 32
 
-#define PI 3.14159265358979323846264338279f
+#define PI ((float)3.14159265358979323846264338279)
 
-#define halfRotation (32468.0f)
+#define halfRotation ((float)((uint64_t)UINT32_MAX + 1) / 2)
+#define quarterRotation (halfRotation/2)
 #define degreeToRadian (PI / halfRotation)
 #define radianToDegree (halfRotation / PI)
 
@@ -50,20 +51,18 @@ struct SCRATCH_sprite;
 struct SCRATCH_thread;
 
 enum SCRATCH_fieldType {
-    SCRATCH_BOOL,
     SCRATCH_NUMBER,
     SCRATCH_DEGREES,
+    SCRATCH_BOOL,
     SCRATCH_STRING,
     SCRATCH_STATICSTRING,
-    SCRATCH_ID,
 };
 
 union SCRATCH_field {
     scaledInt32 number;
-    uint16_t degrees;
+    uint32_t degrees;
     bool boolean;
     char* string;
-    uint16_t id;
 };
 
 struct SCRATCH_data {
@@ -106,7 +105,10 @@ enum SCRATCH_fetchValue {
 enum SCRATCH_continueStatus {
     SCRATCH_continue,
     SCRATCH_yieldGeneric,
+    SCRATCH_yieldLogic,
     SCRATCH_killThread,
+    SCRATCH_killOtherThreads,
+    SCRATCH_killAllThreads,
     SCRATCH_killSprite
 };
 
@@ -157,21 +159,13 @@ struct SCRATCH_waitData {
     uint32_t remainingIterations;
 };
 
-struct SCRATCH_header {
-    uint32_t codeLength;
-    uint32_t imageLength;
-    uint32_t spriteCount;
-    uint32_t messageCount;
-    uint32_t backdropCount;
-};
-
 struct SCRATCH_spriteHeader {
     scaledInt32 x; // Scaled int split into a whole and fractional part. whole part is a Number that, according to my testing, can go from -1000 to 1000.
     scaledInt32 y;
-    uint16_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    uint32_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    uint16_t size; // number representing percent of original size
     bool visible;
     int8_t layer;
-    uint16_t size; // number representing percent of original size
     bool rotationStyle;
     uint8_t costumeIndex;
     uint8_t costumeMax;
@@ -233,8 +227,9 @@ void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool 
 struct image* getImage(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand);
 
 void initData(struct SCRATCH_spriteContext* context);
-void initImages(struct SCRATCH_spriteContext* context, uint8_t* buffer);
+void initImages(struct SCRATCH_spriteContext* context, const uint8_t* buffer);
 struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand);
 bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2);
 
+struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, char* stringBuffer);
 #endif

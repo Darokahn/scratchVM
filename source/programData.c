@@ -22,7 +22,7 @@ void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool 
     events[eventTypeOffsets[type] + input.i] = state;
 }
 
-void initImages(struct SCRATCH_spriteContext* context, uint8_t* buffer) {
+void initImages(struct SCRATCH_spriteContext* context, const uint8_t* buffer) {
     struct SCRATCH_sprite* s;
     int imageCount = 0;
     for (int i = 0; i < context->spriteCount; i++) {
@@ -32,6 +32,7 @@ void initImages(struct SCRATCH_spriteContext* context, uint8_t* buffer) {
             struct image* thisImage = (void*) buffer;
             context->imageTable[imageCount++] = thisImage;
             int imageSize = sizeof (*thisImage) + (thisImage->xResolution * thisImage->yResolution * sizeof(pixel));
+            machineLog("Loaded image %s, pixel size %dx%d, logical size %d%%x%d%%\n", thisImage->name, thisImage->xResolution, thisImage->yResolution, thisImage->widthRatio * 100 / 255, thisImage->heightRatio * 100 / 255);
             buffer += imageSize;
         }
     }

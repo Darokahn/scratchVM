@@ -1,17 +1,20 @@
 // This file is inserted in scratch.c as the body for a switch statement. It is the right combination of size and simple layout that it seemed a good target for factoring out.
 
+#define INTMAX16 65535
 #define ERROR() // Nothing for now
 #define INTERPRET_AS(type, value) *(type*)&(value)
-#define POPNUMBER() stack[--stackIndex]
-#define POPBOOL() stack[--stackIndex]
-#define POPID() stack[--stackIndex]
-#define POPDEGREES() stack[--stackIndex]
+#define POPNUMBER() cast(stack[--stackIndex], SCRATCH_NUMBER, NULL)
+#define POPBOOL() cast(stack[--stackIndex], SCRATCH_BOOL, NULL)
+#define POPID() ((int16_t)cast(stack[--stackIndex], SCRATCH_NUMBER, NULL).data.number.i)
+#define POPDEGREES() cast(stack[--stackIndex], SCRATCH_DEGREES, NULL)
+#define POPTEXT(buffer) cast(stack[--stackIndex], SCRATCH_STRING, buffer)
 #define POPDATA() stack[--stackIndex]
 #define PUSHNUMBER(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.halves.high=value}};
 #define PUSHFRACTION(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.i=value}};
-#define PUSHID(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_ID, {.number.i=value}};
+#define PUSHID(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_NUMBER, {.number.i=(int32_t)value}};
 #define PUSHBOOL(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_BOOL, {.boolean=value}};
 #define PUSHDATA(value) stack[stackIndex++] = value;
+#define PUSHSTATICTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_STATICSTRING, {.string=(value)}};
 #define PUSHTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_STRING, {.string=NULL}};
 #define PUSHDEGREES(value) stack[stackIndex++] = (struct SCRATCH_data) {SCRATCH_DEGREES, {.degrees=value}};
 
@@ -48,8 +51,8 @@ case INNER_PARTITION_BEGINEXPRESSIONS: {
     break;
 }
 case SENSING_ANSWER: {
-    // TODO
-    // push a string to the stack
+    static char* nullString = "";
+    PUSHSTATICTEXT(nullString);
     status = SCRATCH_continue;
     break;
 }
@@ -80,8 +83,7 @@ case SENSING_LOUDNESS: {
     break;
 }
 case SENSING_TIMER: {
-    // TODO
-    // push the value of the global timer
+    break;
 }
 case SENSING_CURRENT: {
     // TODO
@@ -97,7 +99,6 @@ case SENSING_USERNAME: {
 }
 case INNER_FETCHINPUT: {
     uint16_t toFetch = GETARGUMENT(uint16_t);
-    machineLog("%d\n", toFetch);
     PUSHBOOL(inputState[toFetch]);
     status = SCRATCH_continue;
     break;
@@ -187,7 +188,8 @@ case LOOKS_COSTUMENUMBERNAME: {
         PUSHNUMBER(sprite->base.costumeIndex);
     }
     else {
-        PUSHTEXT(getImage(imageTable, sprite->base.id, sprite->base.costumeIndex)->name);
+        char* name = getImage(context, sprite)->name;
+        PUSHSTATICTEXT(name);
     }
     status = SCRATCH_continue;
     break;
@@ -199,25 +201,50 @@ case LOOKS_BACKDROPNUMBERNAME: {
         PUSHNUMBER(context->stage->base.costumeIndex);
     }
     else {
-        PUSHTEXT(getImage(imageTable, context->stage->base.id, context->stage->base.costumeIndex)->name);
+        char* name =getImage(context, context->stage)->name;
+        PUSHSTATICTEXT(name);
     }
     status = SCRATCH_continue;
     break;
 }
 case SENSING_TOUCHINGOBJECT: {
     int16_t target = GETARGUMENT(int16_t);
-    struct SCRATCH_sprite* spriteOperand;
-    struct SCRATCH_rect myRect = getRect(context, NULL);
-    bool colliding = false;
-    for (int i = 0; i < context->spriteCount; i++) {
-        spriteOperand = context->sprites[i];
-        if (spriteOperand->base.id != target) continue;
-        if (!spriteOperand->base.visible) continue;
-        struct SCRATCH_rect otherRect = getRect(context, spriteOperand);
-        colliding |= rectsCollide(myRect, otherRect);
+    // mouse pointer (unused)
+    if (target == -1) {
+        PUSHBOOL(false);
     }
-    PUSHBOOL(colliding);
-    //PUSHBOOL(false);
+    // edge
+    else if (target == -2) {
+        int left = -(SCRATCHWIDTH / 2);
+        int right = (SCRATCHWIDTH / 2);
+        int top = (SCRATCHHEIGHT / 2);
+        int bottom = -(SCRATCHHEIGHT / 2);
+        struct SCRATCH_rect myRect = getRect(context, NULL);
+        bool touchingEdge = false;
+        if      (myRect.x <= left) touchingEdge = true;
+        else if (myRect.x + myRect.width >= right) touchingEdge = true;
+        else if (myRect.y <= bottom) touchingEdge =  true;
+        else if (myRect.y + myRect.height >= top) touchingEdge = true;
+        PUSHBOOL(touchingEdge);
+    }
+    else {
+        if (!sprite->base.visible) {
+            PUSHBOOL(false);
+            status = SCRATCH_continue;
+            break;
+        }
+        struct SCRATCH_sprite* spriteOperand;
+        struct SCRATCH_rect myRect = getRect(context, NULL);
+        bool colliding = false;
+        for (int i = 0; i < context->spriteCount; i++) {
+            spriteOperand = context->sprites[i];
+            if (spriteOperand->base.id != target) continue;
+            if (!spriteOperand->base.visible) continue;
+            struct SCRATCH_rect otherRect = getRect(context, spriteOperand);
+            colliding |= rectsCollide(myRect, otherRect);
+        }
+        PUSHBOOL(colliding);
+    }
     status = SCRATCH_continue;
     break;
 }
@@ -234,21 +261,37 @@ case SENSING_COLORISTOUCHINGCOLOR: {
     break;
 }
 case SENSING_DISTANCETO: {
-    // TODO
-    // push the distance to the sprite specified by (uint16_6) code
+    int id = POPID();
+    struct SCRATCH_sprite* spriteArgument = context->sprites[id];
+
+    // don't bother with subpixel precision
+    int x1 = sprite->base.x.halves.high;
+    int y1 = sprite->base.y.halves.high;
+
+    int x2 = spriteArgument->base.x.halves.high;
+    int y2 = spriteArgument->base.y.halves.high;
+
+    int xDist = x1 - x2;
+    int yDist = y1 - y2;
+
+    int hypot = sqrt(xDist * xDist + yDist * yDist);
+    PUSHNUMBER(hypot);
+
+    status = SCRATCH_continue;
+    break;
 }
 case SENSING_DISTANCETOMENU: {
     ERROR(); // unused
     break;
 }
 case SENSING_ASKANDWAIT: {
-    // TODO
-    // set the talking string (variable 0) of the current sprite to the string specified by the top of stack
-    // immediately push empty string
+    // This block is largely unused
+    status = SCRATCH_continue;
+    break;
 }
 case SENSING_KEYOPTIONS: {
-    // TODO
-    // I have to look into this one
+    ERROR(); // unused
+    break;
 }
 case SENSING_SETDRAGMODE: {
     ERROR(); // unused
@@ -273,16 +316,20 @@ case INNER_PUSHNUMBER: {
     break;
 }
 case INNER_PUSHDEGREES: {
-    uint16_t field = GETARGUMENT(uint16_t);
+    uint32_t field = GETARGUMENT(uint32_t);
     PUSHDEGREES(field);
     status = SCRATCH_continue;
     break;
 }
 case INNER_PUSHTEXT: {
+    char* ptr = (char*)&(code[thread->programCounter]);
+    PUSHSTATICTEXT(ptr);
+    while (code[thread->programCounter++] != 0);
+    status = SCRATCH_continue;
     break;
 }
 case INNER_PUSHID: {
-    uint16_t field = GETARGUMENT(uint16_t);
+    int32_t field = GETARGUMENT(int16_t);
     PUSHID(field);
     status = SCRATCH_continue;
     break;
@@ -306,23 +353,25 @@ case OPERATOR_SUBTRACT: {
 case OPERATOR_MULTIPLY: {
     struct SCRATCH_data op2 = POPNUMBER();
     struct SCRATCH_data op1 = POPNUMBER();
-    PUSHFRACTION(op1.data.number.i * op2.data.number.i);
+    PUSHFRACTION((op1.data.number.i * op2.data.number.i) >> 16);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_DIVIDE: {
     struct SCRATCH_data op2 = POPNUMBER();
     struct SCRATCH_data op1 = POPNUMBER();
-    PUSHFRACTION(op1.data.number.i / op2.data.number.i);
+    PUSHFRACTION((int64_t)(op1.data.number.i << 16) / op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_RANDOM: {
     struct SCRATCH_data high = POPNUMBER();
     struct SCRATCH_data low = POPNUMBER();
-    scaledInt32 lowValue = low.data.number;
-    scaledInt32 highValue = high.data.number;
-    PUSHNUMBER(rand() % (highValue.halves.high - lowValue.halves.high) + lowValue.halves.high);
+    int lowValue = low.data.number.halves.high;
+    int highValue = high.data.number.halves.high;
+    int rangeSize = highValue - lowValue;
+    uint64_t randomNumber = rand();
+    PUSHNUMBER(lowValue + randomNumber * (rangeSize + 1) / ((uint64_t)RAND_MAX + 1));
     status = SCRATCH_continue;
     break;
 }
@@ -429,6 +478,8 @@ case DATA_SETVARIABLETO: {
         spriteOperand = sprites[spriteOperandIndex];
     }
     struct SCRATCH_data x = POPDATA();
+    //char buffer[32];
+    //printf("sprite: %d, var: %d, value: %s\n", spriteOperand->base.id, varIndex, cast(x, SCRATCH_STRING, buffer).data.string);
     spriteOperand->variables[varIndex] = x;
     status = SCRATCH_continue;
     break;
@@ -444,6 +495,8 @@ case DATA_CHANGEVARIABLEBY: {
         spriteOperand = sprites[spriteOperandIndex];
     }
     struct SCRATCH_data x = POPDATA();
+    //char buffer[32];
+    //printf("sprite: %d, var: %d, value: %s\n", spriteOperand->base.id, varIndex, cast(x, SCRATCH_STRING, buffer).data.string);
     spriteOperand->variables[varIndex].data.number.i += x.data.number.i;
     status = SCRATCH_continue;
     break;
@@ -457,19 +510,18 @@ case DATA_HIDEVARIABLE: {
     break;
 }
 case EVENT_BROADCAST: {
-    uint16_t broadcastId = GETARGUMENT(uint16_t);
-    setEvent(ONMESSAGE, (union SCRATCH_eventInput){.message = 0}, true);
+    int broadcastId = POPID();
+    setEvent(ONMESSAGE, (union SCRATCH_eventInput){.message = broadcastId}, true);
     break;
 }
 case INNER_LOOPJUMP: {
     uint16_t to = GETARGUMENT(uint16_t);
     thread->programCounter = to;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_yieldLogic;
     break;
 }
 case CONTROL_CREATE_CLONE_OF: {
-    struct SCRATCH_data fieldData = POPID();
-    int16_t field = fieldData.data.id;
+    int field = POPID();
     struct SCRATCH_spriteHeader h;
     struct SCRATCH_sprite* template;
     if (field == -1) {
@@ -482,12 +534,14 @@ case CONTROL_CREATE_CLONE_OF: {
     }
     struct SCRATCH_sprite* newSprite = SCRATCH_makeNewSprite(h);
     for (int i = 0; i < h.threadCount; i++) {
-        newSprite->threads[i].base = template->threads[i].base;
-        newSprite->threads[i].active = false;
-        newSprite->threads[i].programCounter = template->threads[i].base.entryPoint;
+        struct SCRATCH_threadHeader base = template->threads[i].base;
+        SCRATCH_initThread(&newSprite->threads[i], base);
     }
     for (int i = 0; i < h.variableCount; i++) {
-        // variables need to be handled specially because they can hold allocated strings that need to be copied. TODO
+        if (template->variables[i].type != SCRATCH_STRING) {
+            newSprite->variables[i] = template->variables[i];
+        }
+        // SCRATCH_STRING variables need to be handled specially because they hold allocated strings that need to be copied. TODO
     }
     SCRATCH_wakeSprite(newSprite, ONCLONE, (union SCRATCH_eventInput) {0});
     if (!SCRATCH_addSprite(context, newSprite)) {
@@ -505,8 +559,12 @@ case CONTROL_WAIT: {
     status = SCRATCH_yieldGeneric;
     break;
 }
+case CONTROL_WAIT_UNTIL: {
+    ERROR(); // unused
+    break;
+}
 case CONTROL_CREATE_CLONE_OF_MENU: {
-    // TODO
+    ERROR();
     break;
 }
 case CONTROL_DELETE_THIS_CLONE: {
@@ -521,8 +579,18 @@ case CONTROL_DELETE_THIS_CLONE: {
     break;
 }
 case CONTROL_STOP: {
-    thread->active = false;
-    status = SCRATCH_killThread;
+    int id = POPID();
+    if (id == 0) {
+        thread->active = false;
+        status = SCRATCH_killThread;
+    }
+    else if (id == 1) {
+        thread->active = false;
+        status = SCRATCH_killAllThreads;
+    }
+    else if (id == 2) {
+        status = SCRATCH_killOtherThreads;
+    }
     break;
 }
 case INNER_JUMPIF: {
@@ -552,10 +620,13 @@ case INNER__GLIDEITERATION: {
     sprite->base.x.i += thread->operationData.glideData.stepX.i;
     sprite->base.y.i += thread->operationData.glideData.stepY.i;
     thread->operationData.glideData.remainingIterations--;
+    keepInStage(context, sprite);
     if (thread->operationData.glideData.remainingIterations <= 0) {
         sprite->base.x.halves.high = thread->operationData.glideData.targetX;
         sprite->base.y.halves.high = thread->operationData.glideData.targetY;
-        return SCRATCH_yieldGeneric;
+        keepInStage(context, sprite);
+        status = SCRATCH_yieldGeneric;
+        break;
     }
     thread->programCounter--; // re-align program counter with this instruction so it runs again
     status = SCRATCH_yieldGeneric;
@@ -565,23 +636,24 @@ case MOTION_MOVESTEPS: {
     struct SCRATCH_data steps = POPNUMBER();
     float rotation = sprite->base.rotation * degreeToRadian;
 
-    int x = sin(rotation) * steps.data.number.halves.high;
-    int y = cos(rotation) * steps.data.number.halves.high;
-    sprite->base.x.halves.high += x;
-    sprite->base.y.halves.high += y;
-    status = SCRATCH_yieldGeneric;
+    int x = sin(rotation) * steps.data.number.i;
+    int y = cos(rotation) * steps.data.number.i;
+    sprite->base.x.i += x;
+    sprite->base.y.i += y;
+    keepInStage(context, sprite);
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_TURNRIGHT: {
     struct SCRATCH_data degrees = POPDEGREES();
     sprite->base.rotation += degrees.data.degrees;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_TURNLEFT: {
     struct SCRATCH_data degrees = POPDEGREES();
     sprite->base.rotation -= degrees.data.degrees;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_GOTO: {
@@ -597,7 +669,8 @@ case MOTION_GOTOXY: {
     struct SCRATCH_data op1 = POPNUMBER();
     sprite->base.x = op1.data.number;
     sprite->base.y = op2.data.number;
-    status = SCRATCH_yieldGeneric;
+    keepInStage(context, sprite);
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_GLIDETO: {
@@ -618,6 +691,7 @@ case MOTION_GLIDESECSTOXY: {
     if (iterations == 0) {
         sprite->base.x = x.data.number;
         sprite->base.y = y.data.number;
+        keepInStage(context, sprite);
         thread->operationData.glideData.remainingIterations = 0;
         return SCRATCH_continue;
     }
@@ -634,7 +708,7 @@ case MOTION_GLIDESECSTOXY: {
 case MOTION_POINTINDIRECTION: {
     struct SCRATCH_data degrees = POPDEGREES();
     sprite->base.rotation = degrees.data.degrees;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_POINTTOWARDS: {
@@ -642,8 +716,8 @@ case MOTION_POINTTOWARDS: {
     struct SCRATCH_data y = POPNUMBER();
     float direction = atan2(y.data.number.halves.high, x.data.number.halves.high);
     direction *= radianToDegree;
-    sprite->base.rotation = (uint16_t) direction;
-    status = SCRATCH_yieldGeneric;
+    sprite->base.rotation = (uint32_t) direction;
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_POINTTOWARDS_MENU: {
@@ -653,75 +727,125 @@ case MOTION_POINTTOWARDS_MENU: {
 case MOTION_CHANGEXBY: {
     struct SCRATCH_data x = POPNUMBER();
     sprite->base.x.i += x.data.number.i;
-    status = SCRATCH_yieldGeneric;
+    keepInStage(context, sprite);
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_SETX: {
     struct SCRATCH_data x = POPNUMBER();
     sprite->base.x = x.data.number;
-    status = SCRATCH_yieldGeneric;
+    keepInStage(context, sprite);
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_CHANGEYBY: {
     struct SCRATCH_data y = POPNUMBER();
     sprite->base.y.i += y.data.number.i;
-    status = SCRATCH_yieldGeneric;
+    keepInStage(context, sprite);
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_SETY: {
     struct SCRATCH_data y = POPNUMBER();
     sprite->base.y = y.data.number;
-    status = SCRATCH_yieldGeneric;
+    keepInStage(context, sprite);
+    status = SCRATCH_continue;
     break;
 }
 case MOTION_IFONEDGEBOUNCE: {
-    // TODO
-    // detect whether any amount of sprite is off edge, then if so flip the sprite's angle
+    int xSpan = (SCRATCHWIDTH / 2);
+    int ySpan = (SCRATCHHEIGHT / 2);
+    struct SCRATCH_rect myRect = getRect(context, NULL);
+    const int distances[4] = {
+        MAX(0, xSpan + myRect.x),
+        MAX(0, ySpan - myRect.y - myRect.height),
+        MAX(0, xSpan - myRect.x - myRect.width),
+        MAX(0, ySpan + myRect.y)
+    };
+
+    int minDistIndex = 0;
+    for (int i = 0; i < 4; i++) {
+        if (distances[i] < distances[minDistIndex]) minDistIndex = i;
+    }
+    if (distances[minDistIndex] > 0) {
+        status = SCRATCH_continue;
+        break;
+    }
+
+    float radians = degreeToRadian * (quarterRotation - sprite->base.rotation);
+    float dx = cos(radians);
+    float dy = -sin(radians);
+    float* arg = &dy;
+    if (minDistIndex % 2 == 0) {
+        arg = &dx;
+    }
+    float multiplier = 1;
+    if (minDistIndex > 1) {
+        multiplier = -1;
+    }
+    *arg = MAX(0.2f, fabs(*arg)) * multiplier;
+
+    sprite->base.rotation = (atan2(dy, dx) * radianToDegree) + quarterRotation;
+    printf("unscaled: %u, degrees: %lu\n", sprite->base.rotation, (uint64_t)sprite->base.rotation * 360 / ((uint64_t)UINT32_MAX + 1));
+
+    keepInFrame(context, sprite);
+    status = SCRATCH_continue;
+    break;
 }
 case MOTION_SETROTATIONSTYLE: {
     uint16_t style = GETARGUMENT(uint16_t);
     sprite->base.rotationStyle = style;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_SAY: {
-    // TODO
-    // set the sprite's first variable to the string popped from the stack
+    // TODO: copy speech strings into heap memory and handle freeing
+    static char buffer[300];
+    struct SCRATCH_data string = POPTEXT(buffer);
+    sprite->talkingString = string.data.string;
+    break;
 }
 case LOOKS_THINKFORSECS: {
     ERROR(); // unused
     break;
 }
+case LOOKS_SAYFORSECS: {
+    ERROR(); // unused
+    break;
+}
 case LOOKS_THINK: {
-    // TODO
-    // set the sprite's first variable to the string popped from the stack
+    // TODO: copy speech strings into heap memory and handle freeing
+    static char buffer[300];
+    struct SCRATCH_data string = POPTEXT(buffer);
+    sprite->talkingString = string.data.string;
+    break;
 }
 case LOOKS_SWITCHCOSTUMETO: {
     int16_t index = GETARGUMENT(uint16_t);
     sprite->base.costumeIndex = index;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_NEXTCOSTUME: {
     sprite->base.costumeIndex += 1;
     sprite->base.costumeIndex %= sprite->base.costumeMax;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_SWITCHBACKDROPTO: {
     int16_t index = GETARGUMENT(uint16_t);
     context->stage->base.costumeIndex = index;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_BACKDROPS: {
-    // TODO
+    ERROR();
     break;
 }
 case LOOKS_NEXTBACKDROP: {
     context->stage->base.costumeIndex += 1;
     context->stage->base.costumeIndex %= sprite->base.costumeMax;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_CHANGESIZEBY: {
@@ -729,9 +853,12 @@ case LOOKS_CHANGESIZEBY: {
     break;
 }
 case LOOKS_SETSIZETO: {
-    struct SCRATCH_data size = POPNUMBER();
-    sprite->base.size = size.data.number.halves.high;
-    status = SCRATCH_yieldGeneric;
+    struct SCRATCH_data sizeData = POPNUMBER();
+    uint16_t size = sizeData.data.number.halves.high;
+    size *= SIZERATIO;
+    size /= 100;
+    sprite->base.size = size;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_CHANGEEFFECTBY: {
@@ -748,12 +875,12 @@ case LOOKS_CLEARGRAPHICEFFECTS: {
 }
 case LOOKS_SHOW: {
     sprite->base.visible = true;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_HIDE: {
     sprite->base.visible = false;
-    status = SCRATCH_yieldGeneric;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_GOTOFRONTBACK: {

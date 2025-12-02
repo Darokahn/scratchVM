@@ -19,13 +19,17 @@
 
 #define COSTUMENAMESIZE 256
 
+#define SIZERATIO 1024
+
 typedef uint16_t pixel;
 
 struct image {
-    uint8_t widthRatio;
-    uint8_t heightRatio;
-    uint8_t xResolution;
-    uint8_t yResolution;
+    uint16_t widthRatio;
+    uint16_t heightRatio;
+    uint16_t xResolution;
+    uint16_t yResolution;
+    int16_t xRotationCenter;
+    int16_t yRotationCenter;
     char name[COSTUMENAMESIZE];
     pixel pixels[];
 };
