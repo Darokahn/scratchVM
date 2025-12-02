@@ -21,13 +21,71 @@ TFT_eSprite tftSprite = TFT_eSprite(&tft);
 
 #define TS_CS 33
 #define TS_IRQ 32
-int cursorX = 0;
-int cursorY = 0;
 
 extern "C" {
   #include "scratch.h"
   #include "graphics.h"
   #include "letters.h"
+  #include "externFunctions.h"
+}
+
+const char* PARTITION_LABEL = "program_data"; 
+
+// Global handle for the data partition, found once at setup
+static const esp_partition_t* g_data_partition = NULL;
+
+void setup_program_data_partition() {
+    g_data_partition = esp_partition_find_first(
+        ESP_PARTITION_TYPE_DATA,
+        (esp_partition_subtype_t)0x80, // Custom SubType (matching your CSV)
+        PARTITION_LABEL
+    );
+
+    if (!g_data_partition) {
+        machineLog("FATAL: Partition '%s' not found! Check partitions.csv.", PARTITION_LABEL);
+    } else {
+        machineLog("Partition '%s' found at 0x%X, size %u bytes.", 
+                 PARTITION_LABEL, g_data_partition->address, g_data_partition->size);
+    }
+}
+
+bool write_program_data(const uint8_t* buffer, size_t length) {
+    if (!g_data_partition) {
+        machineLog("Partition handle is NULL. Call setup_program_data_partition() first.");
+        return false;
+    }
+
+    if (length == 0) {
+        machineLog("Data length is zero. Skipping write.");
+        return true;
+    }
+
+    if (length > g_data_partition->size) {
+        machineLog("Data length (%u) exceeds partition size (%u). Aborting.", length, g_data_partition->size);
+        return false;
+    }
+
+    // --- 1. Erase the required flash area ---
+    // We must erase blocks of 4KB (0x1000). The erase size must be rounded up 
+    // to the nearest 4KB boundary that covers the entire data length.
+    size_t erase_size = (length + 0xFFF) & ~0xFFF;
+    
+    machineLog("Erasing %u bytes for new data...", erase_size);
+    esp_err_t err = esp_partition_erase_range(g_data_partition, 0, erase_size);
+    if (err != ESP_OK) {
+        machineLog("Erase failed: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    // --- 2. Write the new data payload ---
+    machineLog("Writing %u bytes to partition...", length);
+    err = esp_partition_write(g_data_partition, 0, buffer, length);
+    if (err != ESP_OK) {
+        machineLog("Write failed: %s", esp_err_to_name(err));
+        return false;
+    }
+
+    machineLog("Program data updated successfully.");
 }
 
 extern "C" int main();
@@ -40,7 +98,7 @@ extern "C" void startIO() {
     pinMode(32, INPUT);
     pinMode(25, INPUT_PULLUP);
 }
-extern "C" void updateIO(uint16_t* framebuffer) {
+extern "C" void updateIO() {
     tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH) / 2, (FULLLCDHEIGHT - LCDHEIGHT) / 2);
     //Serial.println(ESP.getFreeHeap());
 }
@@ -103,10 +161,23 @@ extern "C" int machineLog(const char* fmt, ...) {
     return n;
 }
 
+void pollApp(app_t* out) {
+    uint8_t blockSizeBytes[5];
+    blockSizeBytes[4] = 0;
+    while (Serial.available() < 4);
+    Serial.readBytes(blockSizeBytes, 4);
+    Serial.println((char*)blockSizeBytes);
+    int blockSize = (blockSizeBytes[3] << 24) + (blockSizeBytes[2] << 16) + (blockSizeBytes[1] << 8) + blockSizeBytes[0];
+    strcpy(out->name, "app");
+    out->programData = (uint8_t*)programData;
+}
+
 void loop() {
 }
 
 void setup() {
+    delay(1000);
     Serial.begin(115200);
+    setup_program_data_partition();
     main();
 }

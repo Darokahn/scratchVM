@@ -19,11 +19,11 @@ unsigned long getNow();
 int count = 0;
 int drawRate = 2;
 const uint8_t* code;
-extern const uint8_t programData[];
 
 unsigned long interval = 1000 / FRAMESPERSEC;
 
-int app(const uint8_t* programData) {
+int runApp(app_t* app) {
+    uint8_t* programData = app->programData;
     struct SCRATCH_sprite* sprites[SPRITEMAX];
     struct image* images[IMAGEMAX];
     int spriteSetIndices[SPRITEMAX];
@@ -57,6 +57,8 @@ int app(const uint8_t* programData) {
 int main() {
     startIO();
     while (true) {
-        app(programData);
+        app_t currentApp;
+        pollApp(&currentApp);
+        runApp(&currentApp);
     }
 }

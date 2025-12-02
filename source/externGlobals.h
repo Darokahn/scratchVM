@@ -9,5 +9,6 @@ extern int eventTypeOffsets[__EVENTTYPECOUNT];
 extern bool inputState[];
 extern int cursorX;
 extern int cursorY;
+extern const uint8_t programData[];
 
 #endif

@@ -4,13 +4,19 @@
 #include <stdint.h>
 
 void debugSprite(struct SCRATCH_sprite* sprite) {
+    static bool hasPrintedGeneral = false;
     struct SCRATCH_spriteHeader base = sprite->base;
-    machineLog("General thread information: sizeof header = %d, alignof = %d\n\r", sizeof(base), __alignof(base));
-    machineLog("Specialized information (all fields in their native format): x: %d, y: %d, rotation: %d, size: %d, visible: %d, layer: %d, rotationStyle: %d, costumeIndex: %d, costumeMax: %d, threadCount: %d, variableCount: %d, id: %d\n\r", base.x.i, base.y.i, base.rotation, base.size, base.visible, base.layer, base.rotationStyle, base.costumeIndex, base.costumeMax, base.threadCount, base.variableCount, base.id);
-    machineLog("General thread information: sizeof header = %d, alignof = %d\n\r", sizeof(struct SCRATCH_threadHeader), __alignof(struct SCRATCH_threadHeader));
+    if (!hasPrintedGeneral) {
+        machineLog("General thread information: sizeof header = %d, alignof = %d\n\r", sizeof(struct SCRATCH_threadHeader), __alignof(struct SCRATCH_threadHeader));
+        machineLog("General sprite information: sizeof header = %d, alignof = %d\n\r", sizeof(base), __alignof(base));
+        machineLog("Fields are printed as-is in their native format, which may be misleading. Several fields are scaled integers.\n\r");
+        hasPrintedGeneral = true;
+    }
+    machineLog("This sprite:\n\r\tx: %d, y: %d, rotation: %d, size: %d, visible: %d, layer: %d, rotationStyle: %d, costumeIndex: %d, costumeMax: %d, threadCount: %d, variableCount: %d, id: %d\n\r", base.x.i, base.y.i, base.rotation, base.size, base.visible, base.layer, base.rotationStyle, base.costumeIndex, base.costumeMax, base.threadCount, base.variableCount, base.id);
+    machineLog("Threads for this sprite:\n\r");
     for (int i = 0; i < base.threadCount; i++) {
         struct SCRATCH_threadHeader tHeader = sprite->threads[i].base;
-        machineLog("condition: %d, entry: %d, start: %d\n\r", tHeader.eventCondition, tHeader.entryPoint, tHeader.startEvent);
+        machineLog("\tcondition: %d, entry: %d, start: %d\n\r", tHeader.eventCondition, tHeader.entryPoint, tHeader.startEvent);
     }
 }
 

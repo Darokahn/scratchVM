@@ -199,7 +199,7 @@ export async function getImageBuffer(file, details, byteBudget) {
         }
     }
     for (let image of images) {
-        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, image.md5ext, {mode: "scaleMax", x: 200, y: 200});
+        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, image.md5ext, {mode: "scaleMax", x: 32, y: 32});
         image.scaledImage = scaledImage;
         image.width = width;
         image.height = height;

@@ -131,13 +131,13 @@ case INNER_FETCHVAR: {
     else {
         spriteOperand = sprites[spriteOperandIndex];
     }
-    printf("sprite: %d, var: %d\n", spriteOperand->base.id, varIndex);
+    char buffer[32];
+    machineLog("sprite: %d, var: %d\n", spriteOperand->base.id, varIndex);
     if (spriteOperand->variables[varIndex].type == SCRATCH_UNINIT) {
-        machineLog("WARNING: scratch variable uninitialized.");
+        machineLog("WARNING: scratch variable uninitialized. Not printing.\n");
         fflush(stdout);
     }
-    char buffer[32];
-    printf("value: %s\n", cast(spriteOperand->variables[varIndex], SCRATCH_STRING, buffer).data.string);
+    else machineLog("value: %s\n", cast(spriteOperand->variables[varIndex], SCRATCH_STRING, buffer).data.string);
     PUSHDATA(spriteOperand->variables[varIndex]);
     status = SCRATCH_continue;
     break;
@@ -486,8 +486,6 @@ case DATA_SETVARIABLETO: {
         spriteOperand = sprites[spriteOperandIndex];
     }
     struct SCRATCH_data x = POPDATA();
-    //char buffer[32];
-    //printf("sprite: %d, var: %d, value: %s\n", spriteOperand->base.id, varIndex, cast(x, SCRATCH_STRING, buffer).data.string);
     spriteOperand->variables[varIndex] = x;
     status = SCRATCH_continue;
     break;
@@ -503,8 +501,6 @@ case DATA_CHANGEVARIABLEBY: {
         spriteOperand = sprites[spriteOperandIndex];
     }
     struct SCRATCH_data x = POPDATA();
-    //char buffer[32];
-    //printf("sprite: %d, var: %d, value: %s\n", spriteOperand->base.id, varIndex, cast(x, SCRATCH_STRING, buffer).data.string);
     spriteOperand->variables[varIndex].data.number.i += x.data.number.i;
     status = SCRATCH_continue;
     break;

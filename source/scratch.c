@@ -387,7 +387,9 @@ struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, cha
         "true"
     };
     if (d.type == SCRATCH_UNINIT) {
-        machineLog("WARNING: scratch data value uninitialized. Likely a variable that was never set.");
+        machineLog("WARNING: scratch data value uninitialized. Likely a variable that was never set.\n");
+        fflush(stdout);
+        return d;
     }
     if (d.type == type) return d;
     int combination = pair(type, d.type);

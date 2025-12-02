@@ -1,0 +1,7 @@
+# Override the path to the partition table file
+# NOTE: This path must be relative to the build directory or absolute.
+# Placing the CSV in the sketch folder and using a relative path works best.
+build.partition_table_path={sketch_path}/custom_partitions.csv
+
+# Override the partition scheme name (optional, but good practice)
+build.partition_scheme=custom

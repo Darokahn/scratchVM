@@ -145,11 +145,11 @@ async function convertScratchProject() {
     const file = getFsEntry("project");
     let details = await getDetails(file);
     let bytes = await getProgramAsBlob(details);
-    sendFile(bytesToCarray(bytes, "programData"));
+    sendFile(bytes, "webConverter/uploads/programData.bin");
 }
 
-async function sendFile(blob) {
-    fetch("upload/definitions.c", {
+async function sendFile(name, blob) {
+    fetch("upload/" + name, {
         method: 'POST',
         headers: {},
         body: blob
@@ -257,33 +257,24 @@ async function getProgramAsBlob(details) {
 }
 
 async function addZipToFs(file) {
-    const buffer = await file.arrayBuffer();
+    const buffer = file.arrayBuffer;
     const bytes = new Uint8Array(buffer);
     const unzipped = unzipSync(bytes);
     files["project"] = unzipped;
 }
 
 async function main() {
-    const dropzone = document.getElementById("dropzone");
-
-    dropzone.addEventListener("dragover", e => {
-      e.preventDefault(); // Required so drop works
-      dropzone.style.background = "#eef";
-    });
-
-    dropzone.addEventListener("dragleave", () => {
-      dropzone.style.background = "";
-    });
-
-    dropzone.addEventListener("drop", e => {
-      e.preventDefault();
-      dropzone.style.background = "";
-        
-      const file = e.dataTransfer.files[0];
-      if (file && file.name.endsWith(".sb3")) {
-          addZipToFs(file);
+    let textarea = document.getElementById("projectName");
+    const options = {
+      // May be called periodically with progress updates.
+      onProgress: (type, loaded, total) => {
+        // type is 'metadata', 'project', 'assets', or 'compress'
+        console.log(type, loaded / total);
       }
-    });
+    };
+    const project = await SBDL.downloadProjectFromID('1238081605', options);
+    console.log(project);
+    addZipToFs(project);
 
     const submitButton = document.getElementById("submit");
     submitButton.onclick = convertScratchProject;

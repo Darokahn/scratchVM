@@ -114,3 +114,8 @@ bool getInput(int index) {
     }
     return 0;
 }
+
+void pollApp(app_t* out) {
+    strcpy(out->name, "app");
+    out->programData = programData;
+}
