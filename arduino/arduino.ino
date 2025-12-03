@@ -25,69 +25,94 @@ TFT_eSprite tftSprite = TFT_eSprite(&tft);
 extern "C" {
   #include "scratch.h"
   #include "graphics.h"
-  #include "letters.h"
-  #include "externFunctions.h"
+  #include "programData.h"
+}
+
+int readChar() {
+    int c = Serial.read();
+    //Serial.println(c);
+    return c;
 }
 
 const char* PARTITION_LABEL = "program_data"; 
 
 // Global handle for the data partition, found once at setup
-static const esp_partition_t* g_data_partition = NULL;
+static const esp_partition_t* programDataPartition = NULL;
+static esp_partition_mmap_handle_t mappedRegion = NULL;
 
-void setup_program_data_partition() {
-    g_data_partition = esp_partition_find_first(
+int mappedSections = 0;
+#define SECTIONSIZE 65355
+
+void partitionInit() {
+    programDataPartition = esp_partition_find_first(
         ESP_PARTITION_TYPE_DATA,
         (esp_partition_subtype_t)0x80, // Custom SubType (matching your CSV)
         PARTITION_LABEL
     );
+}
 
-    if (!g_data_partition) {
-        machineLog("FATAL: Partition '%s' not found! Check partitions.csv.", PARTITION_LABEL);
-    } else {
-        machineLog("Partition '%s' found at 0x%X, size %u bytes.", 
-                 PARTITION_LABEL, g_data_partition->address, g_data_partition->size);
+struct writeProcess {
+    int baseOffset;
+    int offset;
+    int currentIndex;
+    uint8_t buffer[4096];
+    bool writing = false;
+};
+
+struct writeProcess process;
+
+void startReadWrite(int offset) {
+    process.baseOffset = offset;
+    process.offset = offset;
+    process.currentIndex = 0;
+    process.writing = true;
+}
+
+void endWriteData() {
+    writeChunk();
+    process.writing = false;
+}
+
+void writeChunk() {
+    esp_partition_erase_range(programDataPartition, process.offset, programDataPartition->erase_size);
+    esp_partition_write(programDataPartition, process.offset, process.buffer, programDataPartition->erase_size);
+    process.offset += programDataPartition->erase_size;
+    if (process.offset - process.baseOffset > SECTIONSIZE) {
+        mappedSections++;
+    }
+    process.currentIndex = 0;
+}
+
+void writeData(const uint8_t* buffer, size_t length) {
+    for (int i = 0; i < length; i++) {
+        process.buffer[process.currentIndex++] = buffer[i];
+        if (process.currentIndex >= programDataPartition->erase_size) {
+            writeChunk();
+        }
     }
 }
 
-bool write_program_data(const uint8_t* buffer, size_t length) {
-    if (!g_data_partition) {
-        machineLog("Partition handle is NULL. Call setup_program_data_partition() first.");
-        return false;
-    }
+#define APPMAX 46
 
-    if (length == 0) {
-        machineLog("Data length is zero. Skipping write.");
-        return true;
-    }
+app_t* appStore[APPMAX];
+int appOffsets[APPMAX];
+int appSizes[APPMAX];
+int appCount = 0;
 
-    if (length > g_data_partition->size) {
-        machineLog("Data length (%u) exceeds partition size (%u). Aborting.", length, g_data_partition->size);
-        return false;
+app_t* checkoutApp(char* name) {
+    for (int i = 0; i < appCount; i++) {
+        app_t* app = appStore[i];
+        if (strcmp(app->name, name) != 0) continue;
+        int offset = appOffsets[i];
+        startReadWrite(offset);
+        esp_partition_mmap(programDataPartition, offset, SECTIONSIZE * appSizes[i], ESP_PARTITION_MMAP_DATA, (const void**)&(app->programData), &mappedRegion);
     }
-
-    // --- 1. Erase the required flash area ---
-    // We must erase blocks of 4KB (0x1000). The erase size must be rounded up 
-    // to the nearest 4KB boundary that covers the entire data length.
-    size_t erase_size = (length + 0xFFF) & ~0xFFF;
-    
-    machineLog("Erasing %u bytes for new data...", erase_size);
-    esp_err_t err = esp_partition_erase_range(g_data_partition, 0, erase_size);
-    if (err != ESP_OK) {
-        machineLog("Erase failed: %s", esp_err_to_name(err));
-        return false;
-    }
-
-    // --- 2. Write the new data payload ---
-    machineLog("Writing %u bytes to partition...", length);
-    err = esp_partition_write(g_data_partition, 0, buffer, length);
-    if (err != ESP_OK) {
-        machineLog("Write failed: %s", esp_err_to_name(err));
-        return false;
-    }
-
-    machineLog("Program data updated successfully.");
+    return NULL;
 }
 
+
+void returnApp() {
+}
 extern "C" int main();
 extern "C" void startIO() {
     tft.init();
@@ -98,9 +123,10 @@ extern "C" void startIO() {
     pinMode(32, INPUT);
     pinMode(25, INPUT_PULLUP);
 }
-extern "C" void updateIO() {
+extern "C" void updateIO(app_t* app) {
+    if (Serial.available()) {
+    }
     tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH) / 2, (FULLLCDHEIGHT - LCDHEIGHT) / 2);
-    //Serial.println(ESP.getFreeHeap());
 }
 
 extern "C" void* mallocDMA(size_t size) {
@@ -161,15 +187,49 @@ extern "C" int machineLog(const char* fmt, ...) {
     return n;
 }
 
+// clear serial noise
+struct dataHeader readHeader() {
+    char magicBytes[] = "scratch!";
+    int index = 0;
+    while (index < (sizeof magicBytes) - 1) {
+        while (Serial.available() < 1);
+        if (readChar() == magicBytes[index]) index++;
+        else index = 0;
+    }
+    struct dataHeader h;
+    uint8_t* ptr = (uint8_t*)&h.spriteCount;
+    while (ptr < (uint8_t*)((&h) + 1)) {
+        if (Serial.available() < 1) continue;
+        uint8_t b = readChar();
+        machineLog("%d\n\r", b);
+        *ptr++ = b;
+    }
+    return h;
+}
+
 void pollApp(app_t* out) {
-    uint8_t blockSizeBytes[5];
-    blockSizeBytes[4] = 0;
-    while (Serial.available() < 4);
-    Serial.readBytes(blockSizeBytes, 4);
-    Serial.println((char*)blockSizeBytes);
-    int blockSize = (blockSizeBytes[3] << 24) + (blockSizeBytes[2] << 16) + (blockSizeBytes[1] << 8) + blockSizeBytes[0];
+    struct dataHeader h = readHeader();
+    
+    machineLog("Reading %u bytes of program data...\n\n\r", h.dataSize);
+    
+    // Allocate memory for the program data blob
+    uint8_t* programDataBuffer = (uint8_t*)malloc(h.dataSize);
+    if (!programDataBuffer) {
+        machineLog("FATAL: Failed to allocate %u bytes as a buffer for program data\n\r", h.dataSize);
+        strcpy(out->name, "app");
+        out->programData = NULL;
+        return;
+    }
+    
+    // Read the blob data from serial
+    *(struct dataHeader*)programDataBuffer = h;
+    h = *(struct dataHeader*)programDataBuffer;
+    int bytesRead = Serial.readBytes(programDataBuffer + h.codeOffset, h.dataSize - h.codeOffset);
+    
+    machineLog("Successfully read %u bytes\n\r", bytesRead);
+    
     strcpy(out->name, "app");
-    out->programData = (uint8_t*)programData;
+    out->programData = programDataBuffer;
 }
 
 void loop() {
@@ -178,6 +238,6 @@ void loop() {
 void setup() {
     delay(1000);
     Serial.begin(115200);
-    setup_program_data_partition();
+    partitionInit();
     main();
 }

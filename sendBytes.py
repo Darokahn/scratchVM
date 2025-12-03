@@ -34,7 +34,6 @@ def interactive_serial_console(port: str, baud_rate: int, timeout: float = 0.1, 
         time.sleep(1) # Wait briefly for the port to stabilize
         
         print(f"\nSuccessfully connected to {port}. (Type 'quit' or 'exit' to stop, or Ctrl+C)")
-        print(filename)
         if (filename):
             with open(filename, "rb") as file:
                 ser.write(file.read())
@@ -81,8 +80,8 @@ def interactive_serial_console(port: str, baud_rate: int, timeout: float = 0.1, 
                     received_data = ser.read(ser.in_waiting)
                     # Print received data as a hex string for clarity
                     print(f"RECV < text: {received_data.decode('utf-8')}")
-                    print(f"RECV < raw text: {received_data}")
-                    print(f"RECV (HEX) < {len(received_data)} bytes: {received_data.hex(' ').upper()}")
+                    # print(f"RECV < raw text: {received_data}")
+                    # print(f"RECV (HEX) < {len(received_data)} bytes: {received_data.hex(' ').upper()}")
                 
             except ValueError:
                 print("Error: Invalid input. Please ensure all inputs are space-separated decimal numbers (0-255).")

@@ -1,3 +1,4 @@
+#pragma once
 enum SCRATCH_opcode {
     INNER_PARTITION_BEGINLOOPCONTROL,
 

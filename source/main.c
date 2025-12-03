@@ -2,11 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "scratch.h"
-#include "graphics.h"
-#include "drawing.h"
-#include "letters.h"
-#include "externFunctions.h"
-#include "externGlobals.h"
+#include "ioFuncs.h"
+#include "globals.h"
 #include "programData.h"
 
 int eventTypeOffsets[__EVENTTYPECOUNT];
@@ -47,7 +44,7 @@ int runApp(app_t* app) {
         SCRATCH_visitAllThreads(&context, (uint8_t*) code);
         if (count++ % drawRate == 0) {
             drawSprites(&context);
-            updateIO();
+            updateIO(app);
         }
         SCRATCH_wakeSprites(&context);
         clearEvents(eventCount);
@@ -56,9 +53,9 @@ int runApp(app_t* app) {
 
 int main() {
     startIO();
+    app_t app;
+    pollApp(&app);
     while (true) {
-        app_t currentApp;
-        pollApp(&currentApp);
-        runApp(&currentApp);
+        runApp(&app);
     }
 }

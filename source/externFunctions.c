@@ -2,12 +2,16 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "graphics.h"
 #include "scratch.h"
-#include "externFunctions.h"
-#include "externGlobals.h"
-#include "letters.h"
+#include "ioFuncs.h"
+#include "programData.h"
 
 SDL_Window* window;
 SDL_Renderer* renderer;
@@ -37,7 +41,7 @@ void startIO() {
 
 int cursorX = 0;
 int cursorY = 0;
-void updateIO() {
+void updateIO(app_t* app) {
     SDL_UpdateTexture(texture, NULL, screen, LCDWIDTH * sizeof(*screen));
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
@@ -116,6 +120,17 @@ bool getInput(int index) {
 }
 
 void pollApp(app_t* out) {
+    struct dataHeader h;
+    uint8_t magic[9];
+    magic[8] = 0;
+    int fd = open("defaultInput", O_RDONLY);
+    read(fd, &magic, 8);
+    read(fd, &h, sizeof h);
+    int size = h.dataSize;
+    uint8_t* programData = malloc(size);
+    lseek(fd, 8, SEEK_SET);
+    read(fd, programData, size);
     strcpy(out->name, "app");
     out->programData = programData;
+    close(fd);
 }

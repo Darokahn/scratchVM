@@ -2,10 +2,9 @@
 #include <string.h>
 #include "graphics.h"
 #include "scratch.h"
-#include "externFunctions.h"
-#include "externGlobals.h"
-#include "letters.h"
-#include "drawing.h"
+#include "ioFuncs.h"
+#include "globals.h"
+#include "programData.h"
 
 void drawSprites(struct SCRATCH_spriteContext* context) {
     for (int i = 0; i < context->spriteCount; i++) {

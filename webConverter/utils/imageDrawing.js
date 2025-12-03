@@ -194,12 +194,17 @@ export async function getImageBuffer(file, details, byteBudget) {
     let images = [];
     for (let sprite of details.sprites) {
         for (let image of sprite.costumes) {
+            console.log(image);
             imageCount++;
             images.push(image);
         }
     }
     for (let image of images) {
-        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, image.md5ext, {mode: "scaleMax", x: 32, y: 32});
+        let filename = image.md5ext;
+        if (filename === undefined) {
+            filename = image.assetId + "." + image.dataFormat;
+        }
+        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, filename, {mode: "scaleMax", x: 32, y: 32});
         image.scaledImage = scaledImage;
         image.width = width;
         image.height = height;

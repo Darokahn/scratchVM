@@ -3,12 +3,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include <stdlib.h>
 #include <limits.h>
 #include <sys/param.h>
+#include <stdio.h>
 #include "scratch.h"
-#include "externFunctions.h"
-#include "externGlobals.h"
+#include "ioFuncs.h"
+#include "globals.h"
+#include "programData.h"
 
 #define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
 
@@ -286,7 +287,8 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header)
     spriteChunk->base = header;
     spriteChunk->variables = (struct SCRATCH_data*) (firstChunkSize + (uint8_t*) spriteChunk);
     for (int i = 0; i < header.variableCount; i++) {
-        spriteChunk->variables[i].type = SCRATCH_UNINIT;
+        spriteChunk->variables[i].type = SCRATCH_NUMBER;
+        spriteChunk->variables[i].data.number.i = 0;
     }
     spriteChunk->talkingString = NULL;
     return spriteChunk;

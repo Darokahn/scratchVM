@@ -1,9 +1,7 @@
-#ifndef GRAPHICS_H
-#define GRAPHICS_H
-
+#pragma once
+#include <stdbool.h>
 #include <stdint.h>
-#include "scratch.h"
-#include "letters.h"
+#include <stddef.h>
 
 #define FULLLCDWIDTH 320
 #define FULLLCDHEIGHT 240
@@ -34,4 +32,24 @@ struct image {
     pixel pixels[];
 };
 
-#endif
+struct SCRATCH_rect;
+
+void drawPixel(int x, int y, pixel color);
+
+struct letterRow {
+    char cols[3];
+};
+
+struct letter {
+    struct letterRow rows[5];
+};
+
+struct letterSet {
+    const struct letter* letters;
+    int letterMax;
+};
+
+const extern struct letter* const letters;
+const extern struct letterSet basicFont;
+
+void drawString(char* string, struct SCRATCH_rect rect, const struct letterSet font, pixel color);

@@ -463,7 +463,66 @@ case OPERATOR_ROUND: {
     // pop number, push rounded (not banker's rounding)
 }
 case OPERATOR_MATHOP: {
-    // TODO
+    int16_t operationEnum = POPID();
+    struct SCRATCH_data operand = POPNUMBER();
+    
+    // Convert scaledInt32 to float
+    float floatValue = (float)operand.data.number.i / 65536.0f;
+    float result = 0.0f;
+    
+    // Perform the math operation based on enum value
+    switch (operationEnum) {
+        case 0: // abs
+            result = fabsf(floatValue);
+            break;
+        case 1: // floor
+            result = floorf(floatValue);
+            break;
+        case 2: // ceil
+            result = ceilf(floatValue);
+            break;
+        case 3: // sqrt
+            result = sqrtf(floatValue >= 0.0f ? floatValue : 0.0f);
+            break;
+        case 4: // sin
+            result = sinf(floatValue);
+            break;
+        case 5: // cos
+            result = cosf(floatValue);
+            break;
+        case 6: // tan
+            result = tanf(floatValue);
+            break;
+        case 7: // asin
+            result = asinf(floatValue);
+            break;
+        case 8: // acos
+            result = acosf(floatValue);
+            break;
+        case 9: // atan
+            result = atanf(floatValue);
+            break;
+        case 10: // ln (natural log)
+            result = logf(floatValue > 0.0f ? floatValue : 1.0f);
+            break;
+        case 11: // log (base 10)
+            result = log10f(floatValue > 0.0f ? floatValue : 1.0f);
+            break;
+        case 12: // e^ (exp)
+            result = expf(floatValue);
+            break;
+        case 13: // 10^
+            result = powf(10.0f, floatValue);
+            break;
+        default:
+            result = floatValue; // Unknown operation, return as-is
+            break;
+    }
+    
+    // Convert float back to scaledInt32
+    int32_t scaledResult = (int32_t)(result * 65536.0f);
+    PUSHFRACTION(scaledResult);
+    status = SCRATCH_continue;
     break;
 }
 case INNER_DEBUGEXPRESSION: {

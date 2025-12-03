@@ -1,11 +1,9 @@
-#ifndef SCRATCH_H
-#define SCRATCH_H
+#pragma once
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
-
-#include "opcodeEnum.h"
+#include <stddef.h>
 #include "graphics.h"
+#include "opcodeEnum.h"
 
 #define STACKMAX (128)
 #define MAXOPCODE (255)
@@ -13,7 +11,6 @@
 #define SPRITEMAX (256) // maximum spritecount
 #define IMAGEMAX (256)
 #define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
-
 
 #define FRAMESPERSEC 30
 
@@ -113,11 +110,7 @@ enum SCRATCH_continueStatus {
     SCRATCH_killSprite
 };
 
-typedef bool (*SCRATCH_functionIterator)(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, int iteration);
 typedef enum SCRATCH_continueStatus (*SCRATCH_function)(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread);
-// SCRATCH_functionIterator is used for animated blocks. A SCRATCH_function that returns non-null signals to the thread
-// that this block should yield and use the returned enumeration to set a new current task.
-
 
 enum SCRATCH_EVENTTYPE {
     ONKEY,
@@ -222,15 +215,11 @@ bool SCRATCH_addSprite(struct SCRATCH_spriteContext* context, struct SCRATCH_spr
 bool SCRATCH_wakeSprite(struct SCRATCH_sprite* sprite, enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
 void SCRATCH_wakeSprites(struct SCRATCH_spriteContext* context);
 
-bool getEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
-void setEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input, bool state);
 
-struct image* getImage(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand);
 
-void initData(struct SCRATCH_spriteContext* context);
-void initImages(struct SCRATCH_spriteContext* context, const uint8_t* buffer);
 struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand);
 bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2);
 
 struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, char* stringBuffer);
-#endif
+
+
