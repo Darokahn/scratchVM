@@ -2,17 +2,20 @@ from flask import Flask, request, send_from_directory, Response, jsonify
 import os
 import json
 import re
+import base64
 from datetime import datetime
 
 app = Flask(__name__)
 UPLOAD_DIR = "upload"
 BUG_REPORTS_DIR = "bug_reports"
 TUTORING_REQUESTS_DIR = "tutoring_requests"
+GAME_REPORTS_DIR = "game_reports"
 
 # Ensure the upload directory exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(BUG_REPORTS_DIR, exist_ok=True)
 os.makedirs(TUTORING_REQUESTS_DIR, exist_ok=True)
+os.makedirs(GAME_REPORTS_DIR, exist_ok=True)
 
 # Serve any file requested
 @app.route('/<path:filename>', methods=['GET', 'OPTIONS'])
@@ -161,6 +164,75 @@ def submit_tutoring_request():
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response, 200
         
+    except Exception as e:
+        error_response = jsonify({'error': f'Server error: {str(e)}'})
+        error_response.headers['Access-Control-Allow-Origin'] = '*'
+        return error_response, 500
+
+@app.route('/api/game-status', methods=['POST', 'OPTIONS'])
+def submit_game_status():
+    if request.method == 'OPTIONS':
+        response = Response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
+    
+    try:
+        data = request.get_json()
+        if not data or 'status' not in data or 'programData' not in data:
+            error_response = jsonify({'error': 'Missing required fields: status and programData'})
+            error_response.headers['Access-Control-Allow-Origin'] = '*'
+            return error_response, 400
+        
+        status = data.get('status', '').strip().lower()
+        allowed_status = {'worked', 'failed'}
+        if status not in allowed_status:
+            error_response = jsonify({'error': 'Status must be "worked" or "failed"'})
+            error_response.headers['Access-Control-Allow-Origin'] = '*'
+            return error_response, 400
+        
+        program_data_b64 = data.get('programData', '')
+        try:
+            program_bytes = base64.b64decode(program_data_b64)
+        except Exception:
+            error_response = jsonify({'error': 'Invalid programData payload'})
+            error_response.headers['Access-Control-Allow-Origin'] = '*'
+            return error_response, 400
+        
+        report_id = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        project_id = data.get('projectId') or None
+        project_name = data.get('projectName') or None
+        byte_length = data.get('byteLength') or len(program_bytes)
+        
+        metadata = {
+            'id': report_id,
+            'timestamp': datetime.now().isoformat(),
+            'status': status,
+            'projectId': project_id,
+            'projectName': project_name,
+            'byteLength': byte_length,
+            'storage': {
+                'binaryFile': f"game_{report_id}.bin",
+                'metadataFile': f"game_{report_id}.json"
+            }
+        }
+        
+        binary_path = os.path.join(GAME_REPORTS_DIR, metadata['storage']['binaryFile'])
+        with open(binary_path, 'wb') as bin_file:
+            bin_file.write(program_bytes)
+        
+        metadata_path = os.path.join(GAME_REPORTS_DIR, metadata['storage']['metadataFile'])
+        with open(metadata_path, 'w', encoding='utf-8') as meta_file:
+            json.dump(metadata, meta_file, indent=2, ensure_ascii=False)
+        
+        response = jsonify({
+            'success': True,
+            'message': 'Game status received',
+            'id': report_id
+        })
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response, 200
     except Exception as e:
         error_response = jsonify({'error': f'Server error: {str(e)}'})
         error_response.headers['Access-Control-Allow-Origin'] = '*'

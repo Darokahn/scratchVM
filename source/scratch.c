@@ -213,13 +213,14 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
     enum SCRATCH_opcode operation;
     struct SCRATCH_sprite* sprite = context->sprites[context->currentIndex];
     struct SCRATCH_sprite** sprites = context->sprites;
-    enum SCRATCH_opcode watchValue = -1;//OPERATOR_MULTIPLY;
+    enum SCRATCH_opcode watchValue = LOOKS_SETSIZETO;
     while (true) {
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        bool loggingCondition = false;//sprite->base.id == 1 && thread - sprite->threads == 0;
-        if (loggingCondition) {
+        bool loggingCondition = false;//sprite->base.id == 2 && thread->base.startEvent == ONCLONE;
+            if (loggingCondition) {
+            printf("%d, %d\n", operation, watchValue);
             machineLog("id: %d, index: %d, thread: %d, hat: %s, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent]);
             if (opcodeName == NULL) machineLog("opcode: %d\n\r", operation);
             else machineLog("opcode: %s\n\r", SCRATCH_opcode_names[operation]);

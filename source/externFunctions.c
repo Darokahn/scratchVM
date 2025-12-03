@@ -123,7 +123,7 @@ void pollApp(app_t* out) {
     struct dataHeader h;
     uint8_t magic[9];
     magic[8] = 0;
-    int fd = open("defaultInput", O_RDONLY);
+    int fd = open("source/program.bin", O_RDONLY);
     read(fd, &magic, 8);
     read(fd, &h, sizeof h);
     int size = h.dataSize;

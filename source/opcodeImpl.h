@@ -917,7 +917,7 @@ case LOOKS_CHANGESIZEBY: {
 }
 case LOOKS_SETSIZETO: {
     struct SCRATCH_data sizeData = POPNUMBER();
-    uint16_t size = sizeData.data.number.halves.high;
+    uint32_t size = sizeData.data.number.halves.high;
     size *= SIZERATIO;
     size /= 100;
     sprite->base.size = size;

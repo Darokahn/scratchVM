@@ -395,19 +395,19 @@
                 <div class="button-group">
                     <button id="downloadProject" class="btn-primary">Download Project</button>
                 </div>
-            </div>
-
-            <div class="card">
+                <br>
                 <h2>ESP32 Serial Communication</h2>
                 <div class="button-group">
                     <button id="connectSerial" class="btn-success">Connect Serial</button>
                     <button id="disconnectSerial" class="btn-danger" style="display:none;">Disconnect Serial</button>
                     <button id="sendProgramData" class="btn-primary">Send Program Data</button>
                 </div>
+                <p style="margin-top: 15px; color: #666;">Tried your game on hardware? Let us know if it worked so we can improve compatibility.</p>
+                <div class="button-group">
+                    <button id="reportGameWorked" class="btn-success" style="background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%);">Report Game Worked</button>
+                    <button id="reportGameFailed" class="btn-danger" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">Report Game Didn&apos;t Work</button>
+                </div>
                 <div id="status"></div>
-            </div>
-
-            <div class="card esp-tools-section">
                 <h2>Flash ESP32 Firmware</h2>
                 <p style="margin-bottom: 15px; color: #666;">Use ESP Web Tools to flash the firmware to your ESP32 device:</p>
                 <esp-web-install-button id="installButton" manifest="/scratchVM-image/manifest.json"></esp-web-install-button>

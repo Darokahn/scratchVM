@@ -294,9 +294,11 @@ const pushFuncs = {
     INTNUM: "NUM",
     ANGLENUM: (input, code) => {
         let degrees = Number(input.value[0]);
+        console.log("degrees scratch format:", degrees);
         let opcode = "INNER_PUSHDEGREES";
         code.push(opcode);
         degrees *= ((UINT32_MAX + 1) / 360);
+        console.log("degrees VM format:", degrees);
         pushArg(code, toCodeLiteral(degrees, 4));
     },
     COLOR: (input) => {
@@ -440,6 +442,8 @@ function getEventCondition(hat, project) {
 let specialFunctions = {
     LOOKS_CHANGEEFFECTBY: () => {},
     LOOKS_SETEFFECTTO: () => {},
+    LOOKS_SETSIZETO: (block, code, blocks, owner) => {
+    }
     CONTROL_STOP: (block, code, blocks, owner) => {
         let options = ["this script", "all", "other scripts in sprite"];
         console.log(block.fields);

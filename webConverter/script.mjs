@@ -5,6 +5,15 @@ import * as imageDrawing from "./utils/imageDrawing.js";
 const SIZERATIO = 1024;
 
 const files = {};
+let currentProjectInfo = null;
+
+function sanitizeProjectName(rawName, fallback = "project") {
+    const safeFallback = fallback || "project";
+    if (!rawName || typeof rawName !== "string") {
+        return safeFallback;
+    }
+    return rawName.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 50) || safeFallback;
+}
 
 // template for the object representing each game object
 function spriteTemplate() {
@@ -133,6 +142,16 @@ function adjustSprite(sprite, isStage) {
 function bytesToCarray(bytes, name) {
     console.log(bytes);
     return ["const unsigned char ", name, "[] = {", bytes.join(", "), "};"].join("");
+}
+
+function uint8ToBase64(uint8) {
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < uint8.length; i += chunkSize) {
+        const chunk = uint8.subarray(i, i + chunkSize);
+        binary += String.fromCharCode.apply(null, chunk);
+    }
+    return btoa(binary);
 }
 
 function pad(array, align) {
@@ -356,18 +375,16 @@ async function downloadScratchProject() {
         console.log("Downloaded project:", project);
         
         // Get project name from the downloaded project
-        let projectName = project.title;
-        
-        // Fallback to project ID if name not found
-        if (!projectName) {
-            projectName = `project_${projectID}`;
+        let projectName = sanitizeProjectName(project.title, `project_${projectID}`);
+        if (!project.title) {
             updateStatus(`Warning: Could not extract project name, using ${projectName}`, "warning");
         }
         
-        // Sanitize project name for filesystem (remove invalid characters)
-        projectName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 50);
-        
         await addZipToFs(project, "project");
+        currentProjectInfo = {
+            id: projectID,
+            name: projectName
+        };
         
         updateStatus(`✓ Project "${projectName}" (ID: ${projectID}) downloaded and stored successfully!`, "success");
         convertScratchProject();
@@ -551,6 +568,47 @@ async function sendProgramDataViaSerial() {
     }
 }
 
+async function reportGameStatus(worked) {
+    try {
+        const file = getFsEntry("project");
+        if (!file) {
+            throw new Error("No project loaded. Please download a Scratch project first.");
+        }
+        
+        updateStatus("Preparing report data...", "info");
+        const details = await getDetails(file);
+        const bytes = await getProgramAsBlob(details);
+        const data = new Uint8Array(bytes);
+        
+        const payload = {
+            status: worked ? "worked" : "failed",
+            projectId: currentProjectInfo?.id || null,
+            projectName: currentProjectInfo?.name || null,
+            byteLength: data.length,
+            programData: uint8ToBase64(data),
+            timestamp: new Date().toISOString()
+        };
+        
+        const response = await fetch("/api/game-status", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || "Server error while submitting report");
+        }
+        
+        updateStatus(`Thanks for the feedback! Report ID: ${result.id}`, "success");
+    } catch (error) {
+        updateStatus(`✗ Could not submit report: ${error.message}`, "error");
+        console.error("Game status report error:", error);
+    }
+}
+
 // Helper function to update status display with styling
 function updateStatus(message, type = "info") {
     const statusDiv = document.getElementById("status");
@@ -585,9 +643,15 @@ async function main() {
       }
     };
 
-    const project = await SBDL.downloadProjectFromID('1238081605', options);
+    const sampleProjectId = '1238081605';
+    const project = await SBDL.downloadProjectFromID(sampleProjectId, options);
     console.log(project);
     addZipToFs(project);
+    const defaultName = sanitizeProjectName(project.title, `project_${sampleProjectId}`);
+    currentProjectInfo = {
+        id: sampleProjectId,
+        name: defaultName
+    };
 
     const connectSerialBtn = document.getElementById("connectSerial");
     if (connectSerialBtn) {
@@ -602,6 +666,16 @@ async function main() {
     const disconnectSerialBtn = document.getElementById("disconnectSerial");
     if (disconnectSerialBtn) {
         disconnectSerialBtn.onclick = disconnectSerial;
+    }
+    
+    const reportWorkedBtn = document.getElementById("reportGameWorked");
+    if (reportWorkedBtn) {
+        reportWorkedBtn.onclick = () => reportGameStatus(true);
+    }
+    
+    const reportFailedBtn = document.getElementById("reportGameFailed");
+    if (reportFailedBtn) {
+        reportFailedBtn.onclick = () => reportGameStatus(false);
     }
     
     const downloadProjectBtn = document.getElementById("downloadProject");

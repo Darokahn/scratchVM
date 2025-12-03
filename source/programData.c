@@ -80,7 +80,6 @@ void initProgram(const uint8_t* buffer, struct SCRATCH_spriteContext* context, c
     *code = &(buffer[d->codeOffset]);
     const struct SCRATCH_spriteHeader* spriteHeaders = (struct SCRATCH_spriteHeader*) &(buffer[d->spriteOffset]);
     const struct SCRATCH_threadHeader* threadHeaders = (struct SCRATCH_threadHeader*) &(buffer[d->threadOffset]);
-    machineLog ("pointer diff: %d\n\r", (uint8_t*)spriteHeaders - buffer);
     context->spriteCount = d->spriteCount;
     for (int i = 0; i < d->spriteCount; i++) {
         struct SCRATCH_spriteHeader spriteHeader = spriteHeaders[i];
