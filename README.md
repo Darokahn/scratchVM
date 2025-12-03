@@ -7,3 +7,4 @@ Sprites own the threads associated with their operation. Each thread is a contai
 The machine is capable of creating and running arbitrarily many threads concurrently.
 Each thread uses a stack-based runtime. Its operations are composed of VM primitives, which can accept code-embedded constants as arguments, and scratch block functions, which do not take code-embedded arguments and look to the stack to consume arguments. The VM primitives are involved in pushing values to the stack for use by block functions, performing control flow operations, and utilizing the system string registers for join operations.
 The machine has two string registers associated with each thread, which are boundless character array buffers used in string joining. For this purpose, joining as a special case is a VM primitive operation rather than a scratch block function.
+# ScratchVMSite
