@@ -28,20 +28,11 @@ extern "C" {
   #include "programData.h"
 }
 
-int readChar() {
-    int c = Serial.read();
-    //Serial.println(c);
-    return c;
-}
-
 const char* PARTITION_LABEL = "program_data"; 
 
 // Global handle for the data partition, found once at setup
 static const esp_partition_t* programDataPartition = NULL;
 static esp_partition_mmap_handle_t mappedRegion = NULL;
-
-int mappedSections = 0;
-#define SECTIONSIZE 65355
 
 void partitionInit() {
     programDataPartition = esp_partition_find_first(
@@ -51,68 +42,54 @@ void partitionInit() {
     );
 }
 
-struct writeProcess {
-    int baseOffset;
-    int offset;
-    int currentIndex;
-    uint8_t buffer[4096];
-    bool writing = false;
-};
+esp_err_t writeBufferToPartition(const esp_partition_t* partition,
+                                 const uint8_t* data,
+                                 size_t dataSize,
+                                 size_t chunkOffset
+                                 ) {
+    if (!partition || !data) return ESP_ERR_INVALID_ARG;
 
-struct writeProcess process;
-
-void startReadWrite(int offset) {
-    process.baseOffset = offset;
-    process.offset = offset;
-    process.currentIndex = 0;
-    process.writing = true;
-}
-
-void endWriteData() {
-    writeChunk();
-    process.writing = false;
-}
-
-void writeChunk() {
-    esp_partition_erase_range(programDataPartition, process.offset, programDataPartition->erase_size);
-    esp_partition_write(programDataPartition, process.offset, process.buffer, programDataPartition->erase_size);
-    process.offset += programDataPartition->erase_size;
-    if (process.offset - process.baseOffset > SECTIONSIZE) {
-        mappedSections++;
+    // Make sure data fits in the partition
+    if (dataSize > partition->size) {
+        ESP_LOGE("FLASH", "Data size %u exceeds partition size %u",
+                 (unsigned)dataSize, (unsigned)partition->size);
+        return ESP_ERR_INVALID_SIZE;
     }
-    process.currentIndex = 0;
-}
 
-void writeData(const uint8_t* buffer, size_t length) {
-    for (int i = 0; i < length; i++) {
-        process.buffer[process.currentIndex++] = buffer[i];
-        if (process.currentIndex >= programDataPartition->erase_size) {
-            writeChunk();
-        }
+    size_t sectorSize = partition->erase_size;
+
+    // Round up total size to next multiple of sector size for erase
+    size_t eraseSize = (dataSize + sectorSize - 1) & ~(sectorSize - 1);
+
+    // Erase one sector at a time
+    for (size_t offset = 0; offset < eraseSize; offset += sectorSize) {
+        size_t thisEraseSize = (offset + sectorSize > eraseSize)
+                               ? (eraseSize - offset)
+                               : sectorSize;
+
+        esp_err_t err = esp_partition_erase_range(partition, offset + (chunkOffset * sectorSize), thisEraseSize);
+        if (err != ESP_OK) return err;
     }
-}
 
-#define APPMAX 46
+    // Write data in sector-sized chunks
+    for (size_t offset = 0; offset < dataSize; offset += sectorSize) {
+        size_t thisWriteSize = (offset + sectorSize > dataSize)
+                               ? (dataSize - offset)
+                               : sectorSize;
 
-app_t* appStore[APPMAX];
-int appOffsets[APPMAX];
-int appSizes[APPMAX];
-int appCount = 0;
-
-app_t* checkoutApp(char* name) {
-    for (int i = 0; i < appCount; i++) {
-        app_t* app = appStore[i];
-        if (strcmp(app->name, name) != 0) continue;
-        int offset = appOffsets[i];
-        startReadWrite(offset);
-        esp_partition_mmap(programDataPartition, offset, SECTIONSIZE * appSizes[i], ESP_PARTITION_MMAP_DATA, (const void**)&(app->programData), &mappedRegion);
+        esp_err_t err = esp_partition_write(partition, offset + (chunkOffset * sectorSize), data + offset, thisWriteSize);
+        if (err != ESP_OK) return err;
     }
-    return NULL;
+
+    return ESP_OK;
 }
 
-
-void returnApp() {
+int readChar() {
+    int c = Serial.read();
+    //Serial.println(c);
+    return c;
 }
+
 extern "C" int main();
 extern "C" void startIO() {
     tft.init();
@@ -209,35 +186,44 @@ struct dataHeader readHeader() {
 
 void pollApp(app_t* out) {
     struct dataHeader h = readHeader();
-    
+
     machineLog("Reading %u bytes of program data...\n\n\r", h.dataSize);
-    
-    // Allocate memory for the program data blob
-    uint8_t* programDataBuffer = (uint8_t*)malloc(h.dataSize);
-    if (!programDataBuffer) {
+
+    // Allocate a temporary buffer to receive the serial data
+    uint8_t* tempBuffer = (uint8_t*)malloc(h.dataSize);
+    if (!tempBuffer) {
         machineLog("FATAL: Failed to allocate %u bytes as a buffer for program data\n\r", h.dataSize);
         strcpy(out->name, "app");
         out->programData = NULL;
         return;
     }
-    
-    // Read the blob data from serial
-    *(struct dataHeader*)programDataBuffer = h;
-    h = *(struct dataHeader*)programDataBuffer;
-    int bytesRead = Serial.readBytes(programDataBuffer + h.codeOffset, h.dataSize - h.codeOffset);
-    
+
+    *(struct dataHeader*)tempBuffer = h;
+    int bytesRead = Serial.readBytes(tempBuffer + h.codeOffset, h.dataSize - h.codeOffset);
     machineLog("Successfully read %u bytes\n\r", bytesRead);
-    
+
+    writeBufferToPartition(programDataPartition, tempBuffer, h.dataSize, 0);
+    free(tempBuffer);
+
+    // Map the flash region to get a pointer
+    if (esp_partition_mmap(programDataPartition, 0, h.dataSize,
+                           ESP_PARTITION_MMAP_DATA, (const void**)&out->programData,
+                           &mappedRegion) != ESP_OK) {
+        machineLog("FATAL: Failed to mmap program_data partition\n\r");
+        out->programData = NULL;
+        return;
+    }
+
     strcpy(out->name, "app");
-    out->programData = programDataBuffer;
+    machineLog("Program data written and mapped to pointer %p\n\r", out->programData);
 }
 
 void loop() {
 }
 
 void setup() {
-    delay(1000);
     Serial.begin(115200);
     partitionInit();
+
     main();
 }

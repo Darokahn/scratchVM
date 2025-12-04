@@ -1,0 +1,12 @@
+{
+  "id": "20251203_234259_816710",
+  "timestamp": "2025-12-03T23:42:59.816731",
+  "status": "worked",
+  "projectId": null,
+  "projectName": null,
+  "byteLength": 0,
+  "storage": {
+    "binaryFile": "game_20251203_234259_816710.bin",
+    "metadataFile": "game_20251203_234259_816710.json"
+  }
+}

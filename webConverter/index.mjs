@@ -3,10 +3,6 @@ import * as serial from "./utils/serialTools.js";
 import {updateStatus, reportGameStatus} from "./utils/status.js";
 import { unzipSync } from "https://unpkg.com/fflate/esm/browser.js";
 
-let currentProjectInfo = null;
-let stateExports = {};
-let stateLocals = {};
-
 // Parse project ID from Scratch URL
 function parseProjectIDFromURL(url) {
     if (!url || !url.trim()) {
@@ -41,17 +37,6 @@ function parseProjectIDFromURL(url) {
     return null;
 }
 
-function uint8ToBase64(uint8) {
-    let binary = "";
-    const chunkSize = 0x8000;
-    for (let i = 0; i < uint8.length; i += chunkSize) {
-        const chunk = uint8.subarray(i, i + chunkSize);
-        binary += String.fromCharCode.apply(null, chunk);
-    }
-    return btoa(binary);
-}
-
-
 async function unzipFile(file) {
     const buffer = file.arrayBuffer;
     const bytes = new Uint8Array(buffer);
@@ -68,7 +53,7 @@ function sanitizeProjectName(rawName, fallback = "project") {
 }
 
 // Download Scratch project by URL and store with project name
-async function downloadScratchProject() {
+async function getScratchProject() {
     try {
         const projectURLInput = document.getElementById("projectURLInput");
         
@@ -110,16 +95,16 @@ async function downloadScratchProject() {
         }
         
         let file = await unzipFile(project, projectID);
-        currentProjectInfo = {
+        let projectInfo = {
             id: projectID,
             name: projectName
         };
         
-        updateStatus(`✓ Project "${projectName}" (ID: ${projectID}) downloaded and stored successfully!`, "success");
-        return compile.compileScratchProject(file);
-        
         // Clear the input
         projectURLInput.value = "";
+        updateStatus(`✓ Project "${projectName}" (ID: ${projectID}) downloaded and stored successfully!`, "success");
+        return {bytes: await compile.compileScratchProject(file), projectInfo}
+        
         
     } catch (error) {
         updateStatus(`✗ Error downloading project: ${error.message}`, "error");
@@ -132,7 +117,7 @@ function get(DOMselector) {
 }
 
 function enable(DOMelement) {
-    DOMelement.style.display = DOMelement.displayOld || DOMelement.style.display;
+    DOMelement.style.display = '';//DOMelement.displayOld || DOMelement.style.display;
 }
 
 function disable(DOMelement) {
@@ -140,45 +125,90 @@ function disable(DOMelement) {
     DOMelement.style.display = "none";
 }
 
-let projectDownload = get("#projectDownload");
-let serialMenu = get("#serialMenu");
-let reportMenu = get("#reportMenu");
+let stateShared = {};
+let stateLocals = {};
 
-console.log(serialMenu);
+function validateShared(expectedFields) {
+    for (let field of expectedFields) {
+        if (stateShared[field] !== undefined) continue;
+        return false;
+    }
+    return true;
+}
 
 let states = {
     awaitingProject: async function (updateEvent) {
         if (updateEvent.type == "switch" || updateEvent.type == "restore") {
             stateLocals = {};
-            enable(projectDownload);
-            disable(serialMenu);
-            disable(reportMenu);
+            enable(projectDownloadCard);
+            disable(serialMenuCard);
+            disable(reportMenuCard);
+            console.log("returning ok");
+            return "ok";
         }
         else if (updateEvent.type == "dom") {
-            switchState("awaitingConnection");
+            console.log("getting project");
+            let {bytes, projectInfo} = await getScratchProject();
+            console.log(bytes, projectInfo);
+            stateShared = {bytes, projectInfo};
+            console.log("switching state");
+            switchState("awaitingUpload");
+            return "ok";
         }
         else if (updateEvent.type == "switchFail") {
             updateState("restore");
+            return "ok";
         }
     },
 
 
     webVmTesting: async function (updateEvent) {
-        if (updateEvent.type == "switch") {
-            stateLocals = {};
-        }
-    },
-
-
-    awaitingConnection: async function (updateEvent) {
     },
 
 
     awaitingUpload: async function (updateEvent) {
+        if (updateEvent.type == "switch") {
+            if (!validateShared(["bytes", "projectInfo"])) {
+                return "awaiting connection requires project";
+            }
+            stateLocals = {};
+            disable(projectDownloadCard);
+            disable(reportMenuCard);
+            enable(serialMenuCard);
+            return "ok";
+        }
+        else if (updateEvent.type == "dom") {
+            await serial.connectSerial();
+            await serial.sendProgramDataViaSerial(stateShared.bytes);
+            await serial.disconnectSerial();
+            switchState("awaitingFeedback");
+            return "ok";
+        }
+        else if (updateEvent.type == "switchFail") {
+            console.error("switch fail:", updateEvent.status);
+        }
     },
 
-
     awaitingFeedback: async function (updateEvent) {
+        if (updateEvent.type == "switch") {
+            if (!validateShared(["bytes", "projectInfo"])) {
+                return "awaiting feedback requires project";
+            }
+            disable(projectDownloadCard);
+            disable(serialMenuCard);
+            enable(reportMenuCard);
+            return "ok";
+        }
+        else if (updateEvent.type == "dom") {
+            console.log(updateEvent.sender);
+            updateEvent.sender.dispatchFunction(stateShared.project);
+            switchState("awaitingProject");
+            return "ok";
+        }
+        else if (updateEvent.type == "switchFail") {
+            console.error("switch fail:", updateEvent.status);
+            return "ok";
+        }
     },
 };
 
@@ -187,14 +217,15 @@ function updateState(updateEvent) {
 }
 
 let currentState = "awaitingProject";
-function switchState(other) {
-    console.log(currentState, other);
-    let switchStatus = states[other]({type: "switch"});
+async function switchState(other) {
+    let switchStatus = await states[other]({type: "switch"});
+    console.log(switchStatus);
     if (switchStatus !== "ok") {
-        states[currentState]({type: "switchFail"});
+        states[currentState]({type: "switchFail", status: switchStatus});
     }
     else {
         currentState = other;
+        console.log("currentState:", currentState);
     }
 }
 
@@ -208,17 +239,37 @@ function registerStateUpdate(DOMobj, eventName, typeFilter) {
     )
 }
 
+function autoRegisterStateUpdates(queryStrings, eventName, typeFilter) {
+    for (let queryString of queryStrings) {
+        console.log(queryString);
+        let element = document.querySelector(queryString);
+        element.addEventListener(
+            eventName, 
+            (event) => {
+                if (typeFilter && typeFilter.includes(event.type)) return;
+                updateState({type: "dom", eventName, event, sender: element});
+            }
+        )
+    }
+}
+
+let projectDownloadCard = get("#projectDownload");
+let serialMenuCard = get("#serialMenu");
+let reportMenuCard = get("#reportMenu");
+
+console.log(serialMenu);
+
 async function main() {
     updateState({type: "switch"});
-    registerStateUpdate(projectDownload, "click");
-    let textarea = document.getElementById("projectID");
-    const options = {
-      // May be called periodically with progress updates.
-      onProgress: (type, loaded, total) => {
-        // type is 'metadata', 'project', 'assets', or 'compress'
-        console.log(type, loaded / total);
-      }
-    };
+    autoRegisterStateUpdates([
+        "#downloadProject", 
+        "#sendProgramData", 
+        "#reportGameWorked", 
+        "#reportGameFailed"
+    ], "click");
+
+    get("#reportGameWorked").dispatchFunction = (bytes) => reportGameStatus(bytes, true);
+    get("#reportGameFailed").dispatchFunction = (bytes) => reportGameStatus(bytes, false);
 }
 
 main();

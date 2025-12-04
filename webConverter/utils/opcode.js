@@ -1,4 +1,3 @@
-const print = console.log.bind(console);
 
 const UINT32_MAX = 4294967295;
 
@@ -294,11 +293,9 @@ const pushFuncs = {
     INTNUM: "NUM",
     ANGLENUM: (input, code) => {
         let degrees = Number(input.value[0]);
-        console.log("degrees scratch format:", degrees);
         let opcode = "INNER_PUSHDEGREES";
         code.push(opcode);
         degrees *= ((UINT32_MAX + 1) / 360);
-        console.log("degrees VM format:", degrees);
         pushArg(code, toCodeLiteral(degrees, 4));
     },
     COLOR: (input) => {
@@ -406,8 +403,8 @@ function pushInput(input, code, blocks, owner) {
     pushFunc(input, code, blocks, owner);
 }
 
-function pushField(field, code) {
-    console.log("in pushField:", field);
+function reportField(block, field, code) {
+    console.log("in pushField:", block, field);
 }
 
 function getEventCondition(hat, project) {
@@ -444,8 +441,6 @@ let specialFunctions = {
     LOOKS_SETEFFECTTO: () => {},
     CONTROL_STOP: (block, code, blocks, owner) => {
         let options = ["this script", "all", "other scripts in sprite"];
-        console.log(block.fields);
-        console.log(block.fields.STOP_OPTION);
         let index = options.indexOf(block.fields.STOP_OPTION[0]);
         code.push("INNER_PUSHID");
         pushArg(code, toCodeLiteral(index, 2));
@@ -694,7 +689,7 @@ export function compileBlock(block, code, blocks, owner) {
         if (Object.keys(block.fields).length > 0) {
         }
         for (let field of Object.values(block.fields)) {
-            pushField(field, code);
+            reportField(block, field, code);
         }
     }
 }

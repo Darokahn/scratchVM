@@ -126,7 +126,6 @@ function drawRGB565ToCanvas(rgb565Array, width, height) {
 async function getScaledImageFromFile(directory, filename, scaleSettings) {
     let file = directory[filename];
     let type = mime.getType(filename);
-    console.log(filename);
     let {scaledImage, width, height, targetWidth, targetHeight} = await drawAndGetPixels(file, type, scaleSettings);
     scaledImage = await flattenAlpha(scaledImage, targetWidth, targetHeight);
     return {scaledImage, width, height, targetWidth, targetHeight};
@@ -194,7 +193,6 @@ export async function getImageBuffer(file, details, byteBudget) {
     let images = [];
     for (let sprite of details.sprites) {
         for (let image of sprite.costumes) {
-            console.log(image);
             imageCount++;
             images.push(image);
         }

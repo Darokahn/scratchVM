@@ -394,21 +394,17 @@ input[type="text"]:focus,
                         <button id="downloadProject" class="btn-primary">Get Project</button>
                     </div>
                 </div>
-                <br>
-                <div class="button-group" id="serialMenu">
-                    <button id="connectSerial" class="btn-success">Connect Serial</button>
-                    <button id="disconnectSerial" class="btn-danger" style="display:none;">Disconnect Serial</button>
+                <div class="button-group" id="serialMenu" style="display:none;">
                     <button id="sendProgramData" class="btn-primary">Send Program Data</button>
                 </div>
-                <br>
-                <div class="button-group" id="reportMenu">
+                <div class="button-group" id="reportMenu" style="display:none;">
                     <p style="margin-top: 15px; color: #666;">Please report whether everything is working as expected.</p>
                     <button id="reportGameWorked" class="btn-success" style="background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%);">✓</button>
                     <button id="reportGameFailed" class="btn-danger" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">✕</button>
                 </div>
                 <div id="status"></div>
-                <h2>Flash ESP32 Firmware</h2>
-                <p style="margin-bottom: 15px; color: #666;">Use ESP Web Tools to flash the firmware to your ESP32 device:</p>
+                <h2>Get Latest Update</h2>
+                <p style="margin-bottom: 15px; color: #666;">If there is a new version of the virtual machine, download it here.</p>
                 <esp-web-install-button id="installButton" manifest="/scratchVM-image/manifest.json"></esp-web-install-button>
             </div>
 

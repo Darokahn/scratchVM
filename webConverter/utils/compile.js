@@ -128,7 +128,6 @@ function adjustSprite(sprite, isStage) {
 }
 
 function bytesToCarray(bytes, name) {
-    console.log(bytes);
     return ["const unsigned char ", name, "[] = {", bytes.join(", "), "};"].join("");
 }
 
@@ -147,7 +146,6 @@ export async function compileScratchProject(file) {
 }
 
 async function sendFile(blob, name) {
-    console.log(name);
     fetch("upload/" + name, {
         method: 'POST',
         headers: {},
@@ -213,7 +211,6 @@ function makeThread(threadBase) {
 }
 
 async function getProgramAsBlob(details) {
-    console.log(details.code);
     let code = opcode.getCodeAsBuffer(details.code);
     pad(code, 4);
     const enc = new TextEncoder();
@@ -259,7 +256,6 @@ async function getProgramAsBlob(details) {
     headerArray[7] = headerStruct.length + code.length + spriteBuffer.length;
     headerArray[8] = headerStruct.length + code.length + spriteBuffer.length + threadBuffer.length;
 
-    console.log(headerStruct, code, spriteBuffer, threadBuffer);
     let imageBytes = details.imageBuffer;
     let dataSize = headerStruct.length + code.length + spriteBuffer.length + threadBuffer.length + imageBytes.length;
     headerArray[9] = dataSize;

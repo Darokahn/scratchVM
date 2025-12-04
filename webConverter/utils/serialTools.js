@@ -24,20 +24,6 @@ export async function connectSerial() {
         
         updateStatus("✓ Serial port connected successfully", "success");
         
-        // Show disconnect button, hide connect button
-        const connectBtn = document.getElementById("connectSerial");
-        const disconnectBtn = document.getElementById("disconnectSerial");
-        if (connectBtn) connectBtn.style.display = "none";
-        if (disconnectBtn) disconnectBtn.style.display = "inline-block";
-        
-        // Set up reader for incoming data (optional, for debugging)
-        const textDecoder = new TextDecoderStream();
-        const readableStreamClosed = serialPort.readable.pipeTo(textDecoder.writable);
-        serialReader = textDecoder.readable.getReader();
-        
-        // Start reading in background (non-blocking)
-        readSerialData();
-        
     } catch (error) {
         if (error.name === "NotFoundError") {
             updateStatus("No serial port selected", "warning");
@@ -118,12 +104,6 @@ export async function disconnectSerial() {
         
         updateStatus("Serial port disconnected", "info");
         
-        // Show connect button, hide disconnect button
-        const connectBtn = document.getElementById("connectSerial");
-        const disconnectBtn = document.getElementById("disconnectSerial");
-        if (connectBtn) connectBtn.style.display = "inline-block";
-        if (disconnectBtn) disconnectBtn.style.display = "none";
-        
     } catch (error) {
         updateStatus(`✗ Error disconnecting: ${error.message}`, "error");
         console.error("Disconnect error:", error);
@@ -132,7 +112,6 @@ export async function disconnectSerial() {
 
 // Send program data via serial
 export async function sendProgramDataViaSerial(bytes) {
-    console.log("bytes");
     try {
         if (!serialPort) {
             throw new Error("Serial port not connected. Please connect first.");
