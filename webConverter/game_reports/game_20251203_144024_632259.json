@@ -1,0 +1,12 @@
+{
+  "id": "20251203_144024_632259",
+  "timestamp": "2025-12-03T14:40:24.632300",
+  "status": "failed",
+  "projectId": "1238081605",
+  "projectName": "BOLLO_s_Adventures",
+  "byteLength": 19918,
+  "storage": {
+    "binaryFile": "game_20251203_144024_632259.bin",
+    "metadataFile": "game_20251203_144024_632259.json"
+  }
+}

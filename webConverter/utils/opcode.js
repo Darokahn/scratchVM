@@ -442,8 +442,6 @@ function getEventCondition(hat, project) {
 let specialFunctions = {
     LOOKS_CHANGEEFFECTBY: () => {},
     LOOKS_SETEFFECTTO: () => {},
-    LOOKS_SETSIZETO: (block, code, blocks, owner) => {
-    }
     CONTROL_STOP: (block, code, blocks, owner) => {
         let options = ["this script", "all", "other scripts in sprite"];
         console.log(block.fields);

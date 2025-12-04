@@ -1,35 +1,62 @@
-// state machine ABI:
-// 
+import * as compile from "./utils/compile.js";
 
 let stateExports = {};
 let stateLocals = {};
 
+function get(DOMselector) {
+    return document.querySelector(DOMselector);
+}
+
+function enable(DOMelement) {
+    DOMelement.hidden = false;
+}
+
+function disable(DOMelement) {
+    DOMelement.hidden = true;
+}
+
+let projectDownload = get("#projectDownload");
+let serialMenu = get("#serialMenu");
+let reportMenu = get("#reportMenu");
+
 let states = {
     awaitingProject: async function (updateEvent) {
+        if (updateEvent.type == "switch" || updateEvent.type == "restore") {
+            stateLocals = {};
+            enable(projectDownload);
+            disable(serialMenu);
+            disable(reportMenu);
+        }
+        else if (updateEvent.type == "dom") {
+            switchState("awaitingConnection");
+        }
+        else if (updateEvent.type == "switchFail") {
+            updateState("restore");
+        }
     },
+
 
     webVmTesting: async function (updateEvent) {
-        let necessaryImports = {};
+        if (updateEvent.type == "switch") {
+            stateLocals = {};
+        }
     },
+
 
     awaitingConnection: async function (updateEvent) {
-        let necessaryImports = {};
     },
+
 
     awaitingUpload: async function (updateEvent) {
-        let necessaryImports = {};
     },
 
+
     awaitingFeedback: async function (updateEvent) {
-        let necessaryImports = {};
     },
 };
 
 function updateState(updateEvent) {
     states[currentState](updateEvent);
-}
-
-function registerStateUpdate(DOMobj, eventName, updateArg) {
 }
 
 let currentState = "awaitingProject";
@@ -41,4 +68,13 @@ function switchState(other) {
     else {
         currentState = other;
     }
+}
+
+function registerStateUpdate(DOMobj, eventName, updateArg) {
+    DOMobj.addEventListener(
+        eventName, 
+        (event) => {
+            updateState({type: "dom", eventName, event});
+        }
+    )
 }

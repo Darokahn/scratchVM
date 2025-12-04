@@ -161,8 +161,7 @@
                 font-size: 1em;
                 transition: border-color 0.3s;
             }
-
-            input[type="text"]:focus,
+input[type="text"]:focus,
             input[type="email"]:focus,
             textarea:focus {
                 outline: none;
@@ -386,26 +385,26 @@
 
             <div class="card">
                 <h2>Download Scratch Project</h2>
-                <div class="form-group">
+                <div class="form-group", id="projectDownload">
                     <label for="projectURLInput">Scratch Project URL or ID</label>
                     <input type="text" id="projectURLInput" 
                            placeholder="https://scratch.mit.edu/projects/1238081605" 
                            autocomplete="off">
-                </div>
-                <div class="button-group">
-                    <button id="downloadProject" class="btn-primary">Download Project</button>
+                    <div class="button-group">
+                        <button id="downloadProject" class="btn-primary">Get Project</button>
+                    </div>
                 </div>
                 <br>
-                <h2>ESP32 Serial Communication</h2>
-                <div class="button-group">
+                <div class="button-group" id="serialMenu">
                     <button id="connectSerial" class="btn-success">Connect Serial</button>
                     <button id="disconnectSerial" class="btn-danger" style="display:none;">Disconnect Serial</button>
                     <button id="sendProgramData" class="btn-primary">Send Program Data</button>
                 </div>
-                <p style="margin-top: 15px; color: #666;">Tried your game on hardware? Let us know if it worked so we can improve compatibility.</p>
-                <div class="button-group">
-                    <button id="reportGameWorked" class="btn-success" style="background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%);">Report Game Worked</button>
-                    <button id="reportGameFailed" class="btn-danger" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">Report Game Didn&apos;t Work</button>
+                <br>
+                <div class="button-group" id="reportMenu">
+                    <p style="margin-top: 15px; color: #666;">Please report whether everything is working as expected.</p>
+                    <button id="reportGameWorked" class="btn-success" style="background: linear-gradient(135deg, #0ba360 0%, #3cba92 100%);">✓</button>
+                    <button id="reportGameFailed" class="btn-danger" style="background: linear-gradient(135deg, #ff512f 0%, #dd2476 100%);">✕</button>
                 </div>
                 <div id="status"></div>
                 <h2>Flash ESP32 Firmware</h2>
@@ -434,6 +433,6 @@
         </div>
         
         <script type="module" src="navigation.mjs"></script>
-        <script type="module" src="script.mjs"></script>
+        <script type="module" src="index.mjs"></script>
     </body>
 </html>
