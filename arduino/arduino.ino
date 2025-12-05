@@ -42,7 +42,7 @@ void partitionInit() {
     );
 }
 
-esp_err_t writeBufferToPartition(const esp_partition_t* partition,
+esp_err_t writePartition(const esp_partition_t* partition,
                                  const uint8_t* data,
                                  size_t dataSize,
                                  size_t chunkOffset
@@ -58,32 +58,42 @@ esp_err_t writeBufferToPartition(const esp_partition_t* partition,
 
     size_t sectorSize = partition->erase_size;
 
-    // Round up total size to next multiple of sector size for erase
-    size_t eraseSize = (dataSize + sectorSize - 1) & ~(sectorSize - 1);
+    size_t fullSectors = dataSize / sectorSize;
+    machineLog("fullSectors: %d\n\r", fullSectors);
+    size_t hangingBytes = dataSize & (sectorSize - 1);
+    esp_err_t err;
 
     // Erase one sector at a time
-    for (size_t offset = 0; offset < eraseSize; offset += sectorSize) {
-        size_t thisEraseSize = (offset + sectorSize > eraseSize)
-                               ? (eraseSize - offset)
-                               : sectorSize;
-
-        esp_err_t err = esp_partition_erase_range(partition, offset + (chunkOffset * sectorSize), thisEraseSize);
+    for (size_t offset = 0; offset <= fullSectors; offset += 1) {
+        machineLog("offset: %d\n\r", offset);
+        size_t sectorOffset = (offset + chunkOffset) * sectorSize;
+        size_t dataOffset = offset * sectorSize;
+        err = esp_partition_erase_range(partition, sectorOffset, sectorSize);
         if (err != ESP_OK) return err;
-    }
-
-    // Write data in sector-sized chunks
-    for (size_t offset = 0; offset < dataSize; offset += sectorSize) {
-        size_t thisWriteSize = (offset + sectorSize > dataSize)
-                               ? (dataSize - offset)
-                               : sectorSize;
-
-        esp_err_t err = esp_partition_write(partition, offset + (chunkOffset * sectorSize), data + offset, thisWriteSize);
+        if (offset == fullSectors) {
+            sectorSize = hangingBytes;
+        }
+        err = esp_partition_write(partition, sectorOffset, data + dataOffset, sectorSize);
         if (err != ESP_OK) return err;
     }
 
     return ESP_OK;
 }
 
+esp_err_t readPartition(const esp_partition_t* partition,
+                                 const uint8_t* out,
+                                 size_t outSize,
+                                 size_t chunkOffset
+                                 ) {
+/*
+    size_t sectorSize = partition->erase_size;
+    size_t hangingBytes = outSize &
+    size_t targetSize = outSize + (sectorSize - 1) & (~(sectorSize - 1));
+    for (int i = 0; i < targetSize; i+= sectorSize) {
+        esp_partition_read(partition, offset +);
+    }
+*/
+}
 int readChar() {
     int c = Serial.read();
     //Serial.println(c);
@@ -164,15 +174,19 @@ extern "C" int machineLog(const char* fmt, ...) {
     return n;
 }
 
+void awaitString(char* string, int len) {
+    int index = 0;
+    while (index < len) {
+        while (Serial.available() < 1);
+        if (readChar() == string[index]) index++;
+        else index = 0;
+    }
+}
+
 // clear serial noise
 struct dataHeader readHeader() {
     char magicBytes[] = "scratch!";
-    int index = 0;
-    while (index < (sizeof magicBytes) - 1) {
-        while (Serial.available() < 1);
-        if (readChar() == magicBytes[index]) index++;
-        else index = 0;
-    }
+    awaitString(magicBytes, (sizeof magicBytes) - 1);
     struct dataHeader h;
     uint8_t* ptr = (uint8_t*)&h.spriteCount;
     while (ptr < (uint8_t*)((&h) + 1)) {
@@ -202,17 +216,19 @@ void pollApp(app_t* out) {
     int bytesRead = Serial.readBytes(tempBuffer + h.codeOffset, h.dataSize - h.codeOffset);
     machineLog("Successfully read %u bytes\n\r", bytesRead);
 
-    writeBufferToPartition(programDataPartition, tempBuffer, h.dataSize, 0);
+    //writePartition(programDataPartition, tempBuffer, h.dataSize, 1);
     free(tempBuffer);
 
     // Map the flash region to get a pointer
-    if (esp_partition_mmap(programDataPartition, 0, h.dataSize,
+    if (esp_partition_mmap(programDataPartition, 1 * programDataPartition->erase_size, h.dataSize,
                            ESP_PARTITION_MMAP_DATA, (const void**)&out->programData,
                            &mappedRegion) != ESP_OK) {
         machineLog("FATAL: Failed to mmap program_data partition\n\r");
         out->programData = NULL;
         return;
     }
+
+    //out->programData = tempBuffer;
 
     strcpy(out->name, "app");
     machineLog("Program data written and mapped to pointer %p\n\r", out->programData);
