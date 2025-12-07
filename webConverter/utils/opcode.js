@@ -150,9 +150,13 @@ for (const [key, value] of Object.entries(enums)) {
 
 export const inputMap = {
     "up arrow": 0,
+    "w": 0,
     "left arrow": 1,
+    "a": 1,
     "down arrow": 2,
+    "s": 2,
     "right arrow": 3,
+    "d": 3,
     "space": 4
 };
 
@@ -222,12 +226,21 @@ let globalObjectIndex = {
     backdrops: {},
     variables: {},
     costumes: {},
+    stage: null,
 };
 
 export function indexObjects(project) {
+    globalObjectIndex = {
+        sprites: {},
+        broadcasts: {},
+        backdrops: {},
+        variables: {},
+        costumes: {},
+        stage: null,
+    };
     let spriteCount = 0;
     let broadcastCount = 0;
-    let backdropCount = 0;
+    let backdropCount = 1;
     let variableCounts = {};
     let costumeCounts = {};
     let stage;
@@ -237,7 +250,7 @@ export function indexObjects(project) {
             stage = target;
         }
         variableCounts[target.name] = 0;
-        costumeCounts[target.name] = 0;
+        costumeCounts[target.name] = 1;
         objectIndex.sprites[target.name] = objectIndex.sprites[target.name] || spriteCount++;
         for (let broadcast in target.broadcasts) {
             objectIndex.broadcasts[broadcast] = objectIndex.broadcasts[broadcast] || broadcastCount++;
@@ -439,6 +452,54 @@ function getEventCondition(hat, project) {
 let specialFunctions = {
     LOOKS_CHANGEEFFECTBY: () => {},
     LOOKS_SETEFFECTTO: () => {},
+    OPERATOR_MATHOP: (block, code, blocks, owner) => {
+        pushInput(block.inputs.NUM, code, blocks, owner);
+        code.push("OPERATOR_MATHOP");
+        pushArg(code, toCodeLiteral(["abs", "floor", "ceiling", "sqrt", "sin", "cos", "tan", "asin", "acos", "atan", "ln", "log", "e ^", "10 ^"].indexOf(block.fields.OPERATOR[0]), 2))
+        console.log(code);
+    },
+    SENSING_OF: (block, code, blocks, owner) => {
+        console.log(block.inputs);
+        pushInput(block.inputs.OBJECT, code, blocks, owner);
+        let propertyEnum = -1;
+        switch (block.fields.PROPERTY[0]) {
+            case "backdrop #":
+            case "costume #":
+                propertyEnum = 0;
+                break;
+            case "backdrop name":
+            case "costume name":
+                propertyEnum = 1;
+                break;
+            case "volume": 
+                propertyEnum = 2;
+                break;
+            case "x position":
+                propertyEnum = 3;
+                break;
+            case "y position":
+                propertyEnum = 4;
+                break;
+            case "direction":
+                propertyEnum = 5
+                break;
+            case "size":
+                propertyEnum = 6;
+                break;
+            default:
+                propertyEnum = 7 + findVariable(block.fields.PROPERTY[0], null);
+        }
+        code.push("SENSING_OF");
+        pushArg(code, toCodeLiteral(propertyEnum, 2));
+    },
+    SENSING_OF_OBJECT_MENU: (block, code, blocks, owner) => {
+        let target = block.fields.OBJECT[0];
+        let targetIndex;
+        if (target == "_stage_") targetIndex = 0;
+        else targetIndex = findSprite(target);
+        code.push("INNER_PUSHID");
+        pushArg(code, toCodeLiteral(targetIndex, 2));
+    },
     CONTROL_STOP: (block, code, blocks, owner) => {
         let options = ["this script", "all", "other scripts in sprite"];
         let index = options.indexOf(block.fields.STOP_OPTION[0]);
@@ -585,6 +646,7 @@ let specialFunctions = {
         code.push(0, 0);
         code[elseIndex] = (code.length & 0xff);
         code[elseIndex + 1] = ((code.length >> 8) & 0xff);
+        console.log(block);
         pushInput(block.inputs.SUBSTACK2, code, blocks, owner);
         code[endIndex] = (code.length & 0xff);
         code[endIndex + 1] = ((code.length >> 8) & 0xff);

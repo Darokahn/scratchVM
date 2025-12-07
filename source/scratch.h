@@ -208,6 +208,7 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
 enum SCRATCH_continueStatus SCRATCH_processThread(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code);
 int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code);
 struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header);
+void SCRATCH_freeSprites(struct SCRATCH_spriteContext* context);
 void SCRATCH_initThread(struct SCRATCH_thread*, struct SCRATCH_threadHeader);
 void handleInputs();
 void clearEvents();

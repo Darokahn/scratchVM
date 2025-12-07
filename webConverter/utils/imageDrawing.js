@@ -202,7 +202,7 @@ export async function getImageBuffer(file, details, byteBudget) {
         if (filename === undefined) {
             filename = image.assetId + "." + image.dataFormat;
         }
-        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, filename, {mode: "scaleMax", x: 32, y: 32});
+        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, filename, {mode: "scaleMax", x: 64, y: 64});
         image.scaledImage = scaledImage;
         image.width = width;
         image.height = height;
@@ -220,7 +220,6 @@ export async function getImageBuffer(file, details, byteBudget) {
         array = RGB888to565(array);
 
         let canvas = drawRGB565ToCanvas(array, scaledWidth, scaledHeight);
-        document.body.appendChild(canvas);
 
         let xOffset = image.rotationCenterX / image.bitmapResolution;
         let yOffset = image.rotationCenterY / image.bitmapResolution;

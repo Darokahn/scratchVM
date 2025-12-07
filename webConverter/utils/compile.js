@@ -78,7 +78,8 @@ async function getDetails(project) {
         adjustSprite(sprite, target.isStage);
         details.sprites.push(sprite);
     }
-    details.objectIndex = opcode.indexObjects(projectJson);
+    details.objectIndex = opcode.indexObjects(projectJson, {});
+    console.log(details.objectIndex);
     details.code = compileSprites(details.sprites, projectJson);
     details.imageBuffer = await imageDrawing.getImageBuffer(project, details);
     return details;

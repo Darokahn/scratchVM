@@ -11,8 +11,6 @@
 #include "globals.h"
 #include "programData.h"
 
-#define SCRATCH_implementFunction(name) static enum SCRATCH_continueStatus name(struct SCRATCH_sprite* sprite, struct SCRATCH_data* stack, int* stackIndex, struct SCRATCH_thread* thread)
-
 const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [EVENT_BROADCAST] = "EVENT_BROADCAST",
     [INNER_PARTITION_BEGINLOOPCONTROL] = "INNER_PARTITION_BEGINLOOPCONTROL",
@@ -213,12 +211,12 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
     enum SCRATCH_opcode operation;
     struct SCRATCH_sprite* sprite = context->sprites[context->currentIndex];
     struct SCRATCH_sprite** sprites = context->sprites;
-    enum SCRATCH_opcode watchValue = LOOKS_SETSIZETO;
+    enum SCRATCH_opcode watchValue = -1;
     while (true) {
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        bool loggingCondition = false;//sprite->base.id == 2 && thread->base.startEvent == ONCLONE;
+        bool loggingCondition = sprite->base.id == 1 && (thread -sprite->threads) == 4;
             if (loggingCondition) {
             printf("%d, %d\n", operation, watchValue);
             machineLog("id: %d, index: %d, thread: %d, hat: %s, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent]);
@@ -295,6 +293,12 @@ struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header)
     return spriteChunk;
 }
 
+void SCRATCH_freeSprites(struct SCRATCH_spriteContext* context) {
+    for (int i = 0; i < context->spriteCount; i++) {
+        free(context->sprites[i]);
+    }
+}
+
 void SCRATCH_initThread(struct SCRATCH_thread* thread, struct SCRATCH_threadHeader h) {
     thread->programCounter = h.entryPoint;
     thread->active = false;
@@ -344,7 +348,7 @@ struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATC
     if (operand == NULL) s = context->sprites[context->currentIndex];
     else s = operand;
     rect.x = s->base.x.halves.high;
-    rect.y = s->base.y.halves.high;
+    rect.y = -s->base.y.halves.high;
     struct image* i = getImage(context, s);
     rect.width = i->widthRatio * SCRATCHWIDTH / 255;
     rect.height = i->heightRatio * SCRATCHHEIGHT / 255;
@@ -355,23 +359,23 @@ struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATC
     return rect;
 }
 
+struct SCRATCH_rect getIntersection(struct SCRATCH_rect r1, struct SCRATCH_rect r2) {
+    int left = MAX(r1.x, r2.x);
+    int right = MIN(r1.x + r1.width, r2.x + r2.width);
+    int top = MAX(r1.y, r2.y);
+    int bottom = MIN(r1.y + r1.height, r2.y + r2.height);
+    struct SCRATCH_rect intersection = {
+        left,
+        top,
+        right - left,
+        bottom - top
+    };
+    return intersection;
+}
+
 bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2) {
-    bool collides = false;
-    for (int i = 0; i < 4; i++) {
-        int x = r1.x;
-        int y = r1.y;
-        if (i & 1) x += r1.width;
-        if (i & 2) y += r1.height;
-        collides |= (x > r2.x && x < r2.x + r2.width) && (y > r2.y && y < r2.y + r2.height);
-    }
-    for (int i = 0; i < 4; i++) {
-        int x = r2.x;
-        int y = r2.y;
-        if (i & 1) x += r2.width;
-        if (i & 2) y += r2.height;
-        collides |= (x > r1.x && x < r1.x + r1.width) && (y > r1.y && y < r1.y + r1.height);
-    }
-    return collides;
+    struct SCRATCH_rect intersection = getIntersection(r1, r2);
+    return (intersection.width > 0 && intersection.height > 0);
 }
 
 /*

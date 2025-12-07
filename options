@@ -1,5 +1,8 @@
 performance options:
 - always blank background
-- bounding rect hitboxes
+- allow visual rotation
+- allow pixel collision
+- pixel resolution (per sprite?)
 preferences:
 - repeat held button
+- wifi signon

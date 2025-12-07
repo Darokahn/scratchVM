@@ -131,13 +131,15 @@ case INNER_FETCHVAR: {
     else {
         spriteOperand = sprites[spriteOperandIndex];
     }
+    /*
     char buffer[32];
-    machineLog("sprite: %d, var: %d\n", spriteOperand->base.id, varIndex);
+    machineLog("sprite: %d, var: %d\n\r", spriteOperand->base.id, varIndex);
     if (spriteOperand->variables[varIndex].type == SCRATCH_UNINIT) {
-        machineLog("WARNING: scratch variable uninitialized. Not printing.\n");
+        machineLog("WARNING: scratch variable uninitialized. Not printing.\n\r");
         fflush(stdout);
     }
-    else machineLog("value: %s\n", cast(spriteOperand->variables[varIndex], SCRATCH_STRING, buffer).data.string);
+    else machineLog("value: %s\n\r", cast(spriteOperand->variables[varIndex], SCRATCH_STRING, buffer).data.string);
+    */
     PUSHDATA(spriteOperand->variables[varIndex]);
     status = SCRATCH_continue;
     break;
@@ -192,7 +194,7 @@ case LOOKS_COSTUMENUMBERNAME: {
     int16_t option = GETARGUMENT(int16_t);
     // number
     if (option == 0) {
-        PUSHNUMBER(sprite->base.costumeIndex);
+        PUSHNUMBER(sprite->base.costumeIndex + 1);
     }
     else {
         char* name = getImage(context, sprite)->name;
@@ -205,10 +207,10 @@ case LOOKS_BACKDROPNUMBERNAME: {
     int16_t option = GETARGUMENT(int16_t);
     // number
     if (option == 0) {
-        PUSHNUMBER(context->stage->base.costumeIndex);
+        PUSHNUMBER(context->stage->base.costumeIndex + 1);
     }
     else {
-        char* name =getImage(context, context->stage)->name;
+        char* name = getImage(context, context->stage)->name;
         PUSHSTATICTEXT(name);
     }
     status = SCRATCH_continue;
@@ -310,7 +312,36 @@ case SENSING_RESETTIMER: {
     // set the value of the global timer to 0
 }
 case SENSING_OF: {
-    ERROR(); // unused
+    int16_t id = GETARGUMENT(int16_t);
+    struct SCRATCH_sprite* spriteOperand = context->sprites[POPID()];
+    switch (id) {
+        case 0:
+            PUSHNUMBER(spriteOperand->base.costumeIndex);
+            break;
+        case 1:
+            char* name = getImage(context, spriteOperand)->name;
+            PUSHSTATICTEXT(name);
+            break;
+        case 2:
+            PUSHNUMBER(0);
+            break;
+        case 3:
+            PUSHFRACTION(spriteOperand->base.x.i);
+            break;
+        case 4:
+            PUSHFRACTION(spriteOperand->base.y.i);
+            break;
+        case 5:
+            PUSHDEGREES(spriteOperand->base.rotation);
+            break;
+        case 6:
+            PUSHFRACTION((spriteOperand->base.size << 16) / SIZERATIO);
+            break;
+        default:
+            PUSHDATA(spriteOperand->variables[id - 6]);
+            
+    }
+    status = SCRATCH_continue;
     break;
 }
 case SENSING_OF_OBJECT_MENU: {
@@ -368,7 +399,7 @@ case OPERATOR_MULTIPLY: {
 case OPERATOR_DIVIDE: {
     struct SCRATCH_data op2 = POPNUMBER();
     struct SCRATCH_data op1 = POPNUMBER();
-    PUSHFRACTION((int64_t)(op1.data.number.i << 16) / op2.data.number.i);
+    PUSHFRACTION(((int64_t)op1.data.number.i << 16) / op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
@@ -386,14 +417,14 @@ case OPERATOR_RANDOM: {
 case OPERATOR_GT: {
     struct SCRATCH_data op2 = POPNUMBER();
     struct SCRATCH_data op1 = POPNUMBER();
-    PUSHBOOL(op1.data.number.i > op2.data.number.i);
+    PUSHBOOL((int32_t)op1.data.number.i > (int32_t)op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
 case OPERATOR_LT: {
     struct SCRATCH_data op2 = POPNUMBER();
     struct SCRATCH_data op1 = POPNUMBER();
-    PUSHBOOL(op1.data.number.i < op2.data.number.i);
+    PUSHBOOL((int32_t)op1.data.number.i < (int32_t)op2.data.number.i);
     status = SCRATCH_continue;
     break;
 }
@@ -463,7 +494,7 @@ case OPERATOR_ROUND: {
     // pop number, push rounded (not banker's rounding)
 }
 case OPERATOR_MATHOP: {
-    int16_t operationEnum = POPID();
+    int16_t operationEnum = GETARGUMENT(int16_t);
     struct SCRATCH_data operand = POPNUMBER();
     
     // Convert scaledInt32 to float
@@ -821,9 +852,9 @@ case MOTION_IFONEDGEBOUNCE: {
     struct SCRATCH_rect myRect = getRect(context, NULL);
     const int distances[4] = {
         MAX(0, xSpan + myRect.x),
-        MAX(0, ySpan - myRect.y - myRect.height),
-        MAX(0, xSpan - myRect.x - myRect.width),
-        MAX(0, ySpan + myRect.y)
+        MAX(0, ySpan + myRect.y),
+        MAX(0, xSpan - (myRect.x + myRect.width)),
+        MAX(0, ySpan - (myRect.y + myRect.height))
     };
 
     int minDistIndex = 0;
@@ -885,7 +916,7 @@ case LOOKS_THINK: {
 }
 case LOOKS_SWITCHCOSTUMETO: {
     int16_t index = GETARGUMENT(uint16_t);
-    sprite->base.costumeIndex = index;
+    sprite->base.costumeIndex = index - 1;
     status = SCRATCH_continue;
     break;
 }
@@ -897,7 +928,7 @@ case LOOKS_NEXTCOSTUME: {
 }
 case LOOKS_SWITCHBACKDROPTO: {
     int16_t index = GETARGUMENT(uint16_t);
-    context->stage->base.costumeIndex = index;
+    context->stage->base.costumeIndex = index - 1;
     status = SCRATCH_continue;
     break;
 }

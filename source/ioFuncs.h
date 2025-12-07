@@ -3,12 +3,13 @@
 #include "graphics.h"
 
 typedef struct {
-    char name[128];
+    int programDataSize;
     uint8_t* programData;
+    char name[12];
 } app_t;
 
 void startIO();
-void updateIO(app_t* app);
+int updateIO(app_t* app);
 int machineLog(const char* fmt, ...);
 
 void drawSprites(struct SCRATCH_spriteContext* context);
@@ -18,8 +19,9 @@ void debugImage(struct image *img, int width, int height);
 // potentially more flags later
 
 bool getInput(int inputIndex);
-void pollApp(app_t* out);
-void selectApp(app_t* out, char* appName);
+void* pollApp(char* nameOut);
+int selectApp(app_t* out, char* appName);
+void loadApp(app_t* out, int offset);
 void closeApp(app_t* app, int flags);
 
 

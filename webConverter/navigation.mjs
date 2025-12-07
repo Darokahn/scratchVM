@@ -19,18 +19,20 @@ function getCurrentPage() {
 // Build navigation links based on developer mode
 function buildNavigationLinks() {
     const currentPage = getCurrentPage();
-    const devMode = isDeveloperModeEnabled();
+    //const devMode = isDeveloperModeEnabled();
     
     const links = [
         { href: 'index.html', label: 'Home', id: 'nav-home' },
         { href: 'bug-report.html', label: 'Report Bug', id: 'nav-bug-report' },
-        { href: 'business.html', label: 'Kits & Classes', id: 'nav-business' }
+        //{ href: 'business.html', label: 'Kits & Classes', id: 'nav-business' }
     ];
     
     // Add hardware extensions link only if developer mode is enabled
+    /*
     if (devMode) {
         links.push({ href: HARDWARE_EXTENSIONS_PAGE, label: 'Hardware Extensions', id: 'nav-hardware' });
     }
+    */
     
     return links;
 }
@@ -90,7 +92,7 @@ function initDeveloperToggle() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
-    initDeveloperToggle();
+    //initDeveloperToggle();
 });
 
 // Export functions for use in other scripts

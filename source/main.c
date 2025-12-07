@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include "scratch.h"
 #include "ioFuncs.h"
 #include "globals.h"
@@ -14,12 +15,15 @@ int eventCount;
 unsigned long getNow();
 
 int count = 0;
-int drawRate = 2;
+int drawRate = 1;
 const uint8_t* code;
+
+char appName[12] = "app";
 
 unsigned long interval = 1000 / FRAMESPERSEC;
 
 int runApp(app_t* app) {
+    machineLog("Running app\n\r");
     uint8_t* programData = app->programData;
     struct SCRATCH_sprite* sprites[SPRITEMAX];
     struct image* images[IMAGEMAX];
@@ -44,7 +48,11 @@ int runApp(app_t* app) {
         SCRATCH_visitAllThreads(&context, (uint8_t*) code);
         if (count++ % drawRate == 0) {
             drawSprites(&context);
-            updateIO(app);
+            int continueStatus = updateIO(app);
+            if (continueStatus != 0) {
+                SCRATCH_freeSprites(&context);
+                return continueStatus;
+            }
         }
         SCRATCH_wakeSprites(&context);
         clearEvents(eventCount);
@@ -54,8 +62,9 @@ int runApp(app_t* app) {
 int main() {
     startIO();
     app_t app;
-    pollApp(&app);
+    selectApp(&app, "app");
     while (true) {
         runApp(&app);
+        closeApp(&app, 0);
     }
 }

@@ -24,7 +24,7 @@ void startIO() {
             "Scratch Project",
             SDL_WINDOWPOS_CENTERED,
             SDL_WINDOWPOS_CENTERED,
-            LCDWIDTH, LCDHEIGHT,
+            LCDWIDTH * 3, LCDHEIGHT * 3,
             0
             );
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -41,7 +41,7 @@ void startIO() {
 
 int cursorX = 0;
 int cursorY = 0;
-void updateIO(app_t* app) {
+int updateIO(app_t* app) {
     SDL_UpdateTexture(texture, NULL, screen, LCDWIDTH * sizeof(*screen));
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
@@ -49,6 +49,7 @@ void updateIO(app_t* app) {
     while(SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) exit(0);
     }
+    return 0;
 }
 
 int machineLog(const char* format, ...) {
@@ -119,7 +120,10 @@ bool getInput(int index) {
     return 0;
 }
 
-void pollApp(app_t* out) {
+void* pollApp(char* nameOut) {
+}
+
+int selectApp(app_t* out, char* appName) {
     struct dataHeader h;
     uint8_t magic[9];
     magic[8] = 0;
@@ -133,4 +137,8 @@ void pollApp(app_t* out) {
     strcpy(out->name, "app");
     out->programData = programData;
     close(fd);
+}
+
+void closeApp(app_t* app, int flags) {
+    free(app->programData);
 }
