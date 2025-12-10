@@ -1,20 +1,22 @@
 #include "../scratch.h"
 #include "../graphics.h"
 #include <stddef.h>
+#include <stdio.h>
 
 int main(void) {
     printf("Offsets in SCRATCH_spriteHeader:\n");
     printf("x             = %zu\n", offsetof(struct SCRATCH_spriteHeader, x));
     printf("y             = %zu\n", offsetof(struct SCRATCH_spriteHeader, y));
     printf("rotation      = %zu\n", offsetof(struct SCRATCH_spriteHeader, rotation));
+    printf("size          = %zu\n", offsetof(struct SCRATCH_spriteHeader, size));
     printf("visible       = %zu\n", offsetof(struct SCRATCH_spriteHeader, visible));
     printf("layer         = %zu\n", offsetof(struct SCRATCH_spriteHeader, layer));
-    printf("size          = %zu\n", offsetof(struct SCRATCH_spriteHeader, size));
     printf("rotationStyle = %zu\n", offsetof(struct SCRATCH_spriteHeader, rotationStyle));
     printf("costumeIndex  = %zu\n", offsetof(struct SCRATCH_spriteHeader, costumeIndex));
     printf("costumeMax    = %zu\n", offsetof(struct SCRATCH_spriteHeader, costumeMax));
     printf("threadCount   = %zu\n", offsetof(struct SCRATCH_spriteHeader, threadCount));
     printf("variableCount = %zu\n", offsetof(struct SCRATCH_spriteHeader, variableCount));
+    printf("listCount     = %zu\n", offsetof(struct SCRATCH_spriteHeader, listCount));
     printf("id            = %zu\n", offsetof(struct SCRATCH_spriteHeader, id));
     printf("sizeof        = %zu\n", sizeof(struct SCRATCH_spriteHeader));
     printf("alignof       = %zu\n", __alignof(struct SCRATCH_spriteHeader));

@@ -1,0 +1,18 @@
+Scratch has no concept of local variables at face value. All variables are global to all threads. Some are "for me only", meaning they are instantiated per sprite of that type, but they are still global to all threads *in* that sprite, and they are also accessible from outside (`property of sprite` block).
+
+Therefore, it is generally sensible to allocate a calculated, static amount of memory per sprite to accomodate its global variables. Accesses of those variables at runtime will simply index into static storage.
+
+However, scratch invisibly *does* have some edge cases where thread-local variables are necessary.
+Essentially, there needs to be determination for when and whether the thread can continue after yielding without saving any information. The cases where this is *not* true are:
+- When the current block is waiting on a timer (and/or gliding to a location)
+- When entering a loop that repeats n times
+These are the surface-level concerns. I implemented dedicated storage for these: A timer field, some glide data fields, and a stack for loop counting.
+However, the dedicated solution is memory-wasteful and speculative. If nested loops go deeper than I have allocated a stack for, this is a runtime failure. If they don't ever nest very far, I have allocated too much and threads have an excessive memory footprint.
+The dedicated solution also does not scale to the application of runtime function calls. Scratch functions, or "My Blocks", use runtime local variables in the form of the arguments passed to them. I have left these unhandled so far.
+The obvious solution for handling the static cases is to borrow the form of static data allocation I already handle. My VM stores variables in a FAM at the end of every sprite. It is easy to allocate extra variables for each thread that needs to maintain state. I will add invisible extra variables to the sprite for every thread that requests them.
+
+There is still a problem where variables are not accounted for: when a function is called recursively, its storage is not static. It therefore needs growable storage so that each call can accept local variables without overwriting the previous instance.
+
+There will be no call stack because of an unique inlining strategy, so only an argument stack is necessary. When a function is called, if it can recurse, a specialized version of it that knows which return address to use is instantiated.
+
+The solution to the argument stack is still relatively simple: Instead of the SCRATCH_data struct that represents a function's argument having a scalar, it will have the already-existing SCRATCH_list data type. This has defined and stable methods for pop, push, and top. When calling a function, push its arguments to the top of the list.

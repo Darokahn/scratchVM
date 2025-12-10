@@ -48,24 +48,35 @@ struct SCRATCH_sprite;
 struct SCRATCH_thread;
 
 enum SCRATCH_fieldType {
-    SCRATCH_NUMBER,
+    SCRATCH_FRACTION,
+    SCRATCH_WHOLENUMBER,
     SCRATCH_DEGREES,
     SCRATCH_BOOL,
     SCRATCH_STRING,
     SCRATCH_STATICSTRING,
+    SCRATCH_LIST,
     SCRATCH_UNINIT,
 };
+
+struct SCRATCH_vector {
+    struct SCRATCH_data* data;
+    uint16_t capacity;
+    uint16_t count;
+};
+
 
 union SCRATCH_field {
     scaledInt32 number;
     uint32_t degrees;
+    int32_t wholeNumber;
     bool boolean;
     char* string;
+    struct SCRATCH_vector* list;
 };
 
 struct SCRATCH_data {
-    uint8_t type;
     union SCRATCH_field data;
+    uint8_t type;
 };
 
 struct SCRATCH_rect {
@@ -136,28 +147,11 @@ struct SCRATCH_event {
     union SCRATCH_eventInput input;
 };
 
-union SCRATCH_stepSize {
-    uint16_t value;
-    uint8_t bytes[2];
-};
-
-struct SCRATCH_glideData {
-    scaledInt32 stepX;
-    scaledInt32 stepY;
-    uint16_t remainingIterations; // how many times to iterate
-    int16_t targetX; // what to set position to when done (assume slight error due to rounding)
-    int16_t targetY;
-};
-
-struct SCRATCH_waitData {
-    uint32_t remainingIterations;
-};
-
 struct SCRATCH_spriteHeader {
-    scaledInt32 x; // Scaled int split into a whole and fractional part. whole part is a Number that, according to my testing, can go from -1000 to 1000.
+    scaledInt32 x;
     scaledInt32 y;
-    uint32_t rotation; // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
-    uint16_t size; // number representing percent of original size
+    uint32_t rotation;  // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    uint16_t size;      // size maps (0 -> 100) to (0 -> SIZERATIO), which is 1024 at the time of writing.
     bool visible;
     int8_t layer;
     uint8_t rotationStyle;
@@ -165,6 +159,7 @@ struct SCRATCH_spriteHeader {
     uint8_t costumeMax;
     uint8_t threadCount;
     uint8_t variableCount;
+    uint8_t listCount;
     uint8_t id;
 };
 
@@ -174,42 +169,49 @@ struct SCRATCH_threadHeader {
     uint8_t startEvent;
 };
 
+// thread has local context, but each instance of thread context lives in the global variable store of its sprite owner with a unique index.
 struct SCRATCH_thread {
     struct SCRATCH_threadHeader base;
+    struct SCRATCH_vector threadLocals;
     uint16_t programCounter;
     bool active;
-    uint16_t loopCounterStack[LOOPNESTMAX];
-    uint8_t loopCounterStackIndex;
-    union {
-        struct SCRATCH_glideData glideData;
-        struct SCRATCH_waitData waitData;
-    } operationData;
 };
 
-// a SCRATCH_sprite is designed to sit in a single heap allocation. `variables` should point to the next SCRATCH_data aligned
-// address after the end of `threads`.
+// a SCRATCH_sprite is designed to sit in a single heap allocation. `variables` should point to the next SCRATCH_data aligned address after the end of `threads`, then `lists` should go after that.
+// potential future memory saving: put loop counter variables inside `thread` as bare integers, saving the space overhead of a whole `struct SCRATCH_data` per loop counter.
+// likely not worthwhile as it adds memory model compexity to support many instances of `repeat(n)`, which are uncommon.
 struct SCRATCH_sprite {
     struct SCRATCH_spriteHeader base;
     char* talkingString;
-    struct SCRATCH_data* variables;
-    struct SCRATCH_thread threads[];
+    // sprite-local storage (global variables: anything declared by the variable object)
+    struct SCRATCH_data* variables;     // static storage for all variables.
+    struct SCRATCH_vector* lists;       // static storage for any lists pointed to by `variables`. Lists are the exception to the "single heap allocation" rule, as they may point to separate allocations.
+    struct SCRATCH_thread threads[];    // static storage for all threads.
 };
 
 struct SCRATCH_spriteContext {
     struct SCRATCH_sprite** sprites;
     struct image** imageTable;
-    int* spriteSetIndices;
-    int spriteCount;
+    uint16_t* spriteSetIndices;
     struct SCRATCH_sprite* stage;
-    int currentIndex;
+    uint16_t spriteCount;
+    uint16_t currentIndex;
 };
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code);
 enum SCRATCH_continueStatus SCRATCH_processThread(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code);
 int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code);
-struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header);
+struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header, const struct SCRATCH_threadHeader* threads);
+void SCRATCH_freeSprite(struct SCRATCH_sprite* sprite);
+struct SCRATCH_sprite* SCRATCH_cloneSprite(struct SCRATCH_sprite* template);
 void SCRATCH_freeSprites(struct SCRATCH_spriteContext* context);
 void SCRATCH_initThread(struct SCRATCH_thread*, struct SCRATCH_threadHeader);
+void SCRATCH_vectorInit(struct SCRATCH_vector* vector);
+void SCRATCH_vectorPush(struct SCRATCH_vector* vector, struct SCRATCH_data data);
+struct SCRATCH_data* SCRATCH_vectorTop(struct SCRATCH_vector* vector);
+struct SCRATCH_data* SCRATCH_vectorFromTop(struct SCRATCH_vector* vector, uint16_t index);
+struct SCRATCH_data* SCRATCH_vectorAt(struct SCRATCH_vector* vector, uint16_t index);
+struct SCRATCH_data SCRATCH_vectorPop(struct SCRATCH_vector* vector);
 void handleInputs();
 void clearEvents();
 bool SCRATCH_addSprite(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite);

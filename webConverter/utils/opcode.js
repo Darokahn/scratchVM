@@ -2,10 +2,6 @@
 const UINT32_MAX = 4294967295;
 
 export const opcodeArray = [
-    "INNER_PARTITION_BEGINLOOPCONTROL",
-    "INNER_LOOPINIT",
-    "INNER_LOOPINCREMENT",
-    "INNER_JUMPIFREPEATDONE",
     "INNER_PARTITION_BEGINEXPRESSIONS",
     "SENSING_ANSWER",
     "SENSING_MOUSEDOWN",
@@ -237,6 +233,7 @@ export function indexObjects(project) {
         variables: {},
         costumes: {},
         stage: null,
+        functions: {},
     };
     let spriteCount = 0;
     let broadcastCount = 0;
@@ -244,6 +241,7 @@ export function indexObjects(project) {
     let variableCounts = {};
     let costumeCounts = {};
     let stage;
+    let functions = {};
     let objectIndex = globalObjectIndex;
     for (let target of project.targets) {
         if (target.isStage) {
@@ -266,6 +264,8 @@ export function indexObjects(project) {
             let key = JSON.stringify([target.name, costume.name]);
             let costumeIndex = objectIndex.costumes[key] || costumeCounts[target.name]++;
             objectIndex.costumes[key] = costumeIndex;
+        }
+        for (let block in target.blocks) {
         }
     }
     for (let backdrop of stage.costumes) {
@@ -294,6 +294,9 @@ function findVariable(name, id) {
     return globalObjectIndex.variables[id];
 }
 
+function findFunction(name) {
+}
+
 const pushFuncs = {
     NUM: (input, code) => {
         let number = Number(input.value[0]);
@@ -312,7 +315,7 @@ const pushFuncs = {
         pushArg(code, toCodeLiteral(degrees, 4));
     },
     COLOR: (input) => {
-        console.log("COLOR");
+        console.error("COLOR");
     },
     TEXT: (input, code) => {
         if (!isNaN(input.value[0])) {
@@ -335,7 +338,7 @@ const pushFuncs = {
         pushArg(code, toCodeLiteral(varIndex, 2));
     },
     LIST: (input) => {
-        console.log("LIST");
+        console.error("LIST");
     },
     OBJECTREF: (input, code, blocks, owner) => {
         let block = blocks[input.value];
@@ -416,6 +419,11 @@ function pushInput(input, code, blocks, owner) {
     pushFunc(input, code, blocks, owner);
 }
 
+function inlineFunction(block, code, blocks, owner) {
+    let newCode = [];
+    let functionBlock = 0;
+}
+
 function reportField(block, field, code) {
     console.log("in pushField:", block, field);
 }
@@ -449,9 +457,15 @@ function getEventCondition(hat, project) {
 // This was an example of premature optimization, as the VM itself runs plenty quickly, and the special cases it requires the programmer to handle are not worth the complexity.
 // The inconsistent strategy you will see among these opcode handlers is reflective of a pivot from the prior strategy to a simpler interpretation where inputs are trusted as inputs.
 // A refactor is needed to bring everything up to consistency.
+// This will allow the list of special functions to be much smaller.
+
 let specialFunctions = {
     LOOKS_CHANGEEFFECTBY: () => {},
     LOOKS_SETEFFECTTO: () => {},
+    PROCEDURES_CALL: (block, code, blocks, owner) => {
+        if (inlineFunction(block, code, blocks, owner) === true) return;
+        // inlining failed: put logic to handle arbitrary recursion here. requires architectural changes at the VM level. TODO
+    },
     OPERATOR_MATHOP: (block, code, blocks, owner) => {
         pushInput(block.inputs.NUM, code, blocks, owner);
         code.push("OPERATOR_MATHOP");

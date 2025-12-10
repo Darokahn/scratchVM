@@ -42,6 +42,7 @@ void startIO() {
 int cursorX = 0;
 int cursorY = 0;
 int updateIO(app_t* app) {
+    (void) app;
     SDL_UpdateTexture(texture, NULL, screen, LCDWIDTH * sizeof(*screen));
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
@@ -121,9 +122,12 @@ bool getInput(int index) {
 }
 
 void* pollApp(char* nameOut) {
+    (void) nameOut;
+    return NULL;
 }
 
 int selectApp(app_t* out, char* appName) {
+    (void) appName;
     struct dataHeader h;
     uint8_t magic[9];
     magic[8] = 0;
@@ -137,8 +141,10 @@ int selectApp(app_t* out, char* appName) {
     strcpy(out->name, "app");
     out->programData = programData;
     close(fd);
+    return 1;
 }
 
 void closeApp(app_t* app, int flags) {
+    (void) flags;
     free(app->programData);
 }

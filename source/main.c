@@ -27,7 +27,7 @@ int runApp(app_t* app) {
     uint8_t* programData = app->programData;
     struct SCRATCH_sprite* sprites[SPRITEMAX];
     struct image* images[IMAGEMAX];
-    int spriteSetIndices[SPRITEMAX];
+    uint16_t spriteSetIndices[SPRITEMAX];
     for (int i = 0; i < SPRITEMAX; i++) {
         sprites[i] = NULL;
     }

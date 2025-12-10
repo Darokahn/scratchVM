@@ -84,11 +84,8 @@ void initProgram(const uint8_t* buffer, struct SCRATCH_spriteContext* context, c
     for (int i = 0; i < d->spriteCount; i++) {
         struct SCRATCH_spriteHeader spriteHeader = spriteHeaders[i];
         if (context->sprites[i] != NULL) free(context->sprites[i]);
-        context->sprites[i] = SCRATCH_makeNewSprite(spriteHeader);
-        for (int ii = 0; ii < spriteHeader.threadCount; ii++) {
-            struct SCRATCH_threadHeader threadHeader = *threadHeaders++;
-            SCRATCH_initThread(&(context->sprites[i]->threads[ii]), threadHeader);
-        }
+        context->sprites[i] = SCRATCH_makeNewSprite(spriteHeader, threadHeaders);
+        threadHeaders += spriteHeader.threadCount;
         debugSprite(context->sprites[i]);
     }
     context->stage = context->sprites[0];

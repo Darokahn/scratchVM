@@ -13,10 +13,6 @@
 
 const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [EVENT_BROADCAST] = "EVENT_BROADCAST",
-    [INNER_PARTITION_BEGINLOOPCONTROL] = "INNER_PARTITION_BEGINLOOPCONTROL",
-    [INNER_LOOPINIT] = "INNER_LOOPINIT",
-    [INNER_LOOPINCREMENT] = "INNER_LOOPINCREMENT",
-    [INNER_JUMPIFREPEATDONE] = "INNER_JUMPIFREPEATDONE",
 
     [INNER_PARTITION_BEGINEXPRESSIONS] = "INNER_PARTITION_BEGINEXPRESSIONS",
 
@@ -216,7 +212,7 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        bool loggingCondition = sprite->base.id == 1 && (thread -sprite->threads) == 4;
+        bool loggingCondition = sprite->base.id == 1;
             if (loggingCondition) {
             printf("%d, %d\n", operation, watchValue);
             machineLog("id: %d, index: %d, thread: %d, hat: %s, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent]);
@@ -271,39 +267,106 @@ nextSprite:
     return activeThreadCount;
 }
 
-struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header) {
-    size_t firstChunkSize =
-            sizeof(struct SCRATCH_sprite) +
-            header.threadCount * sizeof(struct SCRATCH_thread)
-    ;
-    firstChunkSize = (firstChunkSize + __alignof__(struct SCRATCH_data) - 1) & ~(__alignof(struct SCRATCH_data) - 1);
-    size_t fullChunkSize = firstChunkSize + (sizeof(struct SCRATCH_data) * header.variableCount);
+#define align(val, alignTo) ((val + (alignTo) - 1) & ~((alignTo) - 1))
+
+struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header, const struct SCRATCH_threadHeader* threads) {
+    size_t baseSize = sizeof(struct SCRATCH_sprite);
+
+    size_t threadsOffset = align(baseSize, __alignof(struct SCRATCH_thread));
+    size_t sizeWithThreads = threadsOffset + sizeof(struct SCRATCH_thread) * header.threadCount;
+
+    size_t varsOffset = align(sizeWithThreads, __alignof(struct SCRATCH_data));
+    size_t sizeWithVars = varsOffset + sizeof(struct SCRATCH_data) * header.variableCount;
+
+    size_t listsOffset = align(sizeWithVars, __alignof(struct SCRATCH_vector));
+    size_t sizeWithLists = listsOffset + (sizeof(struct SCRATCH_vector) * header.listCount);
+
+    size_t fullChunkSize = sizeWithLists;
     struct SCRATCH_sprite* spriteChunk = malloc(fullChunkSize);
     if (spriteChunk == NULL) {
         machineLog("Failed allocation in SCRATCH_makeNewSprite\n");
         return NULL;
     }
     spriteChunk->base = header;
-    spriteChunk->variables = (struct SCRATCH_data*) (firstChunkSize + (uint8_t*) spriteChunk);
+    spriteChunk->variables = (struct SCRATCH_data*) (varsOffset + (uint8_t*) spriteChunk);
+    spriteChunk->lists = (struct SCRATCH_vector*) (listsOffset + (uint8_t*) spriteChunk);
     for (int i = 0; i < header.variableCount; i++) {
-        spriteChunk->variables[i].type = SCRATCH_NUMBER;
+        spriteChunk->variables[i].type = SCRATCH_FRACTION;
         spriteChunk->variables[i].data.number.i = 0;
+    }
+    if (threads != NULL) {
+        for (int i = 0; i < header.threadCount; i++) {
+            SCRATCH_initThread(&(spriteChunk->threads[i]), threads[i]);
+        }
+    }
+    for (int i = 0; i < header.listCount; i++) {
+        SCRATCH_vectorInit(&(spriteChunk->lists[i]));
     }
     spriteChunk->talkingString = NULL;
     return spriteChunk;
 }
 
+struct SCRATCH_sprite* SCRATCH_cloneSprite(struct SCRATCH_sprite* template) {
+    struct SCRATCH_sprite* newSprite = SCRATCH_makeNewSprite(template->base, NULL);
+    for (int i = 0; i < template->base.threadCount; i++) {
+        struct SCRATCH_threadHeader base = template->threads[i].base;
+        SCRATCH_initThread(&newSprite->threads[i], base);
+    }
+    return newSprite;
+}
+
+void SCRATCH_freeSprite(struct SCRATCH_sprite* sprite) {
+    for (int i = 0; i < sprite->base.threadCount; i++) {
+        free(sprite->threads[i].threadLocals.data);
+    }
+    free(sprite);
+}
+
 void SCRATCH_freeSprites(struct SCRATCH_spriteContext* context) {
     for (int i = 0; i < context->spriteCount; i++) {
-        free(context->sprites[i]);
+        SCRATCH_freeSprite(context->sprites[i]);
     }
 }
 
 void SCRATCH_initThread(struct SCRATCH_thread* thread, struct SCRATCH_threadHeader h) {
     thread->programCounter = h.entryPoint;
     thread->active = false;
-    thread->loopCounterStackIndex = 0;
     thread->base = h;
+    SCRATCH_vectorInit(&thread->threadLocals);
+}
+
+void SCRATCH_vectorInit(struct SCRATCH_vector* vector) {
+    vector->capacity = 16;
+    vector->count = 0;
+    vector->data = malloc(sizeof(vector->data[0]) * vector->capacity);
+}
+
+void SCRATCH_vectorPush(struct SCRATCH_vector* vector, struct SCRATCH_data data) {
+    if (vector->count == vector->capacity) {
+        vector->capacity *= 2;
+        vector->data = realloc(vector->data, sizeof(vector->data[0]) * vector->capacity);
+    }
+    vector->data[vector->count++] = data;
+}
+
+struct SCRATCH_data* SCRATCH_vectorTop(struct SCRATCH_vector* vector) {
+    return vector->data + vector->count - 1;
+}
+
+struct SCRATCH_data* SCRATCH_vectorFromTop(struct SCRATCH_vector* vector, uint16_t index) {
+    return vector->data + vector->count - index - 1;
+}
+
+struct SCRATCH_data* SCRATCH_vectorAt(struct SCRATCH_vector* vector, uint16_t index) {
+    return vector->data + index;
+}
+
+struct SCRATCH_data SCRATCH_vectorPop(struct SCRATCH_vector* vector) {
+    if (vector->count - 1 < vector->capacity / 2) {
+        vector->capacity /= 2;
+        vector->data = realloc(vector->data, sizeof(vector->data[0]) * vector->capacity);
+    }
+    return vector->data[--vector->count];
 }
 
 bool SCRATCH_addSprite(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite) {
@@ -401,47 +464,76 @@ struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, cha
     if (d.type == type) return d;
     int combination = pair(type, d.type);
     switch (combination) {
-        case pair(SCRATCH_STRING, SCRATCH_NUMBER):
+        case pair(SCRATCH_STRING, SCRATCH_FRACTION):
             sprintf(stringBuffer, "%f", (float)d.data.number.halves.high + d.data.number.halves.low / (float)(UINT16_MAX + 1));
             d.data.string = stringBuffer;
             d.type = SCRATCH_STRING;
             return d;
+        case pair(SCRATCH_STRING, SCRATCH_WHOLENUMBER):
+            sprintf(stringBuffer, "%d", d.data.wholeNumber);
+            d.data.string = stringBuffer;
+            d.type = SCRATCH_STRING;
+            return d;
         case pair(SCRATCH_STRING, SCRATCH_DEGREES):
-            d = cast(d, SCRATCH_NUMBER, stringBuffer);
+            d = cast(d, SCRATCH_FRACTION, stringBuffer);
             d = cast(d, SCRATCH_STRING, stringBuffer);
             return d;
         case pair(SCRATCH_STRING, SCRATCH_BOOL):
             d.data.string = boolStrings[d.data.boolean];
             d.type = SCRATCH_STATICSTRING;
             return d;
-        case pair(SCRATCH_NUMBER, SCRATCH_DEGREES):
+        case pair(SCRATCH_FRACTION, SCRATCH_DEGREES):
             d.data.number.i = (uint64_t)d.data.degrees * 360 >> 16;
-            d.type = SCRATCH_NUMBER;
+            d.type = SCRATCH_FRACTION;
             return d;
-        case pair(SCRATCH_NUMBER, SCRATCH_BOOL):
+        case pair(SCRATCH_FRACTION, SCRATCH_BOOL):
             d.data.number.i = d.data.boolean;
-            d.type = SCRATCH_NUMBER;
+            d.type = SCRATCH_FRACTION;
             return d;
-        case pair(SCRATCH_NUMBER, SCRATCH_STRING):
+        case pair(SCRATCH_FRACTION, SCRATCH_WHOLENUMBER):
+            d.data.number.i = d.data.wholeNumber << 16;
+            d.type = SCRATCH_FRACTION;
+            return d;
+        case pair(SCRATCH_FRACTION, SCRATCH_STRING):
             float f = 0;
             sscanf(d.data.string, "%f", &f);
             d.data.number.i = (f * (float)(UINT16_MAX + 1));
-            d.type = SCRATCH_NUMBER;
+            d.type = SCRATCH_FRACTION;
             return d;
-        case pair(SCRATCH_DEGREES, SCRATCH_NUMBER):
+        case pair(SCRATCH_DEGREES, SCRATCH_FRACTION):
             uint64_t newDegrees = (uint64_t)d.data.number.i << 16;
             newDegrees /= 360;
-            // no-op. Good style? I don't know.
             d.data.degrees = newDegrees;
             d.type = SCRATCH_DEGREES;
+            return d;
+        case pair(SCRATCH_DEGREES, SCRATCH_WHOLENUMBER):
+            d = cast(d, SCRATCH_FRACTION, NULL);
+            d = cast(d, SCRATCH_DEGREES, NULL);
             return d;
         case pair(SCRATCH_DEGREES, SCRATCH_BOOL):
             d.data.degrees = d.data.boolean;
             d.type = SCRATCH_DEGREES;
             return d;
         case pair(SCRATCH_DEGREES, SCRATCH_STRING):
-            d = cast(d, SCRATCH_NUMBER, NULL);
+            d = cast(d, SCRATCH_FRACTION, NULL);
             d = cast(d, SCRATCH_DEGREES, NULL);
+            return d;
+        // converting to a whole number is a loss in precision and should only be done when, for example, converting to an array index. compiler should know this, so no ceremony necessary on this side.
+        case pair(SCRATCH_WHOLENUMBER, SCRATCH_FRACTION):
+            d.data.wholeNumber = d.data.number.halves.high;
+            d.type = SCRATCH_WHOLENUMBER;
+            return d;
+        case pair(SCRATCH_WHOLENUMBER, SCRATCH_DEGREES):
+            d.data.wholeNumber = ((d.data.degrees >> 9) * 360) >> 23; // hack to do the proper conversion inside a 32-bit int
+            d.type = SCRATCH_WHOLENUMBER;
+            return d;
+        case pair(SCRATCH_WHOLENUMBER, SCRATCH_BOOL):
+            d.data.wholeNumber = d.data.boolean;
+            d.type = SCRATCH_WHOLENUMBER;
+            return d;
+        case pair(SCRATCH_WHOLENUMBER, SCRATCH_STRING):
+            d = cast(d, SCRATCH_FRACTION, NULL);
+            d = cast(d, SCRATCH_WHOLENUMBER, NULL);
             return d;
         default:
             return d;

@@ -10,12 +10,16 @@ UPLOAD_DIR = "upload"
 BUG_REPORTS_DIR = "bug_reports"
 TUTORING_REQUESTS_DIR = "tutoring_requests"
 GAME_REPORTS_DIR = "game_reports"
+PATCHES_DIR = "patches"
+PLANNED_FEATURES_DIR = "planned_features"
 
 # Ensure the upload directory exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(BUG_REPORTS_DIR, exist_ok=True)
 os.makedirs(TUTORING_REQUESTS_DIR, exist_ok=True)
 os.makedirs(GAME_REPORTS_DIR, exist_ok=True)
+os.makedirs(PATCHES_DIR, exist_ok=True)
+os.makedirs(PLANNED_FEATURES_DIR, exist_ok=True)
 
 # Serve any file requested
 @app.route('/<path:filename>', methods=['GET', 'OPTIONS'])
@@ -237,6 +241,50 @@ def submit_game_status():
         error_response = jsonify({'error': f'Server error: {str(e)}'})
         error_response.headers['Access-Control-Allow-Origin'] = '*'
         return error_response, 500
+
+@app.route('/api/documents/<collection>', methods=['GET', 'OPTIONS'])
+def list_documents(collection):
+    if request.method == 'OPTIONS':
+        response = Response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response
+
+    directory_map = {
+        'patches': PATCHES_DIR,
+        'planned_features': PLANNED_FEATURES_DIR
+    }
+    target_dir = directory_map.get(collection)
+    if not target_dir:
+        error_response = jsonify({'error': 'Unknown collection'})
+        error_response.headers['Access-Control-Allow-Origin'] = '*'
+        return error_response, 404
+
+    os.makedirs(target_dir, exist_ok=True)
+    documents = []
+    for filename in os.listdir(target_dir):
+        filepath = os.path.join(target_dir, filename)
+        if not os.path.isfile(filepath):
+            continue
+        stat = os.stat(filepath)
+        documents.append({
+            'name': filename,
+            'path': f"{target_dir}/{filename}",
+            'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            'size': stat.st_size
+        })
+
+    documents.sort(key=lambda doc: doc['modified'], reverse=True)
+
+    response = jsonify({
+        'docs': documents,
+        'count': len(documents)
+    })
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response, 200
 
 if __name__ == "__main__":
     app.run(debug=True, port=8000)

@@ -23,6 +23,8 @@ function buildNavigationLinks() {
     
     const links = [
         { href: 'index.html', label: 'Home', id: 'nav-home' },
+        { href: 'patch-notes.html', label: 'Patch Notes', id: 'nav-patches' },
+        { href: 'future-updates.html', label: 'Future Updates', id: 'nav-future' },
         { href: 'bug-report.html', label: 'Report Bug', id: 'nav-bug-report' },
         //{ href: 'business.html', label: 'Kits & Classes', id: 'nav-business' }
     ];
