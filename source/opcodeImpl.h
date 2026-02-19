@@ -10,14 +10,14 @@
 #define POPDEGREES() cast(stack[--stackIndex], SCRATCH_DEGREES, NULL)
 #define POPTEXT(buffer) cast(stack[--stackIndex], SCRATCH_STRING, buffer)
 #define POPDATA() stack[--stackIndex]
-#define PUSHFRACTION(value) stack[stackIndex++] = (struct SCRATCH_data) {{.number.i=value}, .type=SCRATCH_FRACTION};
-#define PUSHWHOLENUMBER(value) stack[stackIndex++] = (struct SCRATCH_data) {{.wholeNumber=(int32_t)value}, .type=SCRATCH_WHOLENUMBER};
-#define PUSHID(value) stack[stackIndex++] = (struct SCRATCH_data) {{.wholeNumber=(int32_t)value}, .type=SCRATCH_WHOLENUMBER};
-#define PUSHBOOL(value) stack[stackIndex++] = (struct SCRATCH_data) {{.boolean=value}, .type=SCRATCH_BOOL};
-#define PUSHDATA(value) stack[stackIndex++] = value;
-#define PUSHSTATICTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {{.string=(value)}, .type=SCRATCH_STATICSTRING};
-#define PUSHTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {{.string=NULL}, .type=SCRATCH_STRING};
-#define PUSHDEGREES(value) stack[stackIndex++] = (struct SCRATCH_data) {{.degrees=value}, .type=SCRATCH_DEGREES};
+#define PUSHFRACTION(value) stack[stackIndex++] = (struct SCRATCH_data) {{.number.i=value}, .type=SCRATCH_FRACTION}
+#define PUSHWHOLENUMBER(value) stack[stackIndex++] = (struct SCRATCH_data) {{.wholeNumber=(int32_t)value}, .type=SCRATCH_WHOLENUMBER}
+#define PUSHID(value) stack[stackIndex++] = (struct SCRATCH_data) {{.wholeNumber=(int32_t)value}, .type=SCRATCH_WHOLENUMBER}
+#define PUSHBOOL(value) stack[stackIndex++] = (struct SCRATCH_data) {{.boolean=value}, .type=SCRATCH_BOOL}
+#define PUSHDATA(value) stack[stackIndex++] = value
+#define PUSHSTATICTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {{.string=(value)}, .type=SCRATCH_STATICSTRING}
+#define PUSHTEXT(value) stack[stackIndex++] = (struct SCRATCH_data) {{.string=NULL}, .type=SCRATCH_STRING}
+#define PUSHDEGREES(value) stack[stackIndex++] = (struct SCRATCH_data) {{.degrees=value}, .type=SCRATCH_DEGREES}
 
 #define GETARGUMENT(type) (thread->programCounter = (thread->programCounter + 3) & ~3, thread->programCounter += sizeof(type), INTERPRET_AS(type, code[thread->programCounter - sizeof(type)]))
 
@@ -648,6 +648,23 @@ case CONTROL_STOP: {
     }
     break;
 }
+case INNER_LOCALS_PUSHARG: {
+    struct SCRATCH_data arg = POPDATA();
+    SCRATCH_vectorPush(&thread->threadLocals, arg);
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_LOCALS_POPARG: {
+    SCRATCH_vectorPop(&thread->threadLocals);
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_LOCALS_GETARG: {
+    int16_t offset = GETARGUMENT(uint16_t);
+    PUSHDATA(*SCRATCH_vectorFromTop(&thread->threadLocals, offset));
+    status = SCRATCH_continue;
+    break;
+}
 case INNER_JUMPIF: {
     uint16_t jumpTo = GETARGUMENT(uint16_t);
     struct SCRATCH_data evaluand = POPBOOL();
@@ -669,11 +686,38 @@ case INNER_JUMPIFNOT: {
 case INNER_JUMP: {
     uint16_t jumpTo = GETARGUMENT(uint16_t);
     thread->programCounter = jumpTo;
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_JUMPINDIRECT: {
+    uint16_t jumpTo = POPID();
+    thread->programCounter = jumpTo;
+    status = SCRATCH_continue;
     break;
 }
 case INNER__GLIDEITERATION: {
-    keepInStage(context, sprite);
+    struct SCRATCH_data* yStep = SCRATCH_vectorFromTop(&thread->threadLocals, 0);
+    struct SCRATCH_data* xStep = SCRATCH_vectorFromTop(&thread->threadLocals, 1);
+    struct SCRATCH_data* yTarget = SCRATCH_vectorFromTop(&thread->threadLocals, 2);
+    struct SCRATCH_data* xTarget = SCRATCH_vectorFromTop(&thread->threadLocals, 3);
+    struct SCRATCH_data* iterationsRemaining = SCRATCH_vectorFromTop(&thread->threadLocals, 4);
+    if (iterationsRemaining->data.wholeNumber <= 0) {
+        sprite->base.x = xTarget->data.number;
+        sprite->base.y = yTarget->data.number;
+        keepInStage(context, sprite);
+        SCRATCH_vectorPop(&thread->threadLocals);
+        SCRATCH_vectorPop(&thread->threadLocals);
+        SCRATCH_vectorPop(&thread->threadLocals);
+        SCRATCH_vectorPop(&thread->threadLocals);
+        SCRATCH_vectorPop(&thread->threadLocals);
+        status = SCRATCH_yieldGeneric;
+        break;
+    }
+    sprite->base.x.i += xStep->data.number.i;
+    sprite->base.y.i += yStep->data.number.i;
+    iterationsRemaining->data.wholeNumber--;
     thread->programCounter--; // re-align program counter with this instruction so it runs again
+    keepInStage(context, sprite);
     status = SCRATCH_yieldGeneric;
     break;
 }
@@ -732,8 +776,6 @@ case MOTION_GLIDESECSTOXY: {
     struct SCRATCH_data scaledSecs = POPFRACTION();
     scaledInt32 xDiff = {.i = x.data.number.i - sprite->base.x.i};
     scaledInt32 yDiff = {.i = y.data.number.i - sprite->base.y.i};
-    (void) xDiff;
-    (void) yDiff;
     uint16_t iterations = (scaledSecs.data.number.i * FRAMESPERSEC) >> 16;
     if (iterations == 0) {
         sprite->base.x = x.data.number;
@@ -741,6 +783,11 @@ case MOTION_GLIDESECSTOXY: {
         keepInStage(context, sprite);
         return SCRATCH_continue;
     }
+    SCRATCH_vectorPush(&thread->threadLocals, (struct SCRATCH_data) {{.wholeNumber=iterations}, SCRATCH_WHOLENUMBER});
+    SCRATCH_vectorPush(&thread->threadLocals, x);
+    SCRATCH_vectorPush(&thread->threadLocals, y);
+    SCRATCH_vectorPush(&thread->threadLocals, (struct SCRATCH_data) {{xDiff.i / iterations}, SCRATCH_FRACTION});
+    SCRATCH_vectorPush(&thread->threadLocals, (struct SCRATCH_data) {{yDiff.i / iterations}, SCRATCH_FRACTION});
     status = SCRATCH_continue;
     break;
 }

@@ -15,9 +15,18 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #define TFT_CS   15  // Chip select control pin
 #define TFT_DC    2  // Data Command control pin
 #define TFT_RST   4  // Reset pin (could connect to RST pin)
+#define TFT_LED   5
+
+#define THUMBSTICK_VCC 21
+#define THUMBSTICK_GND 22
+
+#define THUMBSTICK_Y 33
+#define THUMBSTICK_X 32
+#define THUMBSTICK_SW 25
 
 TFT_eSPI tft = TFT_eSPI();
-TFT_eSprite tftSprite = TFT_eSprite(&tft);
+TFT_eSprite tftSpriteUpper = TFT_eSprite(&tft);
+TFT_eSprite tftSpriteLower = TFT_eSprite(&tft);
 
 #define TS_CS 33
 #define TS_IRQ 32
@@ -159,13 +168,24 @@ int readChar() {
 
 extern "C" int main();
 extern "C" int runApp(app_t* app);
+
+const int TOPHEIGHT = 170;
+const int BOTTOMHEIGHT = FULLLCDHEIGHT - 170;
+
 extern "C" void startIO() {
-    pinMode(33, INPUT);
-    pinMode(32, INPUT);
-    pinMode(25, INPUT_PULLUP);
+    pinMode(THUMBSTICK_X, INPUT_PULLUP);
+    pinMode(THUMBSTICK_Y, INPUT_PULLUP);
+    pinMode(THUMBSTICK_SW, INPUT_PULLUP);
+    pinMode(TFT_LED, OUTPUT);
+    digitalWrite(TFT_LED, HIGH);
+    pinMode(THUMBSTICK_VCC, OUTPUT);
+    digitalWrite(THUMBSTICK_VCC, HIGH);
+    pinMode(THUMBSTICK_GND, OUTPUT);
+    digitalWrite(THUMBSTICK_GND, LOW);
     tft.init();
     tft.setRotation(1);
-    tftSprite.createSprite(LCDWIDTH, LCDHEIGHT);
+    tftSpriteUpper.createSprite(FULLLCDWIDTH, TOPHEIGHT);
+    tftSpriteLower.createSprite(FULLLCDWIDTH, BOTTOMHEIGHT);
     tft.fillScreen(TFT_BLACK);
 }
 
@@ -174,7 +194,8 @@ extern "C" int updateIO(app_t* app) {
         pollApp(appName);
         return -1;
     }
-    tftSprite.pushSprite((FULLLCDWIDTH - LCDWIDTH) / 2, (FULLLCDHEIGHT - LCDHEIGHT) / 2);
+    tftSpriteUpper.pushSprite(0, 0);
+    tftSpriteLower.pushSprite(0, TOPHEIGHT);
     return 0;
 }
 
@@ -183,7 +204,10 @@ extern "C" void* mallocDMA(size_t size) {
 }
 
 extern "C" void drawPixel(int x, int y, pixel color) {
-    tftSprite.drawPixel(x, y, color);
+    static TFT_eSprite* halves[] = {&tftSpriteUpper, &tftSpriteLower};
+    TFT_eSprite* screenHalf = halves[y >= TOPHEIGHT];
+    y -= (TOPHEIGHT * (y >= TOPHEIGHT));
+    screenHalf->drawPixel(x, y, color);
 }
 
 int frameInterval = 1000 / FRAMESPERSEC;
@@ -194,17 +218,14 @@ extern "C" unsigned long getNow() {
     return millis();
 }
 
-#define VRX_PIN 32
-#define VRY_PIN 33
-#define SW_PIN 25
-
-const int ADC_CENTER = 1880;       // Midpoint of 12-bit ADC
+int ADC_CENTER = -1;       // Midpoint of 12-bit ADC
 const int DEADZONE  = 200;         // Joystick deadzone threshold
 
 extern "C" bool getInput(int index) {
-    int vrx = analogRead(VRX_PIN);
-    int vry = analogRead(VRY_PIN);
-    bool sw  = digitalRead(SW_PIN) == LOW;  // Active-low button
+    int vrx = analogRead(THUMBSTICK_X);
+    int vry = analogRead(THUMBSTICK_Y);
+    bool sw  = digitalRead(THUMBSTICK_SW) == LOW;  // Active-low button
+    if (ADC_CENTER == -1) ADC_CENTER = vry;
 
     bool activated = false;
     switch (index) {

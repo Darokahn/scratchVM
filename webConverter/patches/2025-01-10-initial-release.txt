@@ -5,3 +5,4 @@ ScratchVM Web Converter Patch - 2025-01-10
 - Enabled bug reporting link for early testers.
 
 
+

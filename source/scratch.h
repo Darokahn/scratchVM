@@ -150,7 +150,7 @@ struct SCRATCH_event {
 struct SCRATCH_spriteHeader {
     scaledInt32 x;
     scaledInt32 y;
-    uint32_t rotation;  // Rotation maps (0 -> 360) to the entire range of a 16-bit integer
+    uint32_t rotation;  // Rotation maps (0 -> 360) to the entire range of a 32-bit integer
     uint16_t size;      // size maps (0 -> 100) to (0 -> SIZERATIO), which is 1024 at the time of writing.
     bool visible;
     int8_t layer;
@@ -203,7 +203,7 @@ enum SCRATCH_continueStatus SCRATCH_processThread(struct SCRATCH_spriteContext* 
 int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code);
 struct SCRATCH_sprite* SCRATCH_makeNewSprite(struct SCRATCH_spriteHeader header, const struct SCRATCH_threadHeader* threads);
 void SCRATCH_freeSprite(struct SCRATCH_sprite* sprite);
-struct SCRATCH_sprite* SCRATCH_cloneSprite(struct SCRATCH_sprite* template);
+struct SCRATCH_sprite* SCRATCH_cloneSprite(struct SCRATCH_sprite* t);
 void SCRATCH_freeSprites(struct SCRATCH_spriteContext* context);
 void SCRATCH_initThread(struct SCRATCH_thread*, struct SCRATCH_threadHeader);
 void SCRATCH_vectorInit(struct SCRATCH_vector* vector);
@@ -217,7 +217,6 @@ void clearEvents();
 bool SCRATCH_addSprite(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite);
 bool SCRATCH_wakeSprite(struct SCRATCH_sprite* sprite, enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
 void SCRATCH_wakeSprites(struct SCRATCH_spriteContext* context);
-
 
 
 struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand);

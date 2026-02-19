@@ -73,9 +73,13 @@ export const opcodeArray = [
     "CONTROL_CREATE_CLONE_OF_MENU",
     "CONTROL_DELETE_THIS_CLONE",
     "CONTROL_STOP",
+    "INNER_LOCALS_PUSHARG",
+    "INNER_LOCALS_POPARG",
+    "INNER_LOCALS_GETARG",
     "INNER_JUMPIF",
     "INNER_JUMPIFNOT",
     "INNER_JUMP",
+    "INNER_JUMPINDIRECT",
     "INNER__GLIDEITERATION",
     "MOTION_MOVESTEPS",
     "MOTION_TURNRIGHT",
@@ -223,6 +227,7 @@ let globalObjectIndex = {
     variables: {},
     costumes: {},
     stage: null,
+    functions: {},
 };
 
 export function indexObjects(project) {
@@ -234,6 +239,8 @@ export function indexObjects(project) {
         costumes: {},
         stage: null,
         functions: {},
+        functionParams: {},
+        functionArgs: {},
     };
     let spriteCount = 0;
     let broadcastCount = 0;
@@ -241,9 +248,9 @@ export function indexObjects(project) {
     let variableCounts = {};
     let costumeCounts = {};
     let stage;
-    let functions = {};
     let objectIndex = globalObjectIndex;
     for (let target of project.targets) {
+        objectIndex.functions[target.name] = {};
         if (target.isStage) {
             stage = target;
         }
@@ -264,8 +271,6 @@ export function indexObjects(project) {
             let key = JSON.stringify([target.name, costume.name]);
             let costumeIndex = objectIndex.costumes[key] || costumeCounts[target.name]++;
             objectIndex.costumes[key] = costumeIndex;
-        }
-        for (let block in target.blocks) {
         }
     }
     for (let backdrop of stage.costumes) {
@@ -463,8 +468,11 @@ let specialFunctions = {
     LOOKS_CHANGEEFFECTBY: () => {},
     LOOKS_SETEFFECTTO: () => {},
     PROCEDURES_CALL: (block, code, blocks, owner) => {
-        if (inlineFunction(block, code, blocks, owner) === true) return;
-        // inlining failed: put logic to handle arbitrary recursion here. requires architectural changes at the VM level. TODO
+        // look up the positional arguments for the function with this name
+        // push those from the input list in order
+        // push the address of the next opcode
+        // look up the code position of the function with this name
+        // jump to it
     },
     OPERATOR_MATHOP: (block, code, blocks, owner) => {
         pushInput(block.inputs.NUM, code, blocks, owner);
@@ -770,6 +778,19 @@ export function compileBlock(block, code, blocks, owner) {
     }
 }
 
+function compileFunction(owner, blocks, code, functionName) {
+    globalObjectIndex.functions[functionName].location = code.length
+    let definition = blocks[functionName];
+    let block = blocks[definition.next];
+    while (block != null) {
+        compileBlock(block, code, blocks, owner);
+        block = blocks[block.next];
+    }
+    code.push("INNER_LOCALS_GETARG");
+    pushArg(code, 0);
+    code.push("INNER_JUMPINDIRECT");
+}
+
 export function compileBlocks(hat, owner, blocks, code, project) {
     indexObjects(project);
     let entryPoint = code.length;
@@ -783,6 +804,7 @@ export function compileBlocks(hat, owner, blocks, code, project) {
     code.push("INNER_PUSHID");
     pushArg(code, [0, 0]);
     code.push("CONTROL_STOP");
+    console.log(code)
     return {entryPoint, startEvent, eventCondition};
 }
 

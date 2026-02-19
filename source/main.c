@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdlib.h>
+// haiiiii :3 :3 :3 :3 :3 :3 :3
 #include <unistd.h>
 #include <string.h>
 #include "scratch.h"
@@ -15,7 +16,7 @@ int eventCount;
 unsigned long getNow();
 
 int count = 0;
-int drawRate = 1;
+int drawRate = 2;
 const uint8_t* code;
 
 char appName[12] = "app";

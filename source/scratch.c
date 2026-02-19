@@ -157,7 +157,6 @@ void clearEvents(int eventCount) {
     }
 }
 
-// scratch's rule is to keep sprites in frame by a fixed number of pixels in each direction.
 void keepInFrame(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite) {
     struct image* i = getImage(context, sprite);
     int pixelWidth = (i->widthRatio * SCRATCHWIDTH * sprite->base.size) / (SIZERATIO * 255);
@@ -174,6 +173,7 @@ void keepInFrame(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* s
     if (sprite->base.y.halves.high > top) sprite->base.y.halves.high = top;
 }
 
+// scratch's rule is to keep sprites in stage by a fixed number of pixels in each direction.
 void keepInStage(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite) {
     const int pixelMargin = 10;
     struct image* i = getImage(context, sprite);
@@ -212,14 +212,14 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        bool loggingCondition = sprite->base.id == 1;
+        bool loggingCondition = true;//sprite->base.id == 1;
             if (loggingCondition) {
-            printf("%d, %d\n", operation, watchValue);
-            machineLog("id: %d, index: %d, thread: %d, hat: %s, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent]);
-            if (opcodeName == NULL) machineLog("opcode: %d\n\r", operation);
-            else machineLog("opcode: %s\n\r", SCRATCH_opcode_names[operation]);
-            if (operation == watchValue) {
-                raise(SIGTRAP);
+                printf("%d, %d\n", operation, watchValue);
+                machineLog("id: %d, index: %d, thread: %d, hat: %s, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent]);
+                if (opcodeName == NULL) machineLog("opcode: %d\n\r", operation);
+                else machineLog("opcode: %s\n\r", SCRATCH_opcode_names[operation]);
+                if (operation == watchValue) {
+                    raise(SIGTRAP);
             }
         }
         switch (operation) {
@@ -487,7 +487,7 @@ struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, cha
             d.type = SCRATCH_FRACTION;
             return d;
         case pair(SCRATCH_FRACTION, SCRATCH_BOOL):
-            d.data.number.i = d.data.boolean;
+            d.data.number.halves.high = d.data.boolean;
             d.type = SCRATCH_FRACTION;
             return d;
         case pair(SCRATCH_FRACTION, SCRATCH_WHOLENUMBER):

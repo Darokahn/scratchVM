@@ -202,7 +202,7 @@ export async function getImageBuffer(file, details, byteBudget) {
         if (filename === undefined) {
             filename = image.assetId + "." + image.dataFormat;
         }
-        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, filename, {mode: "scaleMax", x: 64, y: 64});
+        let {scaledImage, width, height, targetWidth, targetHeight} = await getScaledImageFromFile(file, filename, {mode: "scaleMax", x: 32, y: 32});
         image.scaledImage = scaledImage;
         image.width = width;
         image.height = height;

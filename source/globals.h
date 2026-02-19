@@ -10,8 +10,3 @@ extern int cursorY;
 extern const uint8_t programData[];
 
 extern char appName[];
-
-
-
-
-
