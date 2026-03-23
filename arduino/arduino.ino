@@ -9,27 +9,20 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #include <cstdio>
 #include <TFT_eSPI.h>
 
-#define TFT_MISO 19
-#define TFT_MOSI 23
+#define TFT_MISO -1
+#define TFT_MOSI  5
 #define TFT_SCLK 18
 #define TFT_CS   15  // Chip select control pin
-#define TFT_DC    2  // Data Command control pin
-#define TFT_RST   4  // Reset pin (could connect to RST pin)
-#define TFT_LED   5
+#define TFT_DC    4  // Data Command control pin
+#define TFT_RST   2  // Reset pin (could connect to RST pin)
+#define TFT_LED  19
 
-#define THUMBSTICK_VCC 21
-#define THUMBSTICK_GND 22
+#define THUMBSTICK_VCC 26
+#define THUMBSTICK_GND 27
 
-#define THUMBSTICK_Y 33
-#define THUMBSTICK_X 32
-#define THUMBSTICK_SW 25
-
-TFT_eSPI tft = TFT_eSPI();
-TFT_eSprite tftSpriteUpper = TFT_eSprite(&tft);
-TFT_eSprite tftSpriteLower = TFT_eSprite(&tft);
-
-#define TS_CS 33
-#define TS_IRQ 32
+#define THUMBSTICK_X    33
+#define THUMBSTICK_Y    25
+#define THUMBSTICK_SW   32
 
 extern "C" {
   #include "scratch.h"
@@ -38,6 +31,10 @@ extern "C" {
   #include "firmwareData.h"
   #include "globals.h"
 }
+
+TFT_eSPI tft = TFT_eSPI(FULLLCDWIDTH, FULLLCDHEIGHT);
+TFT_eSprite tftSpriteUpper = TFT_eSprite(&tft);
+TFT_eSprite tftSpriteLower = TFT_eSprite(&tft);
 
 struct firmwareHeader* apps = NULL;
 
@@ -50,7 +47,7 @@ static esp_partition_mmap_handle_t mappedRegion = NULL;
 void partitionInit() {
     programDataPartition = esp_partition_find_first(
         ESP_PARTITION_TYPE_DATA,
-        (esp_partition_subtype_t)0x80, // Custom SubType (matching your CSV)
+        (esp_partition_subtype_t)0x80,
         PARTITION_LABEL
     );
 }
@@ -183,12 +180,15 @@ extern "C" void startIO() {
     pinMode(THUMBSTICK_GND, OUTPUT);
     digitalWrite(THUMBSTICK_GND, LOW);
     tft.init();
-    tft.setRotation(1);
+    tft.setRotation(2);
     tftSpriteUpper.createSprite(FULLLCDWIDTH, TOPHEIGHT);
     tftSpriteLower.createSprite(FULLLCDWIDTH, BOTTOMHEIGHT);
-    tft.fillScreen(TFT_BLACK);
 }
 
+int ADC_CENTER = -1;       // Midpoint of 12-bit ADC
+const int DEADZONE  = 200;         // Joystick deadzone threshold
+
+bool inputs[5];
 extern "C" int updateIO(app_t* app) {
     if (Serial.available()) {
         pollApp(appName);
@@ -196,7 +196,21 @@ extern "C" int updateIO(app_t* app) {
     }
     tftSpriteUpper.pushSprite(0, 0);
     tftSpriteLower.pushSprite(0, TOPHEIGHT);
+    int vrx = analogRead(THUMBSTICK_X);
+    int vry = analogRead(THUMBSTICK_Y);
+    bool sw  = digitalRead(THUMBSTICK_SW) == LOW;  // Active-low button
+    if (ADC_CENTER == -1) ADC_CENTER = vry;
+
+    inputs[0] = vry < ADC_CENTER - DEADZONE;
+    inputs[1] = vrx < ADC_CENTER - DEADZONE;
+    inputs[2] = vry > ADC_CENTER + DEADZONE;
+    inputs[3] = vrx > ADC_CENTER + DEADZONE;
+    inputs[4] = sw;
     return 0;
+}
+
+extern "C" bool getInput(int index) {
+    return inputs[index];
 }
 
 extern "C" void* mallocDMA(size_t size) {
@@ -216,37 +230,6 @@ extern "C" const size_t stampSize = sizeof millis();
 
 extern "C" unsigned long getNow() {
     return millis();
-}
-
-int ADC_CENTER = -1;       // Midpoint of 12-bit ADC
-const int DEADZONE  = 200;         // Joystick deadzone threshold
-
-extern "C" bool getInput(int index) {
-    int vrx = analogRead(THUMBSTICK_X);
-    int vry = analogRead(THUMBSTICK_Y);
-    bool sw  = digitalRead(THUMBSTICK_SW) == LOW;  // Active-low button
-    if (ADC_CENTER == -1) ADC_CENTER = vry;
-
-    bool activated = false;
-    switch (index) {
-        case 0: // UP
-            activated = vry > ADC_CENTER + DEADZONE;
-            break;
-        case 1: // LEFT
-            activated = vrx > ADC_CENTER + DEADZONE;
-            break;
-        case 2: // DOWN
-            activated = vry < ADC_CENTER - DEADZONE;
-            break;
-        case 3: // RIGHT
-            activated = vrx < ADC_CENTER - DEADZONE;
-            break;
-        case 4: // SPACE / action button
-            activated = sw;
-            break;
-    }
-    delay(1);
-    return activated;
 }
 
 extern "C" int machineLog(const char* fmt, ...) {

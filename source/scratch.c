@@ -212,7 +212,7 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        bool loggingCondition = true;//sprite->base.id == 1;
+        bool loggingCondition = false;//sprite->base.id == 1;
             if (loggingCondition) {
                 printf("%d, %d\n", operation, watchValue);
                 machineLog("id: %d, index: %d, thread: %d, hat: %s, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent]);

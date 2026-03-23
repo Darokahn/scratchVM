@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stdlib.h>
-// haiiiii :3 :3 :3 :3 :3 :3 :3
 #include <unistd.h>
 #include <string.h>
 #include "scratch.h"
