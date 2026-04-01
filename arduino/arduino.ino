@@ -9,13 +9,13 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #include <cstdio>
 #include <TFT_eSPI.h>
 
-#define TFT_MISO -1
-#define TFT_MOSI  5
-#define TFT_SCLK 18
-#define TFT_CS   15  // Chip select control pin
-#define TFT_DC    4  // Data Command control pin
-#define TFT_RST   2  // Reset pin (could connect to RST pin)
-#define TFT_LED  19
+#define TFT_MISO 255
+#define TFT_MOSI   5
+#define TFT_SCLK  18
+#define TFT_CS    15  // Chip select control pin
+#define TFT_DC     4  // Data Command control pin
+#define TFT_RST    2  // Reset pin (could connect to RST pin)
+#define TFT_LED   19
 
 #define THUMBSTICK_VCC 26
 #define THUMBSTICK_GND 27
@@ -158,9 +158,20 @@ void unmapPartition() {
     mappedRegion = NULL;
 }
 
+int readCharInteractive() {
+    char c = Serial.read();
+    Serial.print(c);
+    if (c == '\n') Serial.print('\r');
+    else if (c == 0x7f) {
+        Serial.print('\b');
+        Serial.print(' ');
+        Serial.print('\b');
+    }
+    return c;
+}
+
 int readChar() {
-    int c = Serial.read();
-    //Serial.println(c);
+    char c = Serial.read();
     return c;
 }
 
@@ -171,9 +182,9 @@ const int maxHeapAllocation = 100000;
 int TOPHEIGHT = 170;
 int BOTTOMHEIGHT = FULLLCDHEIGHT - 170;
 
-struct hardwareData hardware;
-
 extern "C" void startIO() {
+    struct hardwareData hardware = apps->hardware;
+    printf("hardware data: "); printHardwareData(hardware);
     pinMode(hardware.controls.xAxis, INPUT_PULLUP);
     pinMode(hardware.controls.yAxis, INPUT_PULLUP);
     pinMode(hardware.controls.button, INPUT_PULLUP);
@@ -201,7 +212,7 @@ extern "C" void startIO() {
     BOTTOMHEIGHT = MIN(maxHeapAllocation / hardware.screen.width, remainingHeight);
     tftSpriteUpper.createSprite(hardware.screen.width, TOPHEIGHT);
     tftSpriteLower.createSprite(hardware.screen.width, BOTTOMHEIGHT);
-    tft.fillScreen(TFT_BLACK);
+    tft.fillScreen(TFT_BLUE);
 }
 
 int ADC_CENTER = -1;       // Midpoint of 12-bit ADC
@@ -261,6 +272,54 @@ extern "C" int machineLog(const char* fmt, ...) {
 
 int MAXOFFSET = 14;
 
+#define MAGICSTRING "magic"
+#define CURRENTVERSION "f2026.0"
+
+struct hardwareData hardwareTemplate = {
+    .screen = {
+        .cs=TFT_CS,
+        .reset=TFT_RST,
+        .dc=TFT_DC,
+        .sdi=TFT_MOSI,
+        .sck=TFT_SCLK,
+        .led=TFT_LED,
+        .sdo=TFT_MISO,
+        .width=FULLLCDWIDTH,
+        .height=FULLLCDHEIGHT,
+        .orientation=2,
+    },
+    .controls = {
+        .vcc=THUMBSTICK_VCC,
+        .gnd=THUMBSTICK_GND,
+        .xAxis=THUMBSTICK_X,
+        .yAxis=THUMBSTICK_Y,
+        .button=THUMBSTICK_SW
+    }
+};
+
+struct hardwareData hardwareTemplateDeprecated = {
+    .screen = {
+        .cs=15,
+        .reset=4,
+        .dc=2,
+        .sdi=23,
+        .sck=18,
+        .led=255,
+        .sdo=19,
+        .width=FULLLCDWIDTH,
+        .height=FULLLCDHEIGHT,
+        .orientation=1,
+    },
+    .controls = {
+        .vcc=255,
+        .gnd=255,
+        .xAxis=THUMBSTICK_X,
+        .yAxis=THUMBSTICK_Y,
+        .button=THUMBSTICK_SW
+    }
+};
+bool overwriteHardware = false;
+
 void syncApps() {
     esp_err_t err = writePartition(programDataPartition, (uint8_t*) apps, programDataPartition->erase_size, 0);
     if (err != ESP_OK) {
@@ -268,32 +327,46 @@ void syncApps() {
     }
 }
 
-#define MAGICSTRING "f2026"
+void correctDeprecatedApps(struct firmwareHeader* appsObject) {
+    struct firmwareHeaderOld* appsDeprecated = (struct firmwareHeaderOld*) appsObject;
+    if (strncmp(appsDeprecated->magic, MAGICSTRING, sizeof MAGICSTRING) != 0) return;
+    appsObject->appCount = 0;
+    appsObject->nextOffset = 0;
+    appsObject->hardware = hardwareTemplateDeprecated;
+    strcpy(appsObject->magic, MAGICSTRING);
+    strcpy(appsObject->initialVersion, "p2026.0");
+    strcpy(appsObject->version, CURRENTVERSION);
+}
 
 void initApps() {
-    hardware.screen.led = TFT_LED;
-    hardware.screen.width = FULLLCDWIDTH;
-    hardware.screen.height = FULLLCDHEIGHT;
-    hardware.screen.orientation = 2;
-    hardware.controls.vcc = THUMBSTICK_VCC;
-    hardware.controls.gnd = THUMBSTICK_GND;
-    hardware.controls.xAxis = THUMBSTICK_X;
-    hardware.controls.yAxis = THUMBSTICK_Y;
-    hardware.controls.button = THUMBSTICK_SW;
     apps = (struct firmwareHeader*) malloc(programDataPartition->erase_size);
     esp_err_t err = readPartition(programDataPartition, (uint8_t*) apps, programDataPartition->erase_size, 0);
     if (err != ESP_OK) {
         machineLog("Init app read failed: %s\n", esp_err_to_name(err));
     }
-    if (strncmp(apps->magic, MAGICSTRING, 6) != 0) {
+    bool performSync = false;
+    correctDeprecatedApps(apps);
+    if (strncmp(apps->magic, MAGICSTRING, sizeof MAGICSTRING) != 0) {
         machineLog("Expected magic bytes (ascii) say: \"%s\", read \"%s\"\n\r", MAGICSTRING, apps->magic);
         machineLog("No firmware header found. Initializing...\n\r");
         strcpy(apps->magic, MAGICSTRING);
-        apps->version = 0;
+        strcpy(apps->initialVersion, CURRENTVERSION);
+        strcpy(apps->version, CURRENTVERSION);
         apps->appCount = 0;
         apps->nextOffset = 1;
-        syncApps();
+        apps->hardware = hardwareTemplate;
+        performSync = true;
     }
+    if (strncmp(apps->version, CURRENTVERSION, sizeof CURRENTVERSION) != 0) {
+        // TODO: handle version updates here if they happen
+        strcpy(apps->version, CURRENTVERSION);
+        performSync = true;
+    }
+    if (overwriteHardware) {
+        apps->hardware = hardwareTemplate;
+        performSync = true;
+    }
+    if (performSync) syncApps();
 }
 
 void clearApps() {
@@ -303,10 +376,8 @@ void clearApps() {
 }
 
 void listApps() {
-    machineLog(
-        "app header with magic \"%s\", app count %hu, version %hu, next available offset %hu\n\r", 
-        apps->magic, apps->appCount, apps->version, apps->nextOffset
-    );
+    machineLog("app header with {\n\r\tmagic: %.*s,\n\r\tversion: %.*s,\n\r\tinitialVersion: %.*s,\n\r\tappCount: %hu,\n\r\tnextOffset: %hu\n\r}\n\r", 
+    sizeof apps->magic, apps->magic, sizeof apps->version, apps->version, sizeof apps->initialVersion, apps->initialVersion, apps->appCount, apps->nextOffset);
     for (int i = 0; i < apps->appCount; i++) {
         struct appDescriptor d = apps->apps[i];
         machineLog("\tapp \"%s\" with size %d at offset %d\n\r", d.name, d.size, d.offset);
@@ -317,7 +388,9 @@ void awaitString(char* string, int len) {
     int index = 0;
     while (index < len) {
         while (Serial.available() < 1);
-        if (readChar() == string[index]) index++;
+        int c = readCharInteractive();
+        if (c == 0x7f) index--;
+        else if (c == string[index]) index++;
         else index = 0;
     }
 }
@@ -342,6 +415,11 @@ struct dataHeader readHeader() {
         *ptr++ = b;
     }
     return h;
+}
+
+extern "C" void pollInstruction() {
+    int candidateCount = 0;
+    pollApp(NULL);
 }
 
 extern "C" void* pollApp(char* nameOut) {
