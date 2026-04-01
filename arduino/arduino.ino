@@ -268,6 +268,8 @@ void syncApps() {
     }
 }
 
+#define MAGICSTRING "f2026"
+
 void initApps() {
     hardware.screen.led = TFT_LED;
     hardware.screen.width = FULLLCDWIDTH;
@@ -283,10 +285,10 @@ void initApps() {
     if (err != ESP_OK) {
         machineLog("Init app read failed: %s\n", esp_err_to_name(err));
     }
-    if (strncmp(apps->magic, "magic", 6) != 0) {
-        machineLog("Expected magic bytes (ascii) say: \"magic\", read \"%s\"\n\r", apps->magic);
+    if (strncmp(apps->magic, MAGICSTRING, 6) != 0) {
+        machineLog("Expected magic bytes (ascii) say: \"%s\", read \"%s\"\n\r", MAGICSTRING, apps->magic);
         machineLog("No firmware header found. Initializing...\n\r");
-        strcpy(apps->magic, "magic");
+        strcpy(apps->magic, MAGICSTRING);
         apps->version = 0;
         apps->appCount = 0;
         apps->nextOffset = 1;
@@ -295,7 +297,7 @@ void initApps() {
 }
 
 void clearApps() {
-    strcpy(apps->magic, "magic");
+    strcpy(apps->magic, MAGICSTRING);
     apps->appCount = 0;
     apps->nextOffset = 1;
 }
