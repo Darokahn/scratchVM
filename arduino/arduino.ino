@@ -25,6 +25,7 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #define THUMBSTICK_SW   32
 
 extern "C" {
+  #include <sys/param.h>
   #include "scratch.h"
   #include "graphics.h"
   #include "programData.h"
@@ -32,9 +33,9 @@ extern "C" {
   #include "globals.h"
 }
 
-TFT_eSPI tft = TFT_eSPI(FULLLCDWIDTH, FULLLCDHEIGHT);
-TFT_eSprite tftSpriteUpper = TFT_eSprite(&tft);
-TFT_eSprite tftSpriteLower = TFT_eSprite(&tft);
+TFT_eSPI tft; 
+TFT_eSprite tftSpriteUpper(&tft);
+TFT_eSprite tftSpriteLower(&tft);
 
 struct firmwareHeader* apps = NULL;
 
@@ -166,23 +167,41 @@ int readChar() {
 extern "C" int main();
 extern "C" int runApp(app_t* app);
 
-const int TOPHEIGHT = 170;
-const int BOTTOMHEIGHT = FULLLCDHEIGHT - 170;
+const int maxHeapAllocation = 100000;
+int TOPHEIGHT = 170;
+int BOTTOMHEIGHT = FULLLCDHEIGHT - 170;
+
+struct hardwareData hardware;
 
 extern "C" void startIO() {
-    pinMode(THUMBSTICK_X, INPUT_PULLUP);
-    pinMode(THUMBSTICK_Y, INPUT_PULLUP);
-    pinMode(THUMBSTICK_SW, INPUT_PULLUP);
+    pinMode(hardware.controls.xAxis, INPUT_PULLUP);
+    pinMode(hardware.controls.yAxis, INPUT_PULLUP);
+    pinMode(hardware.controls.button, INPUT_PULLUP);
+
     pinMode(TFT_LED, OUTPUT);
     digitalWrite(TFT_LED, HIGH);
-    pinMode(THUMBSTICK_VCC, OUTPUT);
-    digitalWrite(THUMBSTICK_VCC, HIGH);
-    pinMode(THUMBSTICK_GND, OUTPUT);
-    digitalWrite(THUMBSTICK_GND, LOW);
+    pinMode(hardware.screen.led, OUTPUT);
+    digitalWrite(hardware.screen.led, HIGH);
+    pinMode(hardware.controls.gnd, OUTPUT);
+    digitalWrite(hardware.controls.gnd, LOW);
+
+    tft.~TFT_eSPI();
+    int width = hardware.screen.orientation % 2 == 0 ? hardware.screen.width : hardware.screen.height;
+    int height = hardware.screen.orientation % 2 == 0 ? hardware.screen.height : hardware.screen.width;
+    new (&tft) TFT_eSPI(width, height);
+    tftSpriteLower.~TFT_eSprite();
+    tftSpriteUpper.~TFT_eSprite();
+    new (&tftSpriteLower) TFT_eSprite(&tft);
+    new (&tftSpriteUpper) TFT_eSprite(&tft);
     tft.init();
-    tft.setRotation(2);
-    tftSpriteUpper.createSprite(FULLLCDWIDTH, TOPHEIGHT);
-    tftSpriteLower.createSprite(FULLLCDWIDTH, BOTTOMHEIGHT);
+    tft.setRotation(hardware.screen.orientation);
+    int remainingHeight = hardware.screen.height;
+    TOPHEIGHT = MIN(maxHeapAllocation / (hardware.screen.width * 2), remainingHeight);
+    remainingHeight -= TOPHEIGHT;
+    BOTTOMHEIGHT = MIN(maxHeapAllocation / hardware.screen.width, remainingHeight);
+    tftSpriteUpper.createSprite(hardware.screen.width, TOPHEIGHT);
+    tftSpriteLower.createSprite(hardware.screen.width, BOTTOMHEIGHT);
+    tft.fillScreen(TFT_BLACK);
 }
 
 int ADC_CENTER = -1;       // Midpoint of 12-bit ADC
@@ -250,6 +269,15 @@ void syncApps() {
 }
 
 void initApps() {
+    hardware.screen.led = TFT_LED;
+    hardware.screen.width = FULLLCDWIDTH;
+    hardware.screen.height = FULLLCDHEIGHT;
+    hardware.screen.orientation = 2;
+    hardware.controls.vcc = THUMBSTICK_VCC;
+    hardware.controls.gnd = THUMBSTICK_GND;
+    hardware.controls.xAxis = THUMBSTICK_X;
+    hardware.controls.yAxis = THUMBSTICK_Y;
+    hardware.controls.button = THUMBSTICK_SW;
     apps = (struct firmwareHeader*) malloc(programDataPartition->erase_size);
     esp_err_t err = readPartition(programDataPartition, (uint8_t*) apps, programDataPartition->erase_size, 0);
     if (err != ESP_OK) {
@@ -368,14 +396,13 @@ extern "C" void closeApp(app_t* app, int flags) {
     unmapPartition();
 }
 
-void loop() {
-}
+void loop() {}
 
 void setup() {
     Serial.begin(115200);
-    startIO();
     partitionInit();
     initApps();
+    startIO();
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT) {
         clearApps();
