@@ -1,7 +1,7 @@
 // This file is inserted in scratch.c as the body for a switch statement. It is the right combination of size and simple layout that it seemed a good target for factoring out.
 
 #define INTMAX16 65535
-#define ERROR() // Nothing for now
+#define ERROR() machineLog("something went wrong on line %d\n", __LINE__); exit(-1);
 #define INTERPRET_AS(type, value) *(type*)&(value)
 #define POPFRACTION() cast(stack[--stackIndex], SCRATCH_FRACTION, NULL)
 #define POPWHOLENUMBER() cast(stack[--stackIndex], SCRATCH_WHOLENUMBER, NULL)
@@ -21,9 +21,38 @@
 
 #define GETARGUMENT(type) (thread->programCounter = (thread->programCounter + 3) & ~3, thread->programCounter += sizeof(type), INTERPRET_AS(type, code[thread->programCounter - sizeof(type)]))
 
+// # TODO: shortcut fewer (if any) opcodes; let each one evaluate properly as the engine specifies
+// # TODO: all operations to do with a sprite can be prepended with a special opcode that selects a sprite and hoists it to the "sprite register" for the next opcode
+// # TODO: several pseudo-sprites can be selected this way (random position, mouse position)
+
 case INNER_PARTITION_BEGINEXPRESSIONS: {
     // Not to be implemented
     ERROR();
+    break;
+}
+case INNER_PUSHFRAME: {
+    uint16_t size = GETARGUMENT(uint16_t);
+    SCRATCH_vectorExtend(&thread->threadLocals, size);
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_POPFRAME: {
+    uint16_t size = GETARGUMENT(uint16_t);
+    SCRATCH_vectorRetract(&thread->threadLocals, size);
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_GETFRAMEVAR: {
+    uint16_t index = GETARGUMENT(uint16_t);
+    PUSHDATA(*SCRATCH_vectorFromTop(&thread->threadLocals, index));
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_SETFRAMEVAR: {
+    uint16_t index = GETARGUMENT(uint16_t);
+    struct SCRATCH_data data = POPDATA();
+    *SCRATCH_vectorFromTop(&thread->threadLocals, index) = data;
+    status = SCRATCH_continue;
     break;
 }
 case SENSING_ANSWER: {
@@ -47,10 +76,15 @@ case SENSING_MOUSEY: {
     status = SCRATCH_continue;
     break;
 }
+// TODO handle string
 case SENSING_KEYPRESSED: {
     struct SCRATCH_data keyIndex = POPWHOLENUMBER();
-    PUSHBOOL(inputState[keyIndex.data.wholeNumber]);
     status = SCRATCH_continue;
+    if (-1 == keyIndex.data.wholeNumber) {
+        PUSHBOOL(false);
+        break;
+    }
+    PUSHBOOL(inputState[keyIndex.data.wholeNumber]);
     break;
 }
 case SENSING_LOUDNESS: {
@@ -59,6 +93,12 @@ case SENSING_LOUDNESS: {
     break;
 }
 case SENSING_TIMER: {
+    uint32_t millisSinceLastReset = getNow() - context->timerLastReset;
+    millisSinceLastReset <<= 6;
+    millisSinceLastReset /= 1000;
+    millisSinceLastReset <<= 10;
+    PUSHFRACTION(millisSinceLastReset);
+    status = SCRATCH_continue;
     break;
 }
 case SENSING_CURRENT: {
@@ -74,11 +114,12 @@ case SENSING_USERNAME: {
     // push global username string
 }
 case INNER_FETCHINPUT: {
-    uint16_t toFetch = GETARGUMENT(uint16_t);
+    int16_t toFetch = GETARGUMENT(int16_t);
     PUSHBOOL(inputState[toFetch]);
     status = SCRATCH_continue;
     break;
 }
+// TODO get argument from stack and treat it more stringlike
 case INNER_FETCHPOSITION: {
     int16_t value = GETARGUMENT(int16_t);
     if (value == -1) { // random position
@@ -97,6 +138,7 @@ case INNER_FETCHPOSITION: {
     status = SCRATCH_continue;
     break;
 }
+// TODO get sprite operand from stack and treat it more stringlike
 case INNER_FETCHVAR: {
     int16_t spriteOperandIndex = GETARGUMENT(int16_t);
     int16_t varIndex = GETARGUMENT(int16_t);
@@ -107,19 +149,11 @@ case INNER_FETCHVAR: {
     else {
         spriteOperand = sprites[spriteOperandIndex];
     }
-    /*
-    char buffer[32];
-    machineLog("sprite: %d, var: %d\n\r", spriteOperand->base.id, varIndex);
-    if (spriteOperand->variables[varIndex].type == SCRATCH_UNINIT) {
-        machineLog("WARNING: scratch variable uninitialized. Not printing.\n\r");
-        fflush(stdout);
-    }
-    else machineLog("value: %s\n\r", cast(spriteOperand->variables[varIndex], SCRATCH_STRING, buffer).data.string);
-    */
     PUSHDATA(spriteOperand->variables[varIndex]);
     status = SCRATCH_continue;
     break;
 }
+// TODO get sprite operand from stack and treat it more stringlike
 case MOTION_XPOSITION: {
     int16_t spriteOperandIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
@@ -133,6 +167,7 @@ case MOTION_XPOSITION: {
     status = SCRATCH_continue;
     break;
 }
+// TODO get sprite operand from stack and treat it more stringlike
 case MOTION_YPOSITION: {
     int16_t spriteOperandIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
@@ -146,6 +181,7 @@ case MOTION_YPOSITION: {
     status = SCRATCH_continue;
     break;
 }
+// TODO get sprite operand from stack and treat it more stringlike
 case MOTION_DIRECTION: {
     int16_t spriteOperandIndex = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand;
@@ -243,7 +279,7 @@ case SENSING_TOUCHINGCOLOR: {
     break;
 }
 case SENSING_COLORISTOUCHINGCOLOR: {
-    ERROR() // unused
+    ERROR(); // unused
     break;
 }
 case SENSING_DISTANCETO: {
@@ -261,11 +297,12 @@ case SENSING_DISTANCETO: {
     int yDist = y1 - y2;
 
     int hypot = sqrt(xDist * xDist + yDist * yDist);
-    PUSHWHOLENUMBER(hypot);
+    PUSHFRACTION(hypot);
 
     status = SCRATCH_continue;
     break;
 }
+
 case SENSING_DISTANCETOMENU: {
     ERROR(); // unused
     break;
@@ -284,33 +321,34 @@ case SENSING_SETDRAGMODE: {
     break;
 }
 case SENSING_RESETTIMER: {
-    // TODO
-    // set the value of the global timer to 0
+    context->timerLastReset = getNow();
+    status = SCRATCH_continue;
+    break;
 }
 case SENSING_OF: {
     int16_t id = GETARGUMENT(int16_t);
     struct SCRATCH_sprite* spriteOperand = context->sprites[POPID()];
     switch (id) {
-        case 0: // costume number
+        case -1: // costume number
             PUSHWHOLENUMBER(spriteOperand->base.costumeIndex);
             break;
-        case 1: // costume name
+        case -2: // costume name
             char* name = getImage(context, spriteOperand)->name;
             PUSHSTATICTEXT(name);
             break;
-        case 2: // volume
+        case -3: // volume
             PUSHWHOLENUMBER(0);
             break;
-        case 3: // x
+        case -4: // x
             PUSHFRACTION(spriteOperand->base.x.i);
             break;
-        case 4: // y
+        case -5: // y
             PUSHFRACTION(spriteOperand->base.y.i);
             break;
-        case 5: // direction
+        case -6: // direction
             PUSHDEGREES(spriteOperand->base.rotation);
             break;
-        case 6: // size
+        case -7: // size
             PUSHFRACTION((spriteOperand->base.size << 16) / SIZERATIO);
             break;
         default: // variable
@@ -405,9 +443,9 @@ case OPERATOR_LT: {
     break;
 }
 case OPERATOR_EQUALS: {
-    struct SCRATCH_data op2 = POPFRACTION();
-    struct SCRATCH_data op1 = POPFRACTION();
-    PUSHBOOL(op1.data.number.i == op2.data.number.i);
+    struct SCRATCH_data op2 = POPDATA();
+    struct SCRATCH_data op1 = POPDATA();
+    PUSHBOOL(equal(op1, op2));
     status = SCRATCH_continue;
     break;
 }
@@ -552,6 +590,8 @@ case DATA_SETVARIABLETO: {
         spriteOperand = sprites[spriteOperandIndex];
     }
     struct SCRATCH_data x = POPDATA();
+    char debug[300];
+    cast(x, SCRATCH_STRING, debug);
     spriteOperand->variables[varIndex] = x;
     status = SCRATCH_continue;
     break;
@@ -590,7 +630,35 @@ case INNER_LOOPJUMP: {
     status = SCRATCH_yieldLogic;
     break;
 }
+case INNER_LOOPREPEATINIT: {
+    uint16_t framePos = GETARGUMENT(uint16_t);
+    struct SCRATCH_data target = POPWHOLENUMBER();
+    uint16_t targetPos = framePos;
+    uint16_t iterPos = framePos + 1;
+    struct SCRATCH_data iter = (struct SCRATCH_data) {.data.wholeNumber=0, .type=SCRATCH_WHOLENUMBER};
+    *SCRATCH_vectorFromTop(&thread->threadLocals, targetPos) = target;
+    *SCRATCH_vectorFromTop(&thread->threadLocals, iterPos) = iter;
+    status = SCRATCH_continue;
+    break;
+}
+case INNER_LOOPREPEAT: {
+    status = SCRATCH_continue;
+    uint16_t framePos = GETARGUMENT(uint16_t);
+    uint16_t breakTo = GETARGUMENT(uint16_t);
+    uint16_t targetPos = framePos;
+    uint16_t iterPos = framePos + 1;
+    int32_t* iterations = &(SCRATCH_vectorFromTop(&thread->threadLocals, iterPos)->data.wholeNumber);
+    int32_t* target = &(SCRATCH_vectorFromTop(&thread->threadLocals, targetPos)->data.wholeNumber);
+    if (*iterations == *target) {
+        thread->programCounter = breakTo;
+        break;
+    }
+    ++*iterations;
+    break;
+}
 case CONTROL_CREATE_CLONE_OF: {
+    status = SCRATCH_continue;
+    if (context->spriteCount >= SPRITEMAX) break;
     int field = POPID();
     struct SCRATCH_sprite* template;
     if (field == -1) {
@@ -602,15 +670,15 @@ case CONTROL_CREATE_CLONE_OF: {
     struct SCRATCH_sprite* newSprite = SCRATCH_cloneSprite(template);
     SCRATCH_wakeSprite(newSprite, ONCLONE, (union SCRATCH_eventInput) {0});
     if (!SCRATCH_addSprite(context, newSprite)) {
-        free(newSprite);
+        SCRATCH_freeSprite(newSprite);
     }
-    status = SCRATCH_yieldGeneric;
     break;
 }
 case CONTROL_WAIT: {
     struct SCRATCH_data scaledSecs = POPFRACTION();
+    uint16_t framePos = GETARGUMENT(uint16_t);
     uint16_t iterations = ((scaledSecs.data.number.i * FRAMESPERSEC) >> 16);
-    SCRATCH_vectorPush(&thread->threadLocals, (struct SCRATCH_data){{.wholeNumber=iterations}, SCRATCH_WHOLENUMBER});
+    *SCRATCH_vectorFromTop(&thread->threadLocals, framePos) = (struct SCRATCH_data){{.wholeNumber=iterations}, SCRATCH_WHOLENUMBER};
     status = SCRATCH_yieldGeneric;
     break;
 }
@@ -648,23 +716,6 @@ case CONTROL_STOP: {
     }
     break;
 }
-case INNER_LOCALS_PUSHARG: {
-    struct SCRATCH_data arg = POPDATA();
-    SCRATCH_vectorPush(&thread->threadLocals, arg);
-    status = SCRATCH_continue;
-    break;
-}
-case INNER_LOCALS_POPARG: {
-    SCRATCH_vectorPop(&thread->threadLocals);
-    status = SCRATCH_continue;
-    break;
-}
-case INNER_LOCALS_GETARG: {
-    int16_t offset = GETARGUMENT(uint16_t);
-    PUSHDATA(*SCRATCH_vectorFromTop(&thread->threadLocals, offset));
-    status = SCRATCH_continue;
-    break;
-}
 case INNER_JUMPIF: {
     uint16_t jumpTo = GETARGUMENT(uint16_t);
     struct SCRATCH_data evaluand = POPBOOL();
@@ -696,27 +747,24 @@ case INNER_JUMPINDIRECT: {
     break;
 }
 case INNER__GLIDEITERATION: {
-    struct SCRATCH_data* yStep = SCRATCH_vectorFromTop(&thread->threadLocals, 0);
-    struct SCRATCH_data* xStep = SCRATCH_vectorFromTop(&thread->threadLocals, 1);
-    struct SCRATCH_data* yTarget = SCRATCH_vectorFromTop(&thread->threadLocals, 2);
-    struct SCRATCH_data* xTarget = SCRATCH_vectorFromTop(&thread->threadLocals, 3);
-    struct SCRATCH_data* iterationsRemaining = SCRATCH_vectorFromTop(&thread->threadLocals, 4);
+    uint16_t programCounter = thread->programCounter;
+    uint16_t framePos = GETARGUMENT(uint16_t);
+    struct SCRATCH_data* iterationsRemaining = SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 0);
+    struct SCRATCH_data* xTarget = SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 1);
+    struct SCRATCH_data* yTarget = SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 2);
+    struct SCRATCH_data* xStep = SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 3);
+    struct SCRATCH_data* yStep = SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 4);
     if (iterationsRemaining->data.wholeNumber <= 0) {
         sprite->base.x = xTarget->data.number;
         sprite->base.y = yTarget->data.number;
         keepInStage(context, sprite);
-        SCRATCH_vectorPop(&thread->threadLocals);
-        SCRATCH_vectorPop(&thread->threadLocals);
-        SCRATCH_vectorPop(&thread->threadLocals);
-        SCRATCH_vectorPop(&thread->threadLocals);
-        SCRATCH_vectorPop(&thread->threadLocals);
         status = SCRATCH_yieldGeneric;
         break;
     }
     sprite->base.x.i += xStep->data.number.i;
     sprite->base.y.i += yStep->data.number.i;
     iterationsRemaining->data.wholeNumber--;
-    thread->programCounter--; // re-align program counter with this instruction so it runs again
+    thread->programCounter = programCounter - 1; // re-align program counter with this instruction so it runs again
     keepInStage(context, sprite);
     status = SCRATCH_yieldGeneric;
     break;
@@ -771,6 +819,7 @@ case MOTION_GLIDETO_MENU: {
     break;
 }
 case MOTION_GLIDESECSTOXY: {
+    uint16_t framePos = GETARGUMENT(uint16_t);
     struct SCRATCH_data y = POPFRACTION();
     struct SCRATCH_data x = POPFRACTION();
     struct SCRATCH_data scaledSecs = POPFRACTION();
@@ -783,11 +832,11 @@ case MOTION_GLIDESECSTOXY: {
         keepInStage(context, sprite);
         return SCRATCH_continue;
     }
-    SCRATCH_vectorPush(&thread->threadLocals, (struct SCRATCH_data) {{.wholeNumber=iterations}, SCRATCH_WHOLENUMBER});
-    SCRATCH_vectorPush(&thread->threadLocals, x);
-    SCRATCH_vectorPush(&thread->threadLocals, y);
-    SCRATCH_vectorPush(&thread->threadLocals, (struct SCRATCH_data) {{xDiff.i / iterations}, SCRATCH_FRACTION});
-    SCRATCH_vectorPush(&thread->threadLocals, (struct SCRATCH_data) {{yDiff.i / iterations}, SCRATCH_FRACTION});
+    *SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 0) = (struct SCRATCH_data) {{.wholeNumber=iterations}, SCRATCH_WHOLENUMBER};
+    *SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 1) = x;
+    *SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 2) = y;
+    *SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 3) = (struct SCRATCH_data) {{xDiff.i / iterations}, SCRATCH_FRACTION};
+    *SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 4) = (struct SCRATCH_data) {{yDiff.i / iterations}, SCRATCH_FRACTION};
     status = SCRATCH_continue;
     break;
 }
@@ -798,11 +847,17 @@ case MOTION_POINTINDIRECTION: {
     break;
 }
 case MOTION_POINTTOWARDS: {
-    struct SCRATCH_data x = POPFRACTION();
     struct SCRATCH_data y = POPFRACTION();
-    float direction = atan2(y.data.number.halves.high, x.data.number.halves.high);
+    struct SCRATCH_data x = POPFRACTION();
+    float xDist = sprite->base.x.halves.high - x.data.number.halves.high;
+    float yDist = sprite->base.y.halves.high - y.data.number.halves.high;
+    float direction = atan2(yDist, -xDist);
     direction *= radianToDegree;
-    sprite->base.rotation = (uint32_t) direction;
+    uint32_t intDirection = (uint32_t) direction;
+
+    intDirection += (uint32_t)quarterRotation;
+
+    sprite->base.rotation = intDirection;
     status = SCRATCH_continue;
     break;
 }
@@ -879,7 +934,7 @@ case MOTION_IFONEDGEBOUNCE: {
     break;
 }
 case MOTION_SETROTATIONSTYLE: {
-    uint16_t style = GETARGUMENT(uint16_t);
+    uint16_t style = GETARGUMENT(int16_t);
     sprite->base.rotationStyle = style;
     status = SCRATCH_continue;
     break;
@@ -907,7 +962,7 @@ case LOOKS_THINK: {
     break;
 }
 case LOOKS_SWITCHCOSTUMETO: {
-    int16_t index = GETARGUMENT(uint16_t);
+    uint16_t index = POPID();
     sprite->base.costumeIndex = index - 1;
     status = SCRATCH_continue;
     break;
@@ -919,7 +974,7 @@ case LOOKS_NEXTCOSTUME: {
     break;
 }
 case LOOKS_SWITCHBACKDROPTO: {
-    int16_t index = GETARGUMENT(uint16_t);
+    uint16_t index = POPID();
     context->stage->base.costumeIndex = index - 1;
     status = SCRATCH_continue;
     break;
@@ -970,7 +1025,7 @@ case LOOKS_HIDE: {
     break;
 }
 case LOOKS_GOTOFRONTBACK: {
-    ERROR(); // unused
+    //ERROR(); // unused
     break;
 }
 case LOOKS_GOFORWARDBACKWARDLAYERS: {
@@ -978,13 +1033,12 @@ case LOOKS_GOFORWARDBACKWARDLAYERS: {
     break;
 }
 case INNER__WAITITERATION: {
-    struct SCRATCH_data* iterations = SCRATCH_vectorTop(&thread->threadLocals);
+    uint16_t programCounter = thread->programCounter;
+    uint16_t framePos = GETARGUMENT(uint16_t);
+    struct SCRATCH_data* iterations = SCRATCH_vectorFromTop(&thread->threadLocals, framePos);
     if (iterations->data.wholeNumber > 0) {
         iterations->data.wholeNumber--;
-        thread->programCounter--;
-    }
-    else {
-        SCRATCH_vectorPop(&thread->threadLocals);
+        thread->programCounter = programCounter - 1;
     }
     status = SCRATCH_yieldGeneric;
     break;

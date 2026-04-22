@@ -15,7 +15,7 @@ struct image* getImage(struct SCRATCH_spriteContext* context, struct SCRATCH_spr
 }
 
 bool getEvent(enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input) {
-    int index = eventTypeOffsets[type] + input.i;
+    int16_t index = eventTypeOffsets[type] + input.i;
     if (index == -1) return false;
     return events[index];
 }
@@ -89,5 +89,6 @@ void initProgram(const uint8_t* buffer, struct SCRATCH_spriteContext* context, c
         debugSprite(context->sprites[i]);
     }
     context->stage = context->sprites[0];
+    context->timerLastReset = getNow();
     initImages(context, &(buffer[d->imageOffset]));
 }

@@ -284,6 +284,7 @@ typedef struct {
 void startIO();
 void updateIO(app_t* app);
 int machineLog(const char* fmt, ...);
+uint64_t getNow();
 
 void* mallocDMA(size_t size);
 

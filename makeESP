@@ -1,10 +1,10 @@
 #!/bin/bash
 # Compile
-arduino-cli compile -v --fqbn esp32:esp32:esp32 --library "$(pwd)/arduino/libraries/TFT_eSPI" arduino/
+arduino-cli compile -v --fqbn esp32:esp32:esp32 --library "$(pwd)/arduino/libraries/TFT_eSPI" --output-dir ./arduino/build/ arduino/
 #arduino-cli compile --fqbn esp32:esp32:esp32 arduino/ --library "$(pwd)/libraries/TFT_eSPI" --verbose -e #--build-properties build.partitions=huge_app,upload.maximum_size=3000000
 
 # Upload
-arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 arduino/
+arduino-cli upload -p /dev/ttyUSB2 --fqbn esp32:esp32:esp32 arduino/
 
 # Monitor
 #python3 sendBytes.py -r defaultInput

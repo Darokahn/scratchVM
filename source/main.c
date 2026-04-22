@@ -12,8 +12,6 @@ bool inputState[128];
 bool events[256];
 int eventCount;
 
-unsigned long getNow();
-
 int count = 0;
 int drawRate = 2;
 const uint8_t* code;

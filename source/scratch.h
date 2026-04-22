@@ -20,9 +20,9 @@
 #define PI ((float)3.14159265358979323846264338279)
 
 #define halfRotation ((float)((uint64_t)UINT32_MAX + 1) / 2)
-#define quarterRotation (halfRotation/2)
-#define degreeToRadian (PI / halfRotation)
-#define radianToDegree (halfRotation / PI)
+#define quarterRotation ((float)halfRotation/2)
+#define degreeToRadian ((float)PI / halfRotation)
+#define radianToDegree ((float)halfRotation / PI)
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
     typedef union {
@@ -60,8 +60,8 @@ enum SCRATCH_fieldType {
 
 struct SCRATCH_vector {
     struct SCRATCH_data* data;
-    uint16_t capacity;
-    uint16_t count;
+    int16_t capacity;
+    int16_t count;
 };
 
 
@@ -196,6 +196,7 @@ struct SCRATCH_spriteContext {
     struct SCRATCH_sprite* stage;
     uint16_t spriteCount;
     uint16_t currentIndex;
+    uint64_t timerLastReset;
 };
 
 enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* context, struct SCRATCH_thread* thread, uint8_t* code);
@@ -212,6 +213,8 @@ struct SCRATCH_data* SCRATCH_vectorTop(struct SCRATCH_vector* vector);
 struct SCRATCH_data* SCRATCH_vectorFromTop(struct SCRATCH_vector* vector, uint16_t index);
 struct SCRATCH_data* SCRATCH_vectorAt(struct SCRATCH_vector* vector, uint16_t index);
 struct SCRATCH_data SCRATCH_vectorPop(struct SCRATCH_vector* vector);
+void SCRATCH_vectorExtend(struct SCRATCH_vector* vector, int amount);
+void SCRATCH_vectorRetract(struct SCRATCH_vector* vector, int amount);
 void handleInputs();
 void clearEvents();
 bool SCRATCH_addSprite(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite);
@@ -224,4 +227,5 @@ bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2);
 
 struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, char* stringBuffer);
 
+bool equal(struct SCRATCH_data d0, struct SCRATCH_data d1);
 

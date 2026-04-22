@@ -23,3 +23,5 @@ struct image* getImage(struct SCRATCH_spriteContext* context, struct SCRATCH_spr
 void initImages(struct SCRATCH_spriteContext* context, const uint8_t* buffer);
 void debugSprite(struct SCRATCH_sprite* sprite);
 void initProgram(const uint8_t* buffer, struct SCRATCH_spriteContext* context, const uint8_t** code, int* eventCount, int eventTypeOffsets[]);
+
+extern const unsigned char programData[];

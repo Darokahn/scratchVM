@@ -74,7 +74,9 @@ void drawPixel(int x, int y, pixel color) {
     screen[y * LCDWIDTH + x] = color;
 }
 
-void debugImage(struct image *imgObj, int width, int height) {
+void debugImage(struct image *imgObj) {
+    int width = imgObj->xResolution;
+    int height = imgObj->yResolution;
     pixel* img = imgObj->pixels;
     char pixels[(width * height * 21) + (5 * 128) + 1];
     char* pixelPointer = (char*) &pixels;
@@ -112,10 +114,10 @@ bool getInput(int index) {
     int numkeys;
     keyboardState = SDL_GetKeyboardState(&numkeys);
     switch (index) {
-        case 0: return keyboardState[SDL_SCANCODE_UP];
-        case 1: return keyboardState[SDL_SCANCODE_LEFT];
-        case 2: return keyboardState[SDL_SCANCODE_DOWN];
-        case 3: return keyboardState[SDL_SCANCODE_RIGHT];
+        case 0: return keyboardState[SDL_SCANCODE_UP] || keyboardState[SDL_SCANCODE_W];
+        case 1: return keyboardState[SDL_SCANCODE_LEFT] || keyboardState[SDL_SCANCODE_A];
+        case 2: return keyboardState[SDL_SCANCODE_DOWN] || keyboardState[SDL_SCANCODE_S];
+        case 3: return keyboardState[SDL_SCANCODE_RIGHT] || keyboardState[SDL_SCANCODE_D];
         case 4: return keyboardState[SDL_SCANCODE_SPACE];
     }
     return 0;
@@ -128,6 +130,7 @@ void* pollApp(char* nameOut) {
 
 int selectApp(app_t* out, char* appName) {
     (void) appName;
+    out->programData = programData + 8;
     struct dataHeader h;
     uint8_t magic[9];
     magic[8] = 0;
@@ -135,11 +138,13 @@ int selectApp(app_t* out, char* appName) {
     read(fd, &magic, 8);
     read(fd, &h, sizeof h);
     int size = h.dataSize;
-    uint8_t* programData = malloc(size);
+    uint8_t* fileData = malloc(size);
     lseek(fd, 8, SEEK_SET);
-    read(fd, programData, size);
-    strcpy(out->name, "app");
-    out->programData = programData;
+    read(fd, fileData, size);
+    //strcpy(out->name, "app");
+    //out->programData = programData;
+    int diff = memcmp(programData + 8, fileData, h.dataSize);
+    machineLog("diff: %d\n\r", diff);
     close(fd);
     return 1;
 }

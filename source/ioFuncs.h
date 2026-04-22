@@ -1,6 +1,7 @@
 #pragma once
 #include "scratch.h"
 #include "graphics.h"
+#include <stdint.h>
 
 typedef struct {
     int programDataSize;
@@ -11,9 +12,10 @@ typedef struct {
 void startIO();
 int updateIO(app_t* app);
 int machineLog(const char* fmt, ...);
+uint64_t getNow();
 
 void drawSprites(struct SCRATCH_spriteContext* context);
-void debugImage(struct image *img, int width, int height);
+void debugImage(struct image *img);
 
 #define APP_FREE 1
 // potentially more flags later
@@ -23,9 +25,4 @@ void* pollApp(char* nameOut);
 int selectApp(app_t* out, char* appName);
 void loadApp(app_t* out, int offset);
 void closeApp(app_t* app, int flags);
-
-
-
-
-
 

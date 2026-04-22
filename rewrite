@@ -1,5 +1,0 @@
-I want to do a major rewrite of the engine, because much of it is poorly designed.
-- The decision to use scaled integers was a misunderstanding of the hardware constraints, however many inconsistencies floats may have
-- The opcodes should be defined in one place and processed into the various sites which use them (their canonical definition may be the C implementation of each function, isolated to one header file).
-- The parsing and interpreting systems should not be split across languages; both should be capable of running on the web and both should be capable of running on an embedded device (this is a case for writing the parsing system in C).
-- Developing the parsing and interpreting systems simultaneously before fully understanding the requirements of each resulted in a rat's nest of messy design that can only be corrected by meticulous untangling or a rewrite that comes from a place with broader vision.

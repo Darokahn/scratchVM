@@ -6,8 +6,11 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #pragma GCC optimize ("O3")
 
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <TFT_eSPI.h>
+
+#include "types.h"
 
 #define TFT_MISO 255
 #define TFT_MOSI   5
@@ -20,30 +23,32 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #define THUMBSTICK_VCC 26
 #define THUMBSTICK_GND 27
 
-#define THUMBSTICK_X    33
 #define THUMBSTICK_Y    25
+#define THUMBSTICK_X    33
 #define THUMBSTICK_SW   32
 
 extern "C" {
-  #include <sys/param.h>
-  #include "scratch.h"
-  #include "graphics.h"
-  #include "programData.h"
-  #include "firmwareData.h"
-  #include "globals.h"
+    #include <stddef.h>
+    #include <sys/param.h>
+    #include "scratch.h"
+    #include "graphics.h"
+    #include "programData.h"
+    #include "firmwareData.h"
+    #include "globals.h"
 }
 
 TFT_eSPI tft; 
 TFT_eSprite tftSpriteUpper(&tft);
 TFT_eSprite tftSpriteLower(&tft);
 
-struct firmwareHeader* apps = NULL;
+firmwareHeader* apps = NULL;
 
 const char* PARTITION_LABEL = "program_data"; 
 
 // Global handle for the data partition, found once at setup
 static const esp_partition_t* programDataPartition = NULL;
 static esp_partition_mmap_handle_t mappedRegion = NULL;
+static int lastMappingLine = NULL;
 
 void partitionInit() {
     programDataPartition = esp_partition_find_first(
@@ -51,6 +56,39 @@ void partitionInit() {
         (esp_partition_subtype_t)0x80,
         PARTITION_LABEL
     );
+}
+
+bool verifySectorWrite(const esp_partition_t* partition, uint8_t* data, size_t dataSize, int chunkOffset) {
+    uint8_t bytes[4096];
+    readPartition(partition, bytes, dataSize, chunkOffset);
+    int diff = memcmp(data, bytes, dataSize);
+    return diff == 0;
+}
+
+esp_err_t writeSector(const esp_partition_t* partition, uint8_t* data, size_t dataSize, int chunkOffset) {
+    if (!partition || !data) return ESP_ERR_INVALID_ARG;
+    int err;
+    // Make sure data fits in the partition
+    if (dataSize > partition->erase_size) {
+        ESP_LOGE("FLASH", "Data size %u exceeds partition sector size %u",
+                 (unsigned)dataSize, (unsigned)partition->size);
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    size_t sectorSize = partition->erase_size;
+    size_t writeSize = MIN(partition->erase_size, dataSize);
+    machineLog("writing sector size %u at offset %d (partition size: %d)\n\r", writeSize, chunkOffset, partition->size);
+
+    size_t offset = 0;
+    size_t sectorOffset = chunkOffset * sectorSize;
+    err = esp_partition_erase_range(partition, sectorOffset, sectorSize);
+    if (err != ESP_OK) return err;
+    err = esp_partition_write(partition, sectorOffset, data, writeSize);
+    if (err != ESP_OK) return err;
+
+    verifySectorWrite(partition, data, dataSize, chunkOffset);
+
+    return ESP_OK;
 }
 
 esp_err_t writePartition(const esp_partition_t* partition,
@@ -102,7 +140,6 @@ esp_err_t readPartition(const esp_partition_t* partition,
                                  size_t chunkOffset
                                  ) {
     // Make sure data fits in the partition
-    machineLog("reading size %d at sector offset %d\n\r", dataSize, chunkOffset);
     if (dataSize > partition->size) {
         ESP_LOGE("FLASH", "Data size %u exceeds partition size %u",
                  (unsigned)dataSize, (unsigned)partition->size);
@@ -113,13 +150,11 @@ esp_err_t readPartition(const esp_partition_t* partition,
     size_t readSize = partition->erase_size;
 
     size_t fullSectors = dataSize / sectorSize;
-    machineLog("\tfullSectors: %d\n\r", fullSectors);
     size_t hangingBytes = dataSize & (sectorSize - 1);
     esp_err_t err;
 
-    // Erase one sector at a time
+    // one sector at a time
     for (size_t offset = 0; offset <= fullSectors; offset += 1) {
-        machineLog("\toffset: %d\n\r", offset);
         size_t sectorOffset = (offset + chunkOffset) * sectorSize;
         size_t dataOffset = offset * sectorSize;
         if (offset == fullSectors) {
@@ -133,22 +168,39 @@ esp_err_t readPartition(const esp_partition_t* partition,
     return ESP_OK;
 }
 
+void* mapPartitionDebug(const esp_partition_t* partition, size_t size, size_t sectorOffset, int line) {
+    if (mappedRegion != NULL) {
+        machineLog("FATAL: Previous mapping has not been freed");
+        if (lastMappingLine) machineLog("(on line %d)", lastMappingLine);
+        machineLog(".\n\r");
+        return NULL;
+    }
+    lastMappingLine = line;
+    void* out;
+    esp_err_t err = esp_partition_mmap(partition, sectorOffset * partition->erase_size, size,
+                           ESP_PARTITION_MMAP_DATA, (const void**) &out,
+                           &mappedRegion);
+    if (err != ESP_OK) {
+        machineLog("FATAL: Failed to mmap program_data partition\n\r");
+        return NULL;
+    }
+    return out;
+}
+
 void* mapPartition(const esp_partition_t* partition, size_t size, size_t sectorOffset) {
-    machineLog("map size %d at sector offset %d\n\r", size, sectorOffset);
     if (mappedRegion != NULL) {
         machineLog("FATAL: Previous mapping has not been freed.\n\r");
+        machineLog(".\n\r");
         return NULL;
     }
     void* out;
     esp_err_t err = esp_partition_mmap(partition, sectorOffset * partition->erase_size, size,
                            ESP_PARTITION_MMAP_DATA, (const void**) &out,
                            &mappedRegion);
-    machineLog("testing dereference: %c\n\r", *(char*)out);
     if (err != ESP_OK) {
         machineLog("FATAL: Failed to mmap program_data partition\n\r");
         return NULL;
     }
-    machineLog("data mapped to pointer %p\n\r", out);
     return out;
 }
 
@@ -183,18 +235,18 @@ int TOPHEIGHT = 170;
 int BOTTOMHEIGHT = FULLLCDHEIGHT - 170;
 
 extern "C" void startIO() {
-    struct hardwareData hardware = apps->hardware;
+    hardwareData hardware = apps->hardware;
     printf("hardware data: "); printHardwareData(hardware);
     pinMode(hardware.controls.xAxis, INPUT_PULLUP);
     pinMode(hardware.controls.yAxis, INPUT_PULLUP);
     pinMode(hardware.controls.button, INPUT_PULLUP);
-
-    pinMode(TFT_LED, OUTPUT);
-    digitalWrite(TFT_LED, HIGH);
-    pinMode(hardware.screen.led, OUTPUT);
-    digitalWrite(hardware.screen.led, HIGH);
+    pinMode(hardware.controls.vcc, OUTPUT);
+    digitalWrite(hardware.controls.vcc, HIGH);
     pinMode(hardware.controls.gnd, OUTPUT);
     digitalWrite(hardware.controls.gnd, LOW);
+
+    pinMode(hardware.screen.led, OUTPUT);
+    digitalWrite(hardware.screen.led, HIGH);
 
     tft.~TFT_eSPI();
     int width = hardware.screen.orientation % 2 == 0 ? hardware.screen.width : hardware.screen.height;
@@ -216,12 +268,11 @@ extern "C" void startIO() {
 }
 
 int ADC_CENTER = -1;       // Midpoint of 12-bit ADC
-const int DEADZONE  = 200;         // Joystick deadzone threshold
+const int DEADZONE  = 1500;         // Joystick deadzone threshold
 
 bool inputs[5];
 extern "C" int updateIO(app_t* app) {
     if (Serial.available()) {
-        pollApp(appName);
         return -1;
     }
     tftSpriteUpper.pushSprite(0, 0);
@@ -232,9 +283,9 @@ extern "C" int updateIO(app_t* app) {
     if (ADC_CENTER == -1) ADC_CENTER = vry;
 
     inputs[0] = vry < ADC_CENTER - DEADZONE;
-    inputs[1] = vrx < ADC_CENTER - DEADZONE;
+    inputs[1] = vrx > ADC_CENTER + DEADZONE;
     inputs[2] = vry > ADC_CENTER + DEADZONE;
-    inputs[3] = vrx > ADC_CENTER + DEADZONE;
+    inputs[3] = vrx < ADC_CENTER - DEADZONE;
     inputs[4] = sw;
     return 0;
 }
@@ -258,7 +309,7 @@ int frameInterval = 1000 / FRAMESPERSEC;
 
 extern "C" const size_t stampSize = sizeof millis();
 
-extern "C" unsigned long getNow() {
+extern "C" uint64_t getNow() {
     return millis();
 }
 
@@ -273,9 +324,17 @@ extern "C" int machineLog(const char* fmt, ...) {
 int MAXOFFSET = 14;
 
 #define MAGICSTRING "magic"
+#define MAGICSTRINGSIZE (sizeof MAGICSTRING)
+#define MAGICSTRINGLEN (MAGICSTRINGSIZE - 1)
 #define CURRENTVERSION "f2026.0"
+#define CURRENTVERSIONLEN ((sizeof CURRENTVERSION) - 1)
 
-struct hardwareData hardwareTemplate = {
+enum colorOrders {
+    RGB,
+    BGR
+};
+
+hardwareData hardwareTemplate = {
     .screen = {
         .cs=TFT_CS,
         .reset=TFT_RST,
@@ -284,20 +343,22 @@ struct hardwareData hardwareTemplate = {
         .sck=TFT_SCLK,
         .led=TFT_LED,
         .sdo=TFT_MISO,
+
+        .colorOrder=RGB,
         .width=FULLLCDWIDTH,
         .height=FULLLCDHEIGHT,
-        .orientation=2,
+        .orientation=1,
     },
     .controls = {
         .vcc=THUMBSTICK_VCC,
         .gnd=THUMBSTICK_GND,
-        .xAxis=THUMBSTICK_X,
-        .yAxis=THUMBSTICK_Y,
+        .xAxis=THUMBSTICK_Y,
+        .yAxis=THUMBSTICK_X,
         .button=THUMBSTICK_SW
     }
 };
 
-struct hardwareData hardwareTemplateDeprecated = {
+hardwareData hardwareTemplateDeprecated = {
     .screen = {
         .cs=15,
         .reset=4,
@@ -313,11 +374,12 @@ struct hardwareData hardwareTemplateDeprecated = {
     .controls = {
         .vcc=255,
         .gnd=255,
-        .xAxis=THUMBSTICK_X,
-        .yAxis=THUMBSTICK_Y,
+        .xAxis=THUMBSTICK_Y,
+        .yAxis=THUMBSTICK_X,
         .button=THUMBSTICK_SW
     }
 };
+
 bool overwriteHardware = false;
 
 void syncApps() {
@@ -327,25 +389,38 @@ void syncApps() {
     }
 }
 
-void correctDeprecatedApps(struct firmwareHeader* appsObject) {
-    struct firmwareHeaderOld* appsDeprecated = (struct firmwareHeaderOld*) appsObject;
-    if (strncmp(appsDeprecated->magic, MAGICSTRING, sizeof MAGICSTRING) != 0) return;
+bool correctDeprecatedApps(firmwareHeader* appsObject) {
+    firmwareHeaderOld* appsDeprecated = (firmwareHeaderOld*) appsObject;
+    int comparison = strncmp(appsDeprecated->magic, MAGICSTRING, MAGICSTRINGSIZE);
+    machineLog("comparison ('%s', '%s'): %d\n", appsDeprecated->magic, MAGICSTRING, comparison);
+    if (comparison != 0) return false;
+    *appsObject = (firmwareHeader) {0};
+    machineLog("deprecated, updating\n\r");
     appsObject->appCount = 0;
     appsObject->nextOffset = 0;
     appsObject->hardware = hardwareTemplateDeprecated;
-    strcpy(appsObject->magic, MAGICSTRING);
-    strcpy(appsObject->initialVersion, "p2026.0");
-    strcpy(appsObject->version, CURRENTVERSION);
+    strncpy(appsObject->magic, MAGICSTRING, MAGICSTRINGLEN);
+    strncpy(appsObject->initialVersion, "p2026.0", (sizeof "p2026") - 1);
+    strncpy(appsObject->version, CURRENTVERSION, CURRENTVERSIONLEN);
+    return true;
+}
+
+void handleUpdateTransition(char* current, char* next) {
+    // currently nothing to do
+    return;
 }
 
 void initApps() {
-    apps = (struct firmwareHeader*) malloc(programDataPartition->erase_size);
+    apps = (firmwareHeader*) malloc(programDataPartition->erase_size);
     esp_err_t err = readPartition(programDataPartition, (uint8_t*) apps, programDataPartition->erase_size, 0);
     if (err != ESP_OK) {
         machineLog("Init app read failed: %s\n", esp_err_to_name(err));
     }
+
     bool performSync = false;
-    correctDeprecatedApps(apps);
+
+    // some apps were distributed to hardware before this versioning system and need to be corrected in a way that the regular version system won't
+    performSync |= correctDeprecatedApps(apps);
     if (strncmp(apps->magic, MAGICSTRING, sizeof MAGICSTRING) != 0) {
         machineLog("Expected magic bytes (ascii) say: \"%s\", read \"%s\"\n\r", MAGICSTRING, apps->magic);
         machineLog("No firmware header found. Initializing...\n\r");
@@ -358,7 +433,7 @@ void initApps() {
         performSync = true;
     }
     if (strncmp(apps->version, CURRENTVERSION, sizeof CURRENTVERSION) != 0) {
-        // TODO: handle version updates here if they happen
+        handleUpdateTransition(apps->version, CURRENTVERSION);
         strcpy(apps->version, CURRENTVERSION);
         performSync = true;
     }
@@ -379,7 +454,7 @@ void listApps() {
     machineLog("app header with {\n\r\tmagic: %.*s,\n\r\tversion: %.*s,\n\r\tinitialVersion: %.*s,\n\r\tappCount: %hu,\n\r\tnextOffset: %hu\n\r}\n\r", 
     sizeof apps->magic, apps->magic, sizeof apps->version, apps->version, sizeof apps->initialVersion, apps->initialVersion, apps->appCount, apps->nextOffset);
     for (int i = 0; i < apps->appCount; i++) {
-        struct appDescriptor d = apps->apps[i];
+        appDescriptor d = apps->apps[i];
         machineLog("\tapp \"%s\" with size %d at offset %d\n\r", d.name, d.size, d.offset);
     }
 }
@@ -395,19 +470,20 @@ void awaitString(char* string, int len) {
     }
 }
 
-extern "C" void* saveApp(char* appName, size_t sectorOffset, uint8_t* programData, size_t programDataSize, bool alsoMap) {
-    writePartition(programDataPartition, programData, programDataSize, sectorOffset);
+void* saveApp(char* appName, size_t sectorOffset, uint8_t* newData, size_t size, bool alsoMap) {
+    writePartition(programDataPartition, newData, size, sectorOffset);
     void* toReturn = NULL;
     if (alsoMap) {
-        toReturn = mapPartition(programDataPartition, programDataSize, sectorOffset);
+        toReturn = mapPartition(programDataPartition, size, sectorOffset);
     }
     return toReturn;
 }
 
-struct dataHeader readHeader() {
+dataHeader readHeader() {
     char magicBytes[] = "scratch!";
     awaitString(magicBytes, (sizeof magicBytes) - 1);
-    struct dataHeader h;
+    machineLog("%c\n\r", 6);
+    dataHeader h;
     uint8_t* ptr = (uint8_t*)&h.spriteCount;
     while (ptr < (uint8_t*)((&h) + 1)) {
         if (Serial.available() < 1) continue;
@@ -417,46 +493,165 @@ struct dataHeader readHeader() {
     return h;
 }
 
-extern "C" void pollInstruction() {
-    int candidateCount = 0;
-    pollApp(NULL);
+// TODO
+void pollInstruction() {
+    return;
 }
 
-extern "C" void* pollApp(char* nameOut) {
-    struct dataHeader h = readHeader();
+// This is cursed and I had a lot of fun writing it
+void* memdiffNext(memdiffGenerator* state) {
+    if (state->index >= state->target) {
+        if (!state->runGoing) return NULL;
+        state->runEnding = state->target;
+        state->runGoing = false;
+        return &state->runGoing;
+    }
+    if (state->a[state->index] == state->b[state->index]) {
+        if (!state->runGoing) {
+            state->index++;
+            return &state->index;
+        }
+        state->runEnding = state->index;
+        state->runGoing = false;
+        state->index++;
+        return &state->runGoing;
+    }
+    else {
+        state->differenceCount++;
+        if (state->runGoing) {
+            state->index++;
+            return &state->index;
+        }
+        state->runBeginning = state->index;
+        state->runGoing = true;
+        state->index++;
+        return &state->runGoing;
+    }
+}
+
+void memdiffPrint(memdiffGenerator* state, void* returnHandle) {
+    bool printSatisfied = false;
+    if (returnHandle == NULL) {
+        machineLog("(difference count: %d).\n\r", state->differenceCount);
+    }
+    if (state->printed >= state->maxPrint) return;
+    if (state->maxPrint - state->printed < 20) {
+        state->printed = state->maxPrint;
+        printSatisfied = true;
+    }
+    if (returnHandle == &state->runGoing) {
+        if (state->runGoing) {
+            state->printed += machineLog("%d", state->runBeginning);
+        }
+        else {
+            if (state->runEnding - state->runBeginning == 1) {
+                state->printed += machineLog(": [%d, %d]", state->a[state->runBeginning], state->b[state->runBeginning]);
+            }
+            else {
+                state->printed += machineLog("..%d", state->runEnding);
+            }
+            machineLog(", ");
+        }
+    }
+    if (printSatisfied) {
+        machineLog(".....");
+    }
+}
+
+void memdiffAll(const void* a, const void* b, size_t n, void(*callback)(memdiffGenerator*, void*)) {
+    memdiffGenerator g = {0};
+    g = (memdiffGenerator) {
+        .a=(uint8_t*)a,
+        .b=(uint8_t*)b,
+        .target=n,
+        .maxPrint = 100
+    };
+    while (true) {
+        void* handle = memdiffNext(&g);
+        callback(&g, handle);
+        if (handle == NULL) break;
+    }
+}
+
+void memdiffPrintAll(const void* a, const void* b, size_t n) {
+    memdiffAll(a, b, n, memdiffPrint);
+}
+
+// `Serial.readBytes` is not behaving correctly; it can mistakenly return `size` when it has not read any bytes.
+int timeout = 1000;
+int readBytes(uint8_t* buf, int size) {
+    size_t start = millis();
+    while (Serial.available() == 0) {
+        if ((millis() - start) > timeout) break;
+        delay(1);
+    }
+    if (Serial.available() == 0) return 0;
+    return Serial.readBytes(buf, size);
+}
+
+#define assert(condition, message, ...) if (!(condition)) {machineLog(message, __VA_ARGS__); return NULL;}
+extern "C" void* pollApp(char* name) {
+    dataHeader h = readHeader();
 
     machineLog("Reading %u bytes of program data...\n\n\r", h.dataSize - (sizeof h));
 
-    // Allocate a temporary buffer to receive the serial data
-    uint8_t* tempBuffer = (uint8_t*)malloc(h.dataSize);
+    size_t sectorSize = programDataPartition->erase_size;
+    uint8_t* tempBuffer = (uint8_t*)malloc(sectorSize);
     if (!tempBuffer) {
-        machineLog("FATAL: Failed to allocate %u bytes as a buffer for program data\n\r", h.dataSize);
-        strcpy(nameOut, "app");
+        machineLog("FATAL: Failed to allocate %u bytes as a buffer for program data\n\r", sectorSize);
         return NULL;
     }
 
-    *(struct dataHeader*)tempBuffer = h;
-    int bytesRead = Serial.readBytes(tempBuffer + (sizeof h), h.dataSize - (sizeof h));
-    machineLog("Successfully read %u bytes\n\r", bytesRead);
+    uint8_t* programDataNoHeader = (uint8_t*) programData + 8;
 
-    saveApp(appName, 1, tempBuffer, h.dataSize, false);
-    apps->appCount = 1;
+    int baseOffset = 1;
+    int bytesWritten = 0;
+    memcpy(tempBuffer, &h, sizeof h);
+    int remainder = sectorSize - sizeof h;
+    int bytesRead = readBytes(tempBuffer + sizeof h, remainder);
+    memdiffPrintAll(tempBuffer, programDataNoHeader, sectorSize);
+    assert(bytesRead == remainder, "failed to read %u bytes (read %u)\n", remainder, bytesRead);
+    writeSector(programDataPartition, tempBuffer, sectorSize, baseOffset);
+    machineLog("%c\n\r", 6);
+    bytesWritten += sectorSize;
 
-    syncApps();
-    void* toReturn = tempBuffer;
+    while (true) {
+        bool breakOut = false;
+
+        int maxRemainder = h.dataSize - bytesWritten;
+        remainder = sectorSize;
+        if (remainder >= maxRemainder) {
+            remainder = maxRemainder;
+            breakOut = true;
+        }
+
+        bytesRead = readBytes(tempBuffer, remainder);
+        assert(bytesRead == remainder, "failed to read %u bytes (read %u)\n", remainder, bytesRead);
+
+        writeSector(programDataPartition, tempBuffer, remainder, baseOffset + (bytesWritten / sectorSize));
+        machineLog("%c", 6);
+        bytesWritten += remainder;
+
+        if (breakOut) break;
+    }
+    free(tempBuffer);
+
+    void* toReturn = mapPartition(programDataPartition, h.dataSize, baseOffset);
+
     machineLog("testing dereference of at least header size\n\r");
-    for (int i = 0; i < sizeof h; i++) {
+    for (int i = 0; i < sizeof h * 2; i++) {
         machineLog("char at %d: %d\n\r", i, ((char*)toReturn)[i]);
     }
     machineLog("success\n\r");
     apps->appCount = 1;
-    //free(tempBuffer);
+    syncApps();
     return toReturn;
 }
+#undef assert
 
 extern "C" int selectApp(app_t* out, char* appName) {
     for (int i = 0; i < apps->appCount; i++) {
-        struct appDescriptor* d = &(apps->apps[i]);
+        appDescriptor* d = &(apps->apps[i]);
         int diff = strcmp(d->name, appName);
         machineLog("strcmp(%s, %s) returned %d\n\r", d->name, appName, diff);
         if (diff != 0) continue;
@@ -479,22 +674,34 @@ extern "C" void closeApp(app_t* app, int flags) {
 void loop() {}
 
 void setup() {
-    Serial.begin(115200);
+    Serial.setRxBufferSize(4096 + 64);
+    //Serial.begin(115200);
+    Serial.begin(921600);
     partitionInit();
     initApps();
     startIO();
+    delay(1000);
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT) {
         clearApps();
     }
     listApps();
     app_t app;
-    if (apps->appCount < 1) {
+    bool override = false;
+    if (override) {
+        app.programData = (uint8_t*)programData + 8;
+    }
+    else if (apps->appCount < 1) {
         app.programData = (uint8_t*)pollApp("");
     }
     else {
         app.programData = (uint8_t*)loadApp(1, 65536);
     }
-    runApp(&app);
+    updateIO(&app);
+    while (true) {
+        runApp(&app);
+        closeApp(&app, 0);
+        app.programData = (uint8_t*)pollApp("");
+    }
     ESP.restart();
 }

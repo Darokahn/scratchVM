@@ -12,8 +12,6 @@
 #include "programData.h"
 
 const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
-    [EVENT_BROADCAST] = "EVENT_BROADCAST",
-
     [INNER_PARTITION_BEGINEXPRESSIONS] = "INNER_PARTITION_BEGINEXPRESSIONS",
 
     [SENSING_ANSWER] = "SENSING_ANSWER",
@@ -51,8 +49,8 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [SENSING_OF_OBJECT_MENU] = "SENSING_OF_OBJECT_MENU",
 
     [INNER_PUSHNUMBER] = "INNER_PUSHNUMBER",
-    [INNER_PUSHTEXT] = "INNER_PUSHTEXT",
     [INNER_PUSHDEGREES] = "INNER_PUSHDEGREES",
+    [INNER_PUSHTEXT] = "INNER_PUSHTEXT",
     [INNER_PUSHID] = "INNER_PUSHID",
 
     [OPERATOR_ADD] = "OPERATOR_ADD",
@@ -76,6 +74,11 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [OPERATOR_ROUND] = "OPERATOR_ROUND",
     [OPERATOR_MATHOP] = "OPERATOR_MATHOP",
 
+    [INNER_PUSHFRAME] = "INNER_PUSHFRAME",
+    [INNER_POPFRAME] = "INNER_POPFRAME",
+    [INNER_SETFRAMEVAR] = "INNER_SETFRAMEVAR",
+    [INNER_GETFRAMEVAR] = "INNER_GETFRAMEVAR",
+
     [INNER_DEBUGEXPRESSION] = "INNER_DEBUGEXPRESSION",
 
     [INNER_PARTITION_BEGINSTATEMENTS] = "INNER_PARTITION_BEGINSTATEMENTS",
@@ -84,16 +87,21 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
     [DATA_CHANGEVARIABLEBY] = "DATA_CHANGEVARIABLEBY",
     [DATA_SHOWVARIABLE] = "DATA_SHOWVARIABLE",
     [DATA_HIDEVARIABLE] = "DATA_HIDEVARIABLE",
+    [EVENT_BROADCAST] = "EVENT_BROADCAST",
 
     [INNER_LOOPJUMP] = "INNER_LOOPJUMP",
+    [INNER_LOOPREPEATINIT] = "INNER_LOOPREPEATINIT",
+    [INNER_LOOPREPEAT] = "INNER_LOOPREPEAT",
     [CONTROL_CREATE_CLONE_OF] = "CONTROL_CREATE_CLONE_OF",
     [CONTROL_WAIT] = "CONTROL_WAIT",
+    [CONTROL_WAIT_UNTIL] = "CONTROL_WAIT_UNTIL",
     [CONTROL_CREATE_CLONE_OF_MENU] = "CONTROL_CREATE_CLONE_OF_MENU",
     [CONTROL_DELETE_THIS_CLONE] = "CONTROL_DELETE_THIS_CLONE",
     [CONTROL_STOP] = "CONTROL_STOP",
     [INNER_JUMPIF] = "INNER_JUMPIF",
     [INNER_JUMPIFNOT] = "INNER_JUMPIFNOT",
     [INNER_JUMP] = "INNER_JUMP",
+    [INNER_JUMPINDIRECT] = "INNER_JUMPINDIRECT",
 
     [INNER__GLIDEITERATION] = "INNER__GLIDEITERATION",
 
@@ -118,8 +126,8 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
 
     [LOOKS_SAY] = "LOOKS_SAY",
     [LOOKS_SAYFORSECS] = "LOOKS_SAYFORSECS",
-    [LOOKS_THINKFORSECS] = "LOOKS_THINKFORSECS",
     [LOOKS_THINK] = "LOOKS_THINK",
+    [LOOKS_THINKFORSECS] = "LOOKS_THINKFORSECS",
     [LOOKS_SWITCHCOSTUMETO] = "LOOKS_SWITCHCOSTUMETO",
     [LOOKS_NEXTCOSTUME] = "LOOKS_NEXTCOSTUME",
     [LOOKS_SWITCHBACKDROPTO] = "LOOKS_SWITCHBACKDROPTO",
@@ -137,6 +145,7 @@ const char* SCRATCH_opcode_names[INNER_DEBUGSTATEMENT + 1] = {
 
     [INNER__WAITITERATION] = "INNER__WAITITERATION",
 
+    [INNER_NOP] = "INNER_NOP",
     [INNER_DEBUGSTATEMENT] = "INNER_DEBUGSTATEMENT",
 };
 
@@ -212,14 +221,15 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        bool loggingCondition = false;//sprite->base.id == 1;
-            if (loggingCondition) {
-                printf("%d, %d\n", operation, watchValue);
-                machineLog("id: %d, index: %d, thread: %d, hat: %s, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent]);
-                if (opcodeName == NULL) machineLog("opcode: %d\n\r", operation);
-                else machineLog("opcode: %s\n\r", SCRATCH_opcode_names[operation]);
-                if (operation == watchValue) {
-                    raise(SIGTRAP);
+        //bool loggingCondition = sprite->base.id == 12;
+        //bool loggingCondition = false;
+        bool loggingCondition = true;
+        if (loggingCondition) {
+            machineLog("id: %d, index: %d, thread: %d, hat: %s, programCounter: %d, ", sprite->base.id, context->currentIndex, thread - (sprite->threads), hatTable[thread->base.startEvent], thread->programCounter);
+            if (opcodeName == NULL) machineLog("opcode: %d\n\r", operation);
+            else machineLog("opcode(name): %s\n\r", opcodeName);
+            if (operation == watchValue) {
+                raise(SIGTRAP);
             }
         }
         switch (operation) {
@@ -241,6 +251,16 @@ enum SCRATCH_continueStatus SCRATCH_processThread(struct SCRATCH_spriteContext* 
     return status;
 }
 
+void SCRATCH_killThreads(struct SCRATCH_spriteContext* context, int killerIndex, bool killKiller) {
+    for (int i = 0; i < context->spriteCount; i++) {
+        if (i == killerIndex && !killKiller) continue;
+        struct SCRATCH_sprite* sprite = context->sprites[i];
+        for (int ii = 0; ii < sprite->base.threadCount; ii++) {
+            sprite->threads[ii].active = false;
+        }
+    }
+}
+
 int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code) {
     int activeThreadCount = 0;
     for (int i = 0; i < context->spriteCount; i++) {
@@ -252,10 +272,7 @@ int SCRATCH_visitAllThreads(struct SCRATCH_spriteContext* context, uint8_t* code
                 activeThreadCount++;
             }
             else if (status == SCRATCH_killOtherThreads || status == SCRATCH_killAllThreads) {
-                for (int iii = 0; iii < context->sprites[i]->base.threadCount; iii++) {
-                    if (iii == ii && status == SCRATCH_killOtherThreads) continue;
-                    context->sprites[i]->threads[iii].active = false;
-                }
+                SCRATCH_killThreads(context, i, status == SCRATCH_killAllThreads);
                 goto nextSprite;
             }
             if (status == SCRATCH_killSprite) {
@@ -364,9 +381,30 @@ struct SCRATCH_data* SCRATCH_vectorAt(struct SCRATCH_vector* vector, uint16_t in
 struct SCRATCH_data SCRATCH_vectorPop(struct SCRATCH_vector* vector) {
     if (vector->count - 1 < vector->capacity / 2) {
         vector->capacity /= 2;
+        vector->capacity = MAX(vector->capacity, 16);
         vector->data = realloc(vector->data, sizeof(vector->data[0]) * vector->capacity);
     }
     return vector->data[--vector->count];
+}
+
+void SCRATCH_vectorExtend(struct SCRATCH_vector* vector, int amount) {
+    if (amount == 0) return;
+    vector->count += amount;
+    while (vector->count >= vector->capacity) {
+        vector->capacity *= 2;
+        vector->data = realloc(vector->data, sizeof(vector->data[0]) * vector->capacity);
+    }
+}
+
+void SCRATCH_vectorRetract(struct SCRATCH_vector* vector, int amount) {
+    if (amount == 0) return;
+    vector->count -= amount;
+    if (vector->count < 0) vector->count = 0;
+    if (vector->count < (vector->capacity / 2)) {
+        vector->capacity = vector->count;
+        vector->capacity = MAX(vector->capacity, 16);
+        vector->data = realloc(vector->data, sizeof(vector->data[0]) * vector->capacity);
+    }
 }
 
 bool SCRATCH_addSprite(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite) {
@@ -462,6 +500,7 @@ struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, cha
         return d;
     }
     if (d.type == type) return d;
+    if (d.type == SCRATCH_STATICSTRING) d.type = SCRATCH_STRING;
     int combination = pair(type, d.type);
     switch (combination) {
         case pair(SCRATCH_STRING, SCRATCH_FRACTION):
@@ -491,7 +530,7 @@ struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, cha
             d.type = SCRATCH_FRACTION;
             return d;
         case pair(SCRATCH_FRACTION, SCRATCH_WHOLENUMBER):
-            d.data.number.i = d.data.wholeNumber << 16;
+            d.data.number.i = (unsigned int) d.data.wholeNumber << 16;
             d.type = SCRATCH_FRACTION;
             return d;
         case pair(SCRATCH_FRACTION, SCRATCH_STRING):
@@ -535,8 +574,40 @@ struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, cha
             d = cast(d, SCRATCH_FRACTION, NULL);
             d = cast(d, SCRATCH_WHOLENUMBER, NULL);
             return d;
+        case pair(SCRATCH_BOOL, SCRATCH_FRACTION):
+            d.data.boolean = d.data.number.i != 0;
+            d.type = SCRATCH_BOOL;
+            return d;
+        case pair(SCRATCH_BOOL, SCRATCH_DEGREES):
+            d.data.boolean = d.data.degrees != 0;
+            d.type = SCRATCH_BOOL;
+            return d;
+        case pair(SCRATCH_BOOL, SCRATCH_WHOLENUMBER):
+            d.data.boolean = d.data.wholeNumber != 0;
+            d.type = SCRATCH_BOOL;
+            return d;
+        case pair(SCRATCH_BOOL, SCRATCH_STRING):
+            d = cast(d, SCRATCH_FRACTION, NULL);
+            d = cast(d, SCRATCH_BOOL, NULL);
+            return d;
         default:
             return d;
         // Scratch has no truthiness; All booleans are derived from an expression producing one. There is no cast from something to bool.
+    }
+}
+
+#define unorderedpair(x, y) (MAX(x, y) << 3 | MIN(x, y))
+bool equal(struct SCRATCH_data d0, struct SCRATCH_data d1) {
+    if (d0.type == SCRATCH_STATICSTRING) d0.type = SCRATCH_STRING;
+    if (d1.type == SCRATCH_STATICSTRING) d1.type = SCRATCH_STRING;
+    switch (unorderedpair(d0.type, d1.type)) {
+        case unorderedpair(SCRATCH_STRING, SCRATCH_STRING):
+            return strcmp(d0.data.string, d1.data.string) == 0;
+        case unorderedpair(SCRATCH_FRACTION, SCRATCH_FRACTION):
+            return d0.data.number.i == d1.data.number.i;
+        default:
+            d0 = cast(d0, SCRATCH_FRACTION, NULL);
+            d1 = cast(d1, SCRATCH_FRACTION, NULL);
+            return equal(d0, d1);
     }
 }
