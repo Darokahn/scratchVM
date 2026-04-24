@@ -7,6 +7,7 @@ typedef struct {
     int programDataSize;
     uint8_t* programData;
     char name[12];
+    bool running;
 } app_t;
 
 void startIO();

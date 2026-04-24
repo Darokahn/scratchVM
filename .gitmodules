@@ -1,0 +1,3 @@
+[submodule "source/mylibs"]
+	path = source/mylibs
+	url = git@github.com:Darokahn/libraries.git

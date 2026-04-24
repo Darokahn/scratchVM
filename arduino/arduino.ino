@@ -27,6 +27,7 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #define THUMBSTICK_X    33
 #define THUMBSTICK_SW   32
 
+int readBytes(uint8_t* buf, int size);
 extern "C" {
     #include <stddef.h>
     #include <sys/param.h>
@@ -35,6 +36,7 @@ extern "C" {
     #include "programData.h"
     #include "firmwareData.h"
     #include "globals.h"
+    #include "terminal.h"
 }
 
 TFT_eSPI tft; 
@@ -213,6 +215,7 @@ void unmapPartition() {
 int readCharInteractive() {
     char c = Serial.read();
     Serial.print(c);
+    Serial.print('\06');
     if (c == '\n') Serial.print('\r');
     else if (c == 0x7f) {
         Serial.print('\b');
@@ -271,9 +274,14 @@ int ADC_CENTER = -1;       // Midpoint of 12-bit ADC
 const int DEADZONE  = 1500;         // Joystick deadzone threshold
 
 bool inputs[5];
+terminal_t globalTerminal;
 extern "C" int updateIO(app_t* app) {
-    if (Serial.available()) {
-        return -1;
+    static terminal_t* terminal = terminal_init(&globalTerminal, NULL, NULL, 0, (void*) app);
+    while (Serial.available()) {
+        machineLog("bytes available!\n\r");
+        uint8_t buffer[1024];
+        terminal_read(terminal, buffer, sizeof buffer);
+        if (!app->running) return -1;
     }
     tftSpriteUpper.pushSprite(0, 0);
     tftSpriteLower.pushSprite(0, TOPHEIGHT);
@@ -580,6 +588,7 @@ void memdiffPrintAll(const void* a, const void* b, size_t n) {
 // `Serial.readBytes` is not behaving correctly; it can mistakenly return `size` when it has not read any bytes.
 int timeout = 1000;
 int readBytes(uint8_t* buf, int size) {
+    machineLog("reading bytes\n\r");
     size_t start = millis();
     while (Serial.available() == 0) {
         if ((millis() - start) > timeout) break;
@@ -602,14 +611,12 @@ extern "C" void* pollApp(char* name) {
         return NULL;
     }
 
-    uint8_t* programDataNoHeader = (uint8_t*) programData + 8;
-
     int baseOffset = 1;
     int bytesWritten = 0;
+
     memcpy(tempBuffer, &h, sizeof h);
     int remainder = sectorSize - sizeof h;
     int bytesRead = readBytes(tempBuffer + sizeof h, remainder);
-    memdiffPrintAll(tempBuffer, programDataNoHeader, sectorSize);
     assert(bytesRead == remainder, "failed to read %u bytes (read %u)\n", remainder, bytesRead);
     writeSector(programDataPartition, tempBuffer, sectorSize, baseOffset);
     machineLog("%c\n\r", 6);
@@ -634,6 +641,7 @@ extern "C" void* pollApp(char* name) {
 
         if (breakOut) break;
     }
+
     free(tempBuffer);
 
     void* toReturn = mapPartition(programDataPartition, h.dataSize, baseOffset);
@@ -680,7 +688,6 @@ void setup() {
     partitionInit();
     initApps();
     startIO();
-    delay(1000);
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT) {
         clearApps();
@@ -695,7 +702,7 @@ void setup() {
         app.programData = (uint8_t*)pollApp("");
     }
     else {
-        app.programData = (uint8_t*)loadApp(1, 65536);
+        app.programData = (uint8_t*)loadApp(1, 65537);
     }
     updateIO(&app);
     while (true) {

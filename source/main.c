@@ -21,6 +21,7 @@ char appName[12] = "app";
 unsigned long interval = 1000 / FRAMESPERSEC;
 
 int runApp(app_t* app) {
+    app->running = true;
     machineLog("Running app\n\r");
     uint8_t* programData = app->programData;
     struct SCRATCH_sprite* sprites[SPRITEMAX];
