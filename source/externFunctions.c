@@ -129,22 +129,21 @@ void* pollApp(char* nameOut) {
 }
 
 int selectApp(app_t* out, char* appName) {
+    static char* fileData = NULL;
+    if (fileData != NULL) free(fileData);
+    fileData = NULL;
     (void) appName;
-    out->programData = programData + 8;
     struct dataHeader h;
     uint8_t magic[9];
     magic[8] = 0;
     int fd = open("source/program.bin", O_RDONLY);
     read(fd, &magic, 8);
     read(fd, &h, sizeof h);
-    int size = h.dataSize;
-    uint8_t* fileData = malloc(size);
-    lseek(fd, 8, SEEK_SET);
+    int size = h.dataSize + sizeof h + sizeof "scratch!" - 1;
+    fileData = malloc(size);
+    lseek(fd, 0, SEEK_SET);
+    out->programData = (uint8_t*)fileData + 8;
     read(fd, fileData, size);
-    //strcpy(out->name, "app");
-    //out->programData = programData;
-    int diff = memcmp(programData + 8, fileData, h.dataSize);
-    machineLog("diff: %d\n\r", diff);
     close(fd);
     return 1;
 }

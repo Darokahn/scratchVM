@@ -6,6 +6,7 @@
 
 struct dataHeader {
     uint16_t spriteCount;
+    uint16_t stringsLength;
     uint16_t codeLength;
     uint16_t inputCount;
     uint16_t broadcastCount;

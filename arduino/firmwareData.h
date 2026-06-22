@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <TFT_eSPI.h>
 
 struct appDescriptor {
     uint16_t offset;
@@ -7,26 +8,13 @@ struct appDescriptor {
 };
 
 struct hardwareData {
+    TFT_config screen;
     struct {
-        uint8_t cs;
-        uint8_t reset;
-        uint8_t dc;
-        uint8_t sdi;
-        uint8_t sck;
-        uint8_t led;
-        uint8_t sdo;
-
-        uint8_t colorOrder;
-        uint16_t width;
-        uint16_t height;
-        uint8_t orientation;
-    } screen;
-    struct {
-        uint8_t vcc;
-        uint8_t gnd;
-        uint8_t xAxis;
-        uint8_t yAxis;
-        uint8_t button;
+        int8_t vcc;
+        int8_t gnd;
+        int8_t xAxis;
+        int8_t yAxis;
+        int8_t button;
     } controls;
 };
 
@@ -34,26 +22,26 @@ void printHardwareData(struct hardwareData data) {
     printf(
         "{\n\r"
         "\t.screen = {\n\r"
-        "\t\t.cs = %u,\n\r"
-        "\t\t.reset = %u,\n\r"
-        "\t\t.dc = %u,\n\r"
-        "\t\t.sdi = %u,\n\r"
-        "\t\t.sck = %u,\n\r"
-        "\t\t.led = %u,\n\r"
-        "\t\t.sdo = %u,\n\r"
+        "\t\t.cs = %d,\n\r"
+        "\t\t.reset = %d,\n\r"
+        "\t\t.dc = %d,\n\r"
+        "\t\t.sdi = %d,\n\r"
+        "\t\t.sck = %d,\n\r"
+        "\t\t.led = %d,\n\r"
+        "\t\t.sdo = %d,\n\r"
         "\n\r"
-        "\t\t.colorOrder = %u,\n\r"
-        "\t\t.width = %u,\n\r"
-        "\t\t.height = %u,\n\r"
-        "\t\t.orientation = %u\n\r"
+        "\t\t.colorOrder = %d,\n\r"
+        "\t\t.width = %d,\n\r"
+        "\t\t.height = %d,\n\r"
+        "\t\t.orientation = %d\n\r"
         "\t},\n\r"
         "\n\r"
         "\t.controls = {\n\r"
-        "\t\t.vcc = %u,\n\r"
-        "\t\t.gnd = %u,\n\r"
-        "\t\t.xAxis = %u,\n\r"
-        "\t\t.yAxis = %u,\n\r"
-        "\t\t.button = %u\n\r"
+        "\t\t.vcc = %d,\n\r"
+        "\t\t.gnd = %d,\n\r"
+        "\t\t.xAxis = %d,\n\r"
+        "\t\t.yAxis = %d,\n\r"
+        "\t\t.button = %d\n\r"
         "\t}\n\r"
         "}\n\r",
         data.screen.cs,

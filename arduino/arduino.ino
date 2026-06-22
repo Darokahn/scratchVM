@@ -1,24 +1,14 @@
-/*
-I WOULD RATHER CODE USING A KEYBOARD MADE OF MY OWN TOENAILS AND FINGERNAILS THAT I HAD TO RIP OFF OF MY BODY
-AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
-*/
-
 #pragma GCC optimize ("O3")
 
-#include <cstdarg>
-#include <cstdint>
-#include <cstdio>
-#include <TFT_eSPI.h>
+#define CS      15
+#define RST     2
+#define DC      4
+#define MOSI    5
+#define SCLK    18
+#define LED     19
+#define MISO    -1
 
 #include "types.h"
-
-#define TFT_MISO 255
-#define TFT_MOSI   5
-#define TFT_SCLK  18
-#define TFT_CS    15  // Chip select control pin
-#define TFT_DC     4  // Data Command control pin
-#define TFT_RST    2  // Reset pin (could connect to RST pin)
-#define TFT_LED   19
 
 #define THUMBSTICK_VCC 26
 #define THUMBSTICK_GND 27
@@ -28,16 +18,21 @@ AND GINGERLY PLACE ONTO THE KEYCAPS THAN MAKE AN ENTIRE PROJECT IN C++
 #define THUMBSTICK_SW   32
 
 int readBytes(uint8_t* buf, int size);
+#define COLOR_DEPTH 16
+
+#include <TFT_eSPI.h>
+
+#include "firmwareData.h"
 extern "C" {
     #include <stddef.h>
     #include <sys/param.h>
     #include "scratch.h"
     #include "graphics.h"
     #include "programData.h"
-    #include "firmwareData.h"
     #include "globals.h"
     #include "terminal.h"
 }
+
 
 TFT_eSPI tft; 
 TFT_eSprite tftSpriteUpper(&tft);
@@ -214,14 +209,14 @@ void unmapPartition() {
 
 int readCharInteractive() {
     char c = Serial.read();
-    Serial.print(c);
-    Serial.print('\06');
     if (c == '\n') Serial.print('\r');
     else if (c == 0x7f) {
         Serial.print('\b');
         Serial.print(' ');
         Serial.print('\b');
+        return c;
     }
+    Serial.print(c);
     return c;
 }
 
@@ -235,9 +230,11 @@ extern "C" int runApp(app_t* app);
 
 const int maxHeapAllocation = 100000;
 int TOPHEIGHT = 170;
-int BOTTOMHEIGHT = FULLLCDHEIGHT - 170;
 
+#define PROTOCOLBYTE '^'
+terminal_t globalTerminal;
 extern "C" void startIO() {
+    static terminal_t* terminal = terminal_init(&globalTerminal, NULL, NULL, 0, PROTOCOLBYTE);
     hardwareData hardware = apps->hardware;
     printf("hardware data: "); printHardwareData(hardware);
     pinMode(hardware.controls.xAxis, INPUT_PULLUP);
@@ -252,39 +249,37 @@ extern "C" void startIO() {
     digitalWrite(hardware.screen.led, HIGH);
 
     tft.~TFT_eSPI();
-    int width = hardware.screen.orientation % 2 == 0 ? hardware.screen.width : hardware.screen.height;
-    int height = hardware.screen.orientation % 2 == 0 ? hardware.screen.height : hardware.screen.width;
-    new (&tft) TFT_eSPI(width, height);
+    globalConfig = hardware.screen;
+    new (&tft) TFT_eSPI();
     tftSpriteLower.~TFT_eSprite();
     tftSpriteUpper.~TFT_eSprite();
     new (&tftSpriteLower) TFT_eSprite(&tft);
     new (&tftSpriteUpper) TFT_eSprite(&tft);
     tft.init();
     tft.setRotation(hardware.screen.orientation);
-    int remainingHeight = hardware.screen.height;
-    TOPHEIGHT = MIN(maxHeapAllocation / (hardware.screen.width * 2), remainingHeight);
-    remainingHeight -= TOPHEIGHT;
-    BOTTOMHEIGHT = MIN(maxHeapAllocation / hardware.screen.width, remainingHeight);
-    tftSpriteUpper.createSprite(hardware.screen.width, TOPHEIGHT);
-    tftSpriteLower.createSprite(hardware.screen.width, BOTTOMHEIGHT);
-    tft.fillScreen(TFT_BLUE);
+    int spriteWidth = hardware.screen.trueWidth();
+    int spriteHeight = hardware.screen.trueHeight() / 1.5;
+    TOPHEIGHT = spriteHeight;
+    tftSpriteUpper.createSprite(spriteWidth, spriteHeight);
+    tftSpriteLower.createSprite(spriteWidth, spriteHeight);
 }
 
 int ADC_CENTER = -1;       // Midpoint of 12-bit ADC
 const int DEADZONE  = 1500;         // Joystick deadzone threshold
 
-bool inputs[5];
-terminal_t globalTerminal;
-extern "C" int updateIO(app_t* app) {
-    static terminal_t* terminal = terminal_init(&globalTerminal, NULL, NULL, 0, (void*) app);
-    while (Serial.available()) {
-        machineLog("bytes available!\n\r");
-        uint8_t buffer[1024];
-        terminal_read(terminal, buffer, sizeof buffer);
-        if (!app->running) return -1;
-    }
+void drawScreen() {
     tftSpriteUpper.pushSprite(0, 0);
     tftSpriteLower.pushSprite(0, TOPHEIGHT);
+}
+
+
+bool inputs[5];
+uint8_t frameCounter;
+extern "C" int updateIO(app_t* app) {
+    if (Serial.available()) {
+        return -1;
+    }
+    drawScreen();
     int vrx = analogRead(THUMBSTICK_X);
     int vry = analogRead(THUMBSTICK_Y);
     bool sw  = digitalRead(THUMBSTICK_SW) == LOW;  // Active-low button
@@ -295,6 +290,7 @@ extern "C" int updateIO(app_t* app) {
     inputs[2] = vry > ADC_CENTER + DEADZONE;
     inputs[3] = vrx < ADC_CENTER - DEADZONE;
     inputs[4] = sw;
+    machineLog("vrx: %d\n\rvry: %d\n\rsw:%d\n\r", vrx, vry, sw);
     return 0;
 }
 
@@ -307,10 +303,9 @@ extern "C" void* mallocDMA(size_t size) {
 }
 
 extern "C" void drawPixel(int x, int y, pixel color) {
-    static TFT_eSprite* halves[] = {&tftSpriteUpper, &tftSpriteLower};
-    TFT_eSprite* screenHalf = halves[y >= TOPHEIGHT];
-    y -= (TOPHEIGHT * (y >= TOPHEIGHT));
-    screenHalf->drawPixel(x, y, color);
+    TFT_eSprite* target = y < TOPHEIGHT ? &tftSpriteUpper : & tftSpriteLower;
+    if (target == &tftSpriteLower) y -= TOPHEIGHT;
+    target->drawPixel(x, y, color);
 }
 
 int frameInterval = 1000 / FRAMESPERSEC;
@@ -331,28 +326,32 @@ extern "C" int machineLog(const char* fmt, ...) {
 
 int MAXOFFSET = 14;
 
+#define SPRING  "a"
+#define SUMMER  "b"
+#define FALL    "c"
+
 #define MAGICSTRING "magic"
 #define MAGICSTRINGSIZE (sizeof MAGICSTRING)
 #define MAGICSTRINGLEN (MAGICSTRINGSIZE - 1)
-#define CURRENTVERSION "f2026.0"
+#define CURRENTVERSION ("2026." SUMMER ".0")
 #define CURRENTVERSIONLEN ((sizeof CURRENTVERSION) - 1)
 
 enum colorOrders {
+    BGR,
     RGB,
-    BGR
 };
 
 hardwareData hardwareTemplate = {
     .screen = {
-        .cs=TFT_CS,
-        .reset=TFT_RST,
-        .dc=TFT_DC,
-        .sdi=TFT_MOSI,
-        .sck=TFT_SCLK,
-        .led=TFT_LED,
-        .sdo=TFT_MISO,
+        .cs=CS,
+        .reset=RST,
+        .dc=DC,
+        .sdi=MOSI,
+        .sck=SCLK,
+        .led=LED,
+        .sdo=MISO,
 
-        .colorOrder=RGB,
+        .colorOrder=BGR,
         .width=FULLLCDWIDTH,
         .height=FULLLCDHEIGHT,
         .orientation=1,
@@ -373,15 +372,17 @@ hardwareData hardwareTemplateDeprecated = {
         .dc=2,
         .sdi=23,
         .sck=18,
-        .led=255,
+        .led=-1,
         .sdo=19,
+
+        .colorOrder=BGR,
         .width=FULLLCDWIDTH,
         .height=FULLLCDHEIGHT,
         .orientation=1,
     },
     .controls = {
-        .vcc=255,
-        .gnd=255,
+        .vcc=-1,
+        .gnd=-1,
         .xAxis=THUMBSTICK_Y,
         .yAxis=THUMBSTICK_X,
         .button=THUMBSTICK_SW
@@ -405,20 +406,24 @@ bool correctDeprecatedApps(firmwareHeader* appsObject) {
     *appsObject = (firmwareHeader) {0};
     machineLog("deprecated, updating\n\r");
     appsObject->appCount = 0;
-    appsObject->nextOffset = 0;
-    appsObject->hardware = hardwareTemplateDeprecated;
+    appsObject->nextOffset = 1;
+    appsObject->hardware = hardwareTemplate;
     strncpy(appsObject->magic, MAGICSTRING, MAGICSTRINGLEN);
-    strncpy(appsObject->initialVersion, "p2026.0", (sizeof "p2026") - 1);
-    strncpy(appsObject->version, CURRENTVERSION, CURRENTVERSIONLEN);
+    strncpy(appsObject->initialVersion, "2025.c.0", sizeof "2025.c.0" - 1);
+    // let `initApps` update it
+    strncpy(appsObject->version, "2025.c.0", sizeof "2025.c.0" - 1);
     return true;
 }
 
 void handleUpdateTransition(char* current, char* next) {
-    // currently nothing to do
     return;
 }
 
 void initApps() {
+    if (apps != NULL) {
+        free(apps);
+        apps = NULL;
+    }
     apps = (firmwareHeader*) malloc(programDataPartition->erase_size);
     esp_err_t err = readPartition(programDataPartition, (uint8_t*) apps, programDataPartition->erase_size, 0);
     if (err != ESP_OK) {
@@ -459,6 +464,7 @@ void clearApps() {
 }
 
 void listApps() {
+    machineLog("VERSION%.*s\n\r", sizeof apps->version, apps->version);
     machineLog("app header with {\n\r\tmagic: %.*s,\n\r\tversion: %.*s,\n\r\tinitialVersion: %.*s,\n\r\tappCount: %hu,\n\r\tnextOffset: %hu\n\r}\n\r", 
     sizeof apps->magic, apps->magic, sizeof apps->version, apps->version, sizeof apps->initialVersion, apps->initialVersion, apps->appCount, apps->nextOffset);
     for (int i = 0; i < apps->appCount; i++) {
@@ -485,25 +491,6 @@ void* saveApp(char* appName, size_t sectorOffset, uint8_t* newData, size_t size,
         toReturn = mapPartition(programDataPartition, size, sectorOffset);
     }
     return toReturn;
-}
-
-dataHeader readHeader() {
-    char magicBytes[] = "scratch!";
-    awaitString(magicBytes, (sizeof magicBytes) - 1);
-    machineLog("%c\n\r", 6);
-    dataHeader h;
-    uint8_t* ptr = (uint8_t*)&h.spriteCount;
-    while (ptr < (uint8_t*)((&h) + 1)) {
-        if (Serial.available() < 1) continue;
-        uint8_t b = readChar();
-        *ptr++ = b;
-    }
-    return h;
-}
-
-// TODO
-void pollInstruction() {
-    return;
 }
 
 // This is cursed and I had a lot of fun writing it
@@ -598,11 +585,15 @@ int readBytes(uint8_t* buf, int size) {
     return Serial.readBytes(buf, size);
 }
 
+void registerApp(struct appDescriptor a) {
+    apps->apps[apps->appCount] = a;
+    apps->appCount++;
+}
+
 #define assert(condition, message, ...) if (!(condition)) {machineLog(message, __VA_ARGS__); return NULL;}
 extern "C" void* pollApp(char* name) {
-    dataHeader h = readHeader();
-
-    machineLog("Reading %u bytes of program data...\n\n\r", h.dataSize - (sizeof h));
+    dataHeader h;
+    char magicBytes[] = "scratch!";
 
     size_t sectorSize = programDataPartition->erase_size;
     uint8_t* tempBuffer = (uint8_t*)malloc(sectorSize);
@@ -611,15 +602,20 @@ extern "C" void* pollApp(char* name) {
         return NULL;
     }
 
-    int baseOffset = 1;
+    terminal_read(&globalTerminal, NULL, 0);
+    awaitString(magicBytes, sizeof magicBytes - 1);
+    terminal_read(&globalTerminal, (uint8_t*)&h, sizeof h);
+
+    machineLog("Reading %u bytes of program data...\n\n\r", h.dataSize - (sizeof h));
+
+    int baseOffset = apps->nextOffset;
     int bytesWritten = 0;
 
     memcpy(tempBuffer, &h, sizeof h);
     int remainder = sectorSize - sizeof h;
-    int bytesRead = readBytes(tempBuffer + sizeof h, remainder);
+    int bytesRead = terminal_read(&globalTerminal, tempBuffer + sizeof h, remainder);
     assert(bytesRead == remainder, "failed to read %u bytes (read %u)\n", remainder, bytesRead);
     writeSector(programDataPartition, tempBuffer, sectorSize, baseOffset);
-    machineLog("%c\n\r", 6);
     bytesWritten += sectorSize;
 
     while (true) {
@@ -632,15 +628,15 @@ extern "C" void* pollApp(char* name) {
             breakOut = true;
         }
 
-        bytesRead = readBytes(tempBuffer, remainder);
+        bytesRead = terminal_read(&globalTerminal, tempBuffer, remainder);
         assert(bytesRead == remainder, "failed to read %u bytes (read %u)\n", remainder, bytesRead);
 
         writeSector(programDataPartition, tempBuffer, remainder, baseOffset + (bytesWritten / sectorSize));
-        machineLog("%c", 6);
         bytesWritten += remainder;
 
         if (breakOut) break;
     }
+    apps->nextOffset = baseOffset + (bytesWritten / sectorSize);
 
     free(tempBuffer);
 
@@ -651,7 +647,7 @@ extern "C" void* pollApp(char* name) {
         machineLog("char at %d: %d\n\r", i, ((char*)toReturn)[i]);
     }
     machineLog("success\n\r");
-    apps->appCount = 1;
+    registerApp((struct appDescriptor) {baseOffset, h.dataSize, "app"});
     syncApps();
     return toReturn;
 }
@@ -683,22 +679,25 @@ void loop() {}
 
 void setup() {
     Serial.setRxBufferSize(4096 + 64);
-    //Serial.begin(115200);
     Serial.begin(921600);
     partitionInit();
     initApps();
+    listApps();
     startIO();
+    char dump[116];
+    readBytes((uint8_t*)dump, 116);
     esp_reset_reason_t reason = esp_reset_reason();
     if (reason == ESP_RST_PANIC || reason == ESP_RST_INT_WDT) {
         clearApps();
     }
-    listApps();
     app_t app;
     bool override = false;
     if (override) {
+        clearApps();
         app.programData = (uint8_t*)programData + 8;
     }
     else if (apps->appCount < 1) {
+        machineLog("finding new app\n\r");
         app.programData = (uint8_t*)pollApp("");
     }
     else {

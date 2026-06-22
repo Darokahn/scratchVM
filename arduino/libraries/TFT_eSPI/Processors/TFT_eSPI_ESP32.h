@@ -48,17 +48,14 @@ VSPI = 3, uses SPI3
 ESP32-S2:
 FSPI = 1, uses SPI2
 HSPI = 2, uses SPI3
-VSPI not defined
+VSPI not defined so have made VSPI = HSPI
 
-ESP32 C3:
-FSPI = 0, uses SPI2 ???? To be checked
-HSPI = 1, uses SPI3 ???? To be checked
-VSPI not defined
-
-For ESP32/S2/C3:
-SPI1_HOST = 0
-SPI2_HOST = 1
-SPI3_HOST = 2
+For ESP32 C3, C5, C6, H2, P4, S2, S3:
+(C3 only SPI2 port is available, SPI0 & SPI1 are dedicated to internal flash memory)
+Confusingly in ESP-IDF enumerations are:
+SPI1_HOST = 0,  ///< actually SPI0
+SPI2_HOST = 1,  ///< actually SPI1
+SPI3_HOST = 2,  ///< actually SPI2
 */
 
 // ESP32 specific SPI port selection
@@ -144,102 +141,14 @@ SPI3_HOST = 2
 ////////////////////////////////////////////////////////////////////////////////////////
 // Define the DC (TFT Data/Command or Register Select (RS))pin drive code
 ////////////////////////////////////////////////////////////////////////////////////////
-#ifndef TFT_DC
-  #define DC_C // No macro allocated so it generates no code
-  #define DC_D // No macro allocated so it generates no code
-#else
-  #if defined (TFT_PARALLEL_8_BIT)
-    // TFT_DC, by design, must be in range 0-31 for single register parallel write
-    #if (TFT_DC >= 0) &&  (TFT_DC < 32)
-      #define DC_C GPIO.out_w1tc = (1 << TFT_DC)
-      #define DC_D GPIO.out_w1ts = (1 << TFT_DC)
-    #elif (TFT_DC >= 32)
-      #define DC_C GPIO.out1_w1tc.val = (1 << (TFT_DC- 32))
-      #define DC_D GPIO.out1_w1ts.val = (1 << (TFT_DC- 32))
-    #else
-      #define DC_C
-      #define DC_D
-    #endif
-  #else
-    #if (TFT_DC >= 32)
-      #ifdef RPI_DISPLAY_TYPE  // RPi displays need a slower DC change
-        #define DC_C GPIO.out1_w1ts.val = (1 << (TFT_DC - 32)); \
-                     GPIO.out1_w1tc.val = (1 << (TFT_DC - 32))
-        #define DC_D GPIO.out1_w1tc.val = (1 << (TFT_DC - 32)); \
-                     GPIO.out1_w1ts.val = (1 << (TFT_DC - 32))
-      #else
-        #define DC_C GPIO.out1_w1tc.val = (1 << (TFT_DC - 32))//;GPIO.out1_w1tc.val = (1 << (TFT_DC - 32))
-        #define DC_D GPIO.out1_w1ts.val = (1 << (TFT_DC - 32))//;GPIO.out1_w1ts.val = (1 << (TFT_DC - 32))
-      #endif
-    #elif (TFT_DC >= 0)
-      #if defined (RPI_DISPLAY_TYPE)
-        #if defined (ILI9486_DRIVER)
-          // RPi ILI9486 display needs a slower DC change
-          #define DC_C GPIO.out_w1tc = (1 << TFT_DC); \
-                       GPIO.out_w1tc = (1 << TFT_DC)
-          #define DC_D GPIO.out_w1tc = (1 << TFT_DC); \
-                       GPIO.out_w1ts = (1 << TFT_DC)
-        #else
-          // Other RPi displays need a slower C->D change
-          #define DC_C GPIO.out_w1tc = (1 << TFT_DC)
-          #define DC_D GPIO.out_w1tc = (1 << TFT_DC); \
-                       GPIO.out_w1ts = (1 << TFT_DC)
-        #endif
-      #else
-        #define DC_C GPIO.out_w1tc = (1 << TFT_DC)//;GPIO.out_w1tc = (1 << TFT_DC)
-        #define DC_D GPIO.out_w1ts = (1 << TFT_DC)//;GPIO.out_w1ts = (1 << TFT_DC)
-      #endif
-    #else
-      #define DC_C
-      #define DC_D
-    #endif
-  #endif
-#endif
+#define DC_C GPIO.out_w1tc = (1 << TFT_DC)
+#define DC_D GPIO.out_w1ts = (1 << TFT_DC)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Define the CS (TFT chip select) pin drive code
 ////////////////////////////////////////////////////////////////////////////////////////
-#ifndef TFT_CS
-  #define TFT_CS -1  // Keep DMA code happy
-  #define CS_L       // No macro allocated so it generates no code
-  #define CS_H       // No macro allocated so it generates no code
-#else
-  #if defined (TFT_PARALLEL_8_BIT)
-    #if TFT_CS >= 32
-        #define CS_L GPIO.out1_w1tc.val = (1 << (TFT_CS - 32))
-        #define CS_H GPIO.out1_w1ts.val = (1 << (TFT_CS - 32))
-    #elif TFT_CS >= 0
-        #define CS_L GPIO.out_w1tc = (1 << TFT_CS)
-        #define CS_H GPIO.out_w1ts = (1 << TFT_CS)
-    #else
-      #define CS_L
-      #define CS_H
-    #endif
-  #else
-    #if (TFT_CS >= 32)
-      #ifdef RPI_DISPLAY_TYPE  // RPi display needs a slower CS change
-        #define CS_L GPIO.out1_w1ts.val = (1 << (TFT_CS - 32)); \
-                     GPIO.out1_w1tc.val = (1 << (TFT_CS - 32))
-        #define CS_H GPIO.out1_w1tc.val = (1 << (TFT_CS - 32)); \
-                     GPIO.out1_w1ts.val = (1 << (TFT_CS - 32))
-      #else
-        #define CS_L GPIO.out1_w1tc.val = (1 << (TFT_CS - 32)); GPIO.out1_w1tc.val = (1 << (TFT_CS - 32))
-        #define CS_H GPIO.out1_w1ts.val = (1 << (TFT_CS - 32))//;GPIO.out1_w1ts.val = (1 << (TFT_CS - 32))
-      #endif
-    #elif (TFT_CS >= 0)
-      #ifdef RPI_DISPLAY_TYPE  // RPi display needs a slower CS change
-        #define CS_L GPIO.out_w1ts = (1 << TFT_CS); GPIO.out_w1tc = (1 << TFT_CS)
-        #define CS_H GPIO.out_w1tc = (1 << TFT_CS); GPIO.out_w1ts = (1 << TFT_CS)
-      #else
-        #define CS_L GPIO.out_w1tc = (1 << TFT_CS); GPIO.out_w1tc = (1 << TFT_CS)
-        #define CS_H GPIO.out_w1ts = (1 << TFT_CS)//;GPIO.out_w1ts = (1 << TFT_CS)
-      #endif
-    #else
-      #define CS_L
-      #define CS_H
-    #endif
-  #endif
-#endif
+#define CS_L GPIO.out_w1tc = (1 << TFT_CS)
+#define CS_H GPIO.out_w1ts = (1 << TFT_CS)
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Define the WR (TFT Write) pin drive code
@@ -287,10 +196,6 @@ SPI3_HOST = 2
     #ifndef TFT_MOSI
       #define TFT_MOSI 13
     #endif
-    #if (TFT_MOSI == -1)
-      #undef TFT_MOSI
-      #define TFT_MOSI 13
-    #endif
 
     #ifndef TFT_SCLK
       #define TFT_SCLK 14
@@ -306,29 +211,9 @@ SPI3_HOST = 2
       #define TFT_MISO -1
     #endif
 
-    #ifndef TFT_MOSI
-      #define TFT_MOSI 23
-    #endif
-    #if (TFT_MOSI == -1)
-      #undef TFT_MOSI
-      #define TFT_MOSI 23
-    #endif
-
     #ifndef TFT_SCLK
       #define TFT_SCLK 18
     #endif
-    #if (TFT_SCLK == -1)
-      #undef TFT_SCLK
-      #define TFT_SCLK 18
-    #endif
-
-    #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32S2)
-      #if (TFT_MISO == -1)
-        #undef TFT_MISO
-        #define TFT_MISO TFT_MOSI
-      #endif
-    #endif
-
   #endif
 
 #endif

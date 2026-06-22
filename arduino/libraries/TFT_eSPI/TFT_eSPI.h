@@ -1,3 +1,4 @@
+#pragma once
 /***************************************************
   Arduino TFT graphics library targeted at ESP8266
   and ESP32 based boards.
@@ -12,11 +13,7 @@
   Last review/edit by Bodmer: 04/02/22
  ****************************************************/
 
-// Stop fonts etc. being loaded multiple times
-#ifndef _TFT_eSPIH_
-#define _TFT_eSPIH_
-
-#define TFT_ESPI_VERSION "2.5.43"
+#define TFT_ESPI_VERSION "2.5.44"
 
 // Bit level feature flags
 // Bit 0 set: viewport capability
@@ -27,8 +24,8 @@
 ***************************************************************************************/
 
 //Standard support
-//#include <Arduino.h>
-//#include <Print.h>
+#include <Arduino.h>
+#include <Print.h>
 #if !defined (TFT_PARALLEL_8_BIT) && !defined (RP2040_PIO_INTERFACE)
   #include <SPI.h>
 #endif
@@ -1007,5 +1004,3 @@ fastBlend(A alpha, F fgc, B bgc)
 
 // Load the Sprite Class
 #include "Extensions/Sprite.h"
-
-#endif // ends #ifndef _TFT_eSPIH_

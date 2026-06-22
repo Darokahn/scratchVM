@@ -18,7 +18,7 @@
 #if defined (ESP32)
   #if defined(CONFIG_IDF_TARGET_ESP32S3)
     #include "Processors/TFT_eSPI_ESP32_S3.c" // Tested with SPI and 8-bit parallel
-  #elif defined(CONFIG_IDF_TARGET_ESP32C3)
+  #elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
     #include "Processors/TFT_eSPI_ESP32_C3.c" // Tested with SPI (8-bit parallel will probably work too!)
   #else
     #include "Processors/TFT_eSPI_ESP32.c"
@@ -436,15 +436,16 @@ bool TFT_eSPI::clipWindow(int32_t *xs, int32_t *ys, int32_t *xe, int32_t *ye)
 ** Function name:           TFT_eSPI
 ** Description:             Constructor , we must use hardware SPI pins
 ***************************************************************************************/
+TFT_config globalConfig;
 TFT_eSPI::TFT_eSPI(int16_t w, int16_t h)
 {
-  _init_width  = _width  = w; // Set by specific xxxxx_Defines.h file or by users sketch
-  _init_height = _height = h; // Set by specific xxxxx_Defines.h file or by users sketch
+  _init_width  = _width  = globalConfig.orientation % 2 == 0 ? globalConfig.width : globalConfig.height; // Set by specific xxxxx_Defines.h file or by users sketch
+  _init_height = _height = globalConfig.orientation % 2 == 0 ? globalConfig.height : globalConfig.width; // Set by specific xxxxx_Defines.h file or by users sketch
 
   // Reset the viewport to the whole screen
   resetViewport();
 
-  rotation  = 0;
+  rotation  = globalConfig.orientation;
   cursor_y  = cursor_x  = last_cursor_x = bg_cursor_x = 0;
   textfont  = 1;
   textsize  = 1;
@@ -806,7 +807,6 @@ void TFT_eSPI::init(uint8_t tc)
 ***************************************************************************************/
 void TFT_eSPI::setRotation(uint8_t m)
 {
-
   begin_tft_write();
 
     // This loads the driver specific rotation code  <<<<<<<<<<<<<<<<<<<<< ADD NEW DRIVERS TO THE LIST HERE <<<<<<<<<<<<<<<<<<<<<<<
@@ -3004,8 +3004,8 @@ void TFT_eSPI::setTextPadding(uint16_t x_width)
 }
 
 /***************************************************************************************
-** Function name:           setTextPadding
-** Description:             Define padding width (aids erasing old text and numbers)
+** Function name:           getTextPadding
+** Description:             Return the padding width (as used by setTextPadding)
 ***************************************************************************************/
 uint16_t TFT_eSPI::getTextPadding(void)
 {

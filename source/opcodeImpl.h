@@ -102,16 +102,19 @@ case SENSING_TIMER: {
     break;
 }
 case SENSING_CURRENT: {
-    // TODO
-    // Get enumerated request type from (uint16_t) code; push 2025 for year, (whichever day that was) for day, and 0 for rest
+    PUSHFRACTION(0);
+    status = SCRATCH_continue;
+    break;
 }
 case SENSING_DAYSSINCE2000: {
-    // TODO
-    // push however many days it was from jan 1 2000 to jan 1 2025
+    PUSHFRACTION(0);
+    status = SCRATCH_continue;
+    break;
 }
 case SENSING_USERNAME: {
-    // TODO
-    // push global username string
+    PUSHSTATICTEXT("user");
+    status = SCRATCH_continue;
+    break;
 }
 case INNER_FETCHINPUT: {
     int16_t toFetch = GETARGUMENT(int16_t);
@@ -199,8 +202,9 @@ case LOOKS_COSTUME: {
     break;
 }
 case LOOKS_SIZE: {
-    // TODO
-    // push the size of the sprite specified by (uint16_6) code
+    PUSHFRACTION((sprite->base.size << 16) / SIZERATIO);
+    status = SCRATCH_continue;
+    break;
 }
 case LOOKS_COSTUMENUMBERNAME: {
     int16_t option = GETARGUMENT(int16_t);
@@ -302,7 +306,6 @@ case SENSING_DISTANCETO: {
     status = SCRATCH_continue;
     break;
 }
-
 case SENSING_DISTANCETOMENU: {
     ERROR(); // unused
     break;
@@ -990,7 +993,12 @@ case LOOKS_NEXTBACKDROP: {
     break;
 }
 case LOOKS_CHANGESIZEBY: {
-    // TODO
+    struct SCRATCH_data sizeData = POPWHOLENUMBER();
+    int32_t size = sizeData.data.wholeNumber;
+    size *= SIZERATIO;
+    size /= 100;
+    sprite->base.size =+ size;
+    status = SCRATCH_continue;
     break;
 }
 case LOOKS_SETSIZETO: {

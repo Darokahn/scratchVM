@@ -12,7 +12,7 @@
 #define IMAGEMAX (256)
 #define ALIGN8(ptr) ((void*) (((uint64_t) ptr + 7) & ~7))
 
-#define FRAMESPERSEC 30
+#define FRAMESPERSEC 40
 
 #define STAGERESOLUTION 128
 #define SPRITERESOLUTION 32
@@ -220,7 +220,6 @@ void clearEvents();
 bool SCRATCH_addSprite(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* sprite);
 bool SCRATCH_wakeSprite(struct SCRATCH_sprite* sprite, enum SCRATCH_EVENTTYPE type, union SCRATCH_eventInput input);
 void SCRATCH_wakeSprites(struct SCRATCH_spriteContext* context);
-
 
 struct SCRATCH_rect getRect(struct SCRATCH_spriteContext* context, struct SCRATCH_sprite* operand);
 bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2);

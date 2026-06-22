@@ -62,16 +62,6 @@
 #define TFT_MAD_MH  0x04
 #define TFT_MAD_RGB 0x00
 
-#ifdef TFT_RGB_ORDER
-  #if (TFT_RGB_ORDER == 1)
-    #define TFT_MAD_COLOR_ORDER TFT_MAD_RGB
-  #else
-    #define TFT_MAD_COLOR_ORDER TFT_MAD_BGR
-  #endif
-#else
-  #define TFT_MAD_COLOR_ORDER TFT_MAD_BGR
-#endif
-
 // All ILI9341 specific commands some are used by init()
 #define ILI9341_NOP     0x00
 #define ILI9341_SWRESET 0x01
