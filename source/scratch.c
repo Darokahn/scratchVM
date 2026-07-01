@@ -221,7 +221,7 @@ enum SCRATCH_continueStatus SCRATCH_processBlock(struct SCRATCH_spriteContext* c
         operation = code[thread->programCounter++];
         enum SCRATCH_continueStatus status;
         const char* opcodeName = SCRATCH_opcode_names[operation];
-        //bool loggingCondition = sprite->base.id == 12;
+        //bool loggingCondition = sprite->base.id == 2;
         bool loggingCondition = false;
         //bool loggingCondition = true;
         if (loggingCondition) {
@@ -610,4 +610,10 @@ bool equal(struct SCRATCH_data d0, struct SCRATCH_data d1) {
             d1 = cast(d1, SCRATCH_FRACTION, NULL);
             return equal(d0, d1);
     }
+}
+
+void debugData(char* message, struct SCRATCH_data d) {
+    char space[128];
+    cast(d, SCRATCH_STRING, space);
+    machineLog("%s: %.*s\n\r", message, sizeof space, space);
 }

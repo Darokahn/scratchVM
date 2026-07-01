@@ -10,6 +10,7 @@
 #define POPDEGREES() cast(stack[--stackIndex], SCRATCH_DEGREES, NULL)
 #define POPTEXT(buffer) cast(stack[--stackIndex], SCRATCH_STRING, buffer)
 #define POPDATA() stack[--stackIndex]
+#define TOP() stack[stackIndex - 1]
 #define PUSHFRACTION(value) stack[stackIndex++] = (struct SCRATCH_data) {{.number.i=value}, .type=SCRATCH_FRACTION}
 #define PUSHWHOLENUMBER(value) stack[stackIndex++] = (struct SCRATCH_data) {{.wholeNumber=(int32_t)value}, .type=SCRATCH_WHOLENUMBER}
 #define PUSHID(value) stack[stackIndex++] = (struct SCRATCH_data) {{.wholeNumber=(int32_t)value}, .type=SCRATCH_WHOLENUMBER}
@@ -202,7 +203,7 @@ case LOOKS_COSTUME: {
     break;
 }
 case LOOKS_SIZE: {
-    PUSHFRACTION((sprite->base.size << 16) / SIZERATIO);
+    PUSHFRACTION((sprite->base.size << 16) / SIZERATIO * 100);
     status = SCRATCH_continue;
     break;
 }
@@ -352,7 +353,7 @@ case SENSING_OF: {
             PUSHDEGREES(spriteOperand->base.rotation);
             break;
         case -7: // size
-            PUSHFRACTION((spriteOperand->base.size << 16) / SIZERATIO);
+            PUSHFRACTION((spriteOperand->base.size << 16) / SIZERATIO * 100);
             break;
         default: // variable
             PUSHDATA(spriteOperand->variables[id - 6]);
@@ -593,8 +594,6 @@ case DATA_SETVARIABLETO: {
         spriteOperand = sprites[spriteOperandIndex];
     }
     struct SCRATCH_data x = POPDATA();
-    char debug[300];
-    cast(x, SCRATCH_STRING, debug);
     spriteOperand->variables[varIndex] = x;
     status = SCRATCH_continue;
     break;
@@ -829,12 +828,15 @@ case MOTION_GLIDESECSTOXY: {
     scaledInt32 xDiff = {.i = x.data.number.i - sprite->base.x.i};
     scaledInt32 yDiff = {.i = y.data.number.i - sprite->base.y.i};
     uint16_t iterations = (scaledSecs.data.number.i * FRAMESPERSEC) >> 16;
-    if (iterations == 0) {
+    if (iterations == 0) iterations = 1;
+    /*
+    {
         sprite->base.x = x.data.number;
         sprite->base.y = y.data.number;
         keepInStage(context, sprite);
-        return SCRATCH_continue;
+        //skip GLIDEITERATION
     }
+    */
     *SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 0) = (struct SCRATCH_data) {{.wholeNumber=iterations}, SCRATCH_WHOLENUMBER};
     *SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 1) = x;
     *SCRATCH_vectorFromTop(&thread->threadLocals, framePos + 2) = y;

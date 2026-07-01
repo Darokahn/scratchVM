@@ -62,6 +62,7 @@ int main() {
     startIO();
     app_t app;
     selectApp(&app, "app");
+    //app.programData = (uint8_t*)programData + 8;
     while (true) {
         runApp(&app);
         closeApp(&app, 0);

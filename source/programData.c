@@ -76,7 +76,7 @@ void initProgram(const uint8_t* buffer, struct SCRATCH_spriteContext* context, c
     offsetTotal += 0;
     *eventCount = offsetTotal;
     machineLog("\n\r\n\r");
-    machineLog("%d %d %d %d %d %d %d %d %d\n\r", d->spriteCount, d->codeLength, d->inputCount, d->broadcastCount, d->backdropCount, d->codeOffset, d->spriteOffset, d->threadOffset, d->imageOffset);
+    machineLog("spriteCount: %d\n\rcodeLength: %d\n\rinputCount: %d\n\rbroadcastCount: %d\n\rbackdropCount: %d\n\rcodeOffset: %d\n\rspriteOffset: %d\n\rthreadOffset: %d\n\rimageOffset: %d\n\r", d->spriteCount, d->codeLength, d->inputCount, d->broadcastCount, d->backdropCount, d->codeOffset, d->spriteOffset, d->threadOffset, d->imageOffset);
     *code = &(buffer[d->codeOffset]);
     const struct SCRATCH_spriteHeader* spriteHeaders = (struct SCRATCH_spriteHeader*) &(buffer[d->spriteOffset]);
     const struct SCRATCH_threadHeader* threadHeaders = (struct SCRATCH_threadHeader*) &(buffer[d->threadOffset]);

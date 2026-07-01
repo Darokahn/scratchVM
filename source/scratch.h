@@ -227,4 +227,5 @@ bool rectsCollide(struct SCRATCH_rect r1, struct SCRATCH_rect r2);
 struct SCRATCH_data cast(struct SCRATCH_data d, enum SCRATCH_fieldType type, char* stringBuffer);
 
 bool equal(struct SCRATCH_data d0, struct SCRATCH_data d1);
+void debugData(char* message, struct SCRATCH_data d);
 
